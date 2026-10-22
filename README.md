@@ -16,6 +16,12 @@ The crispy variety has staged feedback: fine cracks appear under pressure, the s
 
 ![Crispy Peach after the shell breaks](docs/crispy-preview.png)
 
+The supermarket ramen pack adds an audio-visual payoff: light squeezes crinkle the wrapper, maximum pressure pops the seam with a short generated sound, and the noodle cake springs out. No downloaded sound file is needed.
+
+![Ramen pack under pressure](docs/ramen-preview.png)
+
+![Ramen pack after it pops](docs/ramen-burst-preview.png)
+
 ## 中文三步启动
 
 1. 在 Codex 中选择 **Open Folder**，打开这个 `SQUISH` 文件夹，再打开内置终端。
@@ -29,8 +35,9 @@ The crispy variety has staged feedback: fine cracks appear under pressure, the s
 - Live one-hand and two-hand tracking with OpenCV and MediaPipe
 - Hand-open / hand-closed estimation, normalised for hand size
 - Horizontal two-palm distance mapped to side pressure
-- Three tactile variations built around the same interaction: slow **Cyber Apple**, bouncy **Soft Blob**, and breakable **Crispy Peach**
-- Per-toy spring deformation, staged cracking, shell fragments, visible rebound, and automatic shell repair
+- Four tactile variations built around the same interaction: slow **Cyber Apple**, bouncy **Soft Blob**, breakable **Crispy Peach**, and noisy **Ramen Pack**
+- Per-toy spring deformation, staged cracking, wrapper crinkles, fragments, visible rebound, and automatic repair
+- Procedurally generated crinkle and pop sounds, with mute and audio-unavailable feedback
 - A squish meter, tracking status, expressive faces, and celebratory particles
 - Automatic keyboard/mouse fallback
 - Resizable Pygame window
@@ -78,8 +85,9 @@ uv run python run_squish.py --no-camera
 | Hold `Space` or left mouse | Manual squish |
 | Hold `Shift + Space` | Manual horizontal squeeze |
 | Arrow keys | Gradually adjust squish |
-| `1`, `2`, `3` | Select Cyber Apple, Soft Blob, or Crispy Peach |
+| `1`, `2`, `3`, `4` | Select Cyber Apple, Soft Blob, Crispy Peach, or Ramen Pack |
 | `Tab` | Move to the next toy |
+| `M` | Mute/unmute sound |
 | `C` | Pause or restart camera |
 | `H` | Hide/show instructions |
 | `R` | Reset the current toy |
@@ -96,6 +104,8 @@ Keyboard and mouse input temporarily take priority over the camera, so you can d
 **The wrong gesture is detected.** For one-hand mode, start with a clearly open palm, then make a clear fist. For two-hand mode, keep both palms visible and move them horizontally together or apart. Unusual angles, overlap, or a hand leaving the frame can confuse tracking. That limitation is documented honestly in `PROCESS.md`.
 
 **A package fails to install.** Confirm that `uv run python --version` reports Python 3.11 or 3.12. The project intentionally excludes Python 3.13 because MediaPipe wheel support varies by platform.
+
+**There is no sound.** Press `M` and check the control panel for `sound ON`. If it says `sound unavailable`, the computer did not provide an audio output device; the complete visual interaction still works.
 
 ## Check that the code works
 
@@ -123,7 +133,7 @@ SQUISH/
 
 | Criterion | Evidence in this repository |
 |---|---|
-| Interaction and design — 5 | One-hand closure controls vertical squish; two-hand distance controls horizontal compression. The meter, direction label, expression, cracks, particles, and rebound make the result legible. |
+| Interaction and design — 5 | One-hand closure controls vertical squish; two-hand distance controls horizontal compression. The meter, direction label, expression, cracks, particles, generated sound, and rebound make the result legible. |
 | Working implementation — 4 | Reproducible `uv` setup, pinned compatible camera libraries, camera-free fallback, automated logic tests, and documented limitations. |
 | Usability and iteration — 3 | Visible controls, camera status, reset/quit paths, denied-camera fallback, and a trial procedure in `PROCESS.md`. **The real user trial is still required.** |
 | Process and communication — 3 | README screenshots, process decisions, AI-use record, credits, and a multi-commit Git history. |
@@ -132,7 +142,7 @@ The work is due **Sunday 1 November 2026 at 23:59 Hong Kong time**. Before submi
 
 ## Sensible next steps
 
-Keep the submitted version focused. The three varieties change the tactile response but do not add separate scenes, scores, accounts, or menus. Prioritise the required user trial and tuning over adding more toys.
+Keep the submitted version focused. The four varieties change the tactile response but do not add separate scenes, scores, accounts, or menus. Prioritise the required user trial and tuning over adding more toys.
 
 ## Git checkpoint plan
 

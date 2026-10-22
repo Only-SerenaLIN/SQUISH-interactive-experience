@@ -25,7 +25,7 @@ Library versions used for a particular submission are recorded in `uv.lock` afte
 
 ## Visual and media assets
 
-All shapes, character graphics, particles, and interface elements are drawn procedurally by the Python code. There are no downloaded images, fonts, sounds, prerecorded camera clips, or third-party visual assets in prototype version 0.3.
+All shapes, character graphics, particles, interface elements, and short sound effects are generated procedurally by the Python code. There are no downloaded images, fonts, sounds, prerecorded camera clips, or third-party visual assets in prototype version 0.4.
 
 ## Interaction references
 

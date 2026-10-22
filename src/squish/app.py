@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import array
 import math
 import random
 import sys
@@ -37,6 +38,7 @@ TOYS = (
     ToySpec("CYBER APPLE", "slow, glossy, reassuring", (147, 224, 63), (74, 180, 83), 22.0, 7.5),
     ToySpec("SOFT BLOB", "bouncy original friend", PURPLE, PINK, 28.0, 8.0),
     ToySpec("CRISPY PEACH", "crack the shell, find the soft core", (255, 210, 157), (255, 116, 145), 38.0, 10.0),
+    ToySpec("RAMEN PACK", "crinkle the bag, then pop the noodles", (255, 91, 68), (255, 190, 61), 42.0, 11.0),
 )
 
 
@@ -54,6 +56,7 @@ class Particle:
 
 class SquishApp:
     def __init__(self, camera_index: int = 0, use_camera: bool = True) -> None:
+        pygame.mixer.pre_init(44100, -16, 2, 512)
         pygame.init()
         pygame.display.set_caption("SQUISH! — hand-powered stress toy")
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
@@ -77,7 +80,49 @@ class SquishApp:
         self.toy_index = 0
         self.shell_broken = False
         self.heal_timer = 0.0
+        self.sound_on = True
+        self.crinkle_cooldown = 0.0
+        self.crinkle_sound = self.make_sound("crinkle")
+        self.burst_sound = self.make_sound("burst")
+        if self.crinkle_sound is not None:
+            self.crinkle_sound.set_volume(0.28)
+        if self.burst_sound is not None:
+            self.burst_sound.set_volume(0.48)
         self.running = True
+
+    @staticmethod
+    def make_sound(kind: str) -> pygame.mixer.Sound | None:
+        """Create short tactile sounds in memory so the project needs no audio files."""
+        if pygame.mixer.get_init() is None:
+            return None
+        sample_rate = 44100
+        duration = 0.13 if kind == "crinkle" else 0.34
+        rng = random.Random(73 if kind == "crinkle" else 109)
+        samples = array.array("h")
+        previous_noise = 0.0
+        for i in range(int(sample_rate * duration)):
+            t = i / sample_rate
+            envelope = max(0.0, 1.0 - t / duration)
+            noise = rng.uniform(-1.0, 1.0)
+            crisp_noise = noise - previous_noise * 0.72
+            previous_noise = noise
+            if kind == "crinkle":
+                pulse = 1.0 if (i // 390) % 3 == 0 else 0.30
+                value = crisp_noise * envelope * pulse * 0.23
+            else:
+                thump = math.sin(math.tau * (92 - 100 * t) * t) * math.exp(-18 * t)
+                crackle = crisp_noise * envelope * (0.50 if t < 0.11 else 0.18)
+                value = thump * 0.70 + crackle
+            sample = int(max(-1.0, min(1.0, value)) * 32767)
+            samples.extend((sample, sample))
+        try:
+            return pygame.mixer.Sound(buffer=samples.tobytes())
+        except pygame.error:
+            return None
+
+    def play_sound(self, sound: pygame.mixer.Sound | None) -> None:
+        if self.sound_on and sound is not None:
+            sound.play()
 
     @property
     def toy(self) -> ToySpec:
@@ -93,6 +138,7 @@ class SquishApp:
         self.target = self.manual_target = 0.0
         self.shell_broken = False
         self.heal_timer = 0.0
+        self.crinkle_cooldown = 0.0
 
     def handle_events(self) -> None:
         for event in pygame.event.get():
@@ -107,12 +153,16 @@ class SquishApp:
                     self.help_visible = not self.help_visible
                 elif event.key == pygame.K_r:
                     self.reset_toy()
+                elif event.key == pygame.K_m:
+                    self.sound_on = not self.sound_on
                 elif event.key in (pygame.K_1, pygame.K_KP1):
                     self.select_toy(0)
                 elif event.key in (pygame.K_2, pygame.K_KP2):
                     self.select_toy(1)
                 elif event.key in (pygame.K_3, pygame.K_KP3):
                     self.select_toy(2)
+                elif event.key in (pygame.K_4, pygame.K_KP4):
+                    self.select_toy(3)
                 elif event.key == pygame.K_TAB:
                     self.select_toy(self.toy_index + 1)
 
@@ -132,12 +182,13 @@ class SquishApp:
         self.manual_target = max(0.0, self.manual_target - dt * 2.7)
         return None
 
-    def spawn_pop(self, cx: float, cy: float, *, crispy: bool = False) -> None:
-        palette = (self.toy.color, self.toy.accent, MINT, (255, 245, 200))
-        for _ in range(28 if crispy else 18):
+    def spawn_pop(self, cx: float, cy: float, *, crispy: bool = False, ramen: bool = False) -> None:
+        palette = ((244, 190, 75), (255, 226, 135), (213, 55, 45), (255, 247, 201)) if ramen else (self.toy.color, self.toy.accent, MINT, (255, 245, 200))
+        count = 38 if ramen else 28 if crispy else 18
+        for _ in range(count):
             angle = random.uniform(math.pi, 2 * math.pi)
-            speed = random.uniform(100, 290 if crispy else 230)
-            self.particles.append(Particle(cx, cy, math.cos(angle) * speed, math.sin(angle) * speed, random.uniform(0.55, 1.0), random.choice(palette), random.uniform(4, 10 if crispy else 8), crispy))
+            speed = random.uniform(100, 330 if ramen else 290 if crispy else 230)
+            self.particles.append(Particle(cx, cy, math.cos(angle) * speed, math.sin(angle) * speed, random.uniform(0.55, 1.0), random.choice(palette), random.uniform(4, 11 if crispy or ramen else 8), crispy or ramen))
 
     def update_particles(self, dt: float) -> None:
         alive = []
@@ -175,11 +226,19 @@ class SquishApp:
         self.spring.stiffness = self.toy.stiffness
         self.spring.damping = self.toy.damping
         squish = self.spring.update(self.target, dt)
-        if self.toy_index == 2 and squish > 0.82 and not self.shell_broken:
+        self.crinkle_cooldown = max(0.0, self.crinkle_cooldown - dt)
+        if self.toy_index == 3 and not self.shell_broken:
+            crossed_crinkle = any(self.last_squish <= level < squish for level in (0.22, 0.43, 0.64))
+            if crossed_crinkle and self.crinkle_cooldown <= 0:
+                self.play_sound(self.crinkle_sound)
+                self.crinkle_cooldown = 0.12
+
+        if self.toy_index in (2, 3) and squish > (0.86 if self.toy_index == 3 else 0.82) and not self.shell_broken:
             self.shell_broken = True
             w, h = self.screen.get_size()
-            self.spawn_pop(w * 0.5, h * 0.49, crispy=True)
-        elif self.toy_index != 2 and squish > 0.80 and self.last_squish <= 0.80:
+            self.spawn_pop(w * 0.5, h * 0.49, crispy=True, ramen=self.toy_index == 3)
+            self.play_sound(self.burst_sound)
+        elif self.toy_index not in (2, 3) and squish > 0.80 and self.last_squish <= 0.80:
             w, h = self.screen.get_size()
             self.spawn_pop(w * 0.5, h * 0.52)
 
@@ -306,6 +365,66 @@ class SquishApp:
             pygame.draw.polygon(surface, (255, 218, 173), [(cx + (x - cx) * 0.93, cy + (y - cy) * 0.93) for x, y in poly])
         self.draw_face(surface, cx, cy + 8 * scale, core_w, core_h, scale, s)
 
+    def draw_ramen_cake(self, surface: pygame.Surface, cx: float, cy: float, width: float, height: float, scale: float) -> None:
+        cake = pygame.Rect(0, 0, width, height)
+        cake.center = (cx, cy)
+        pygame.draw.rect(surface, INK, cake, border_radius=max(8, int(18 * scale)))
+        inner = cake.inflate(-9 * scale, -9 * scale)
+        pygame.draw.rect(surface, (247, 201, 91), inner, border_radius=max(6, int(14 * scale)))
+        for row in range(7):
+            points = []
+            for column in range(18):
+                x = inner.left + column / 17 * inner.width
+                y = inner.top + (row + 0.6) / 7 * inner.height + math.sin(column * 1.75 + row) * 4 * scale
+                points.append((x, y))
+            pygame.draw.lines(surface, (196, 132, 45), False, points, max(1, int(3 * scale)))
+
+    def draw_ramen(self, surface: pygame.Surface, cx: float, cy: float, scale: float) -> None:
+        s = clamp(self.spring.value)
+        width, height = self.deformed_size(330, 285, s, 0.30, 0.36, scale)
+        cy += 38 * s if self.squeeze_axis == "vertical" else 0
+        self.draw_shadow(surface, cx, cy + height * 0.54, width, scale)
+        if self.shell_broken:
+            self.draw_ramen_cake(surface, cx, cy + 8 * scale, width * 0.70, height * 0.62, scale)
+            tear = 30 * scale
+            left = [(cx - width * 0.48, cy - height * 0.44), (cx - width * 0.18, cy - height * 0.34), (cx - width * 0.29, cy + height * 0.39), (cx - width * 0.58, cy + height * 0.26)]
+            right = [(cx + width * 0.48, cy - height * 0.44), (cx + width * 0.18, cy - height * 0.34), (cx + width * 0.29, cy + height * 0.39), (cx + width * 0.58, cy + height * 0.26)]
+            for piece in (left, right):
+                pygame.draw.polygon(surface, INK, piece)
+                inset = [(x + (cx - x) * 0.035, y + (cy - y) * 0.035) for x, y in piece]
+                pygame.draw.polygon(surface, self.toy.color, inset)
+            pygame.draw.line(surface, (255, 225, 140), (cx - tear, cy - height * 0.36), (cx, cy - height * 0.25), max(3, int(5 * scale)))
+            self.draw_face(surface, cx, cy + 10 * scale, width * 0.62, height * 0.54, scale, s)
+            return
+
+        bag = pygame.Rect(0, 0, width, height)
+        bag.center = (cx, cy)
+        pygame.draw.rect(surface, INK, bag, border_radius=max(12, int(35 * scale)))
+        inner = bag.inflate(-10 * scale, -10 * scale)
+        pygame.draw.rect(surface, self.toy.color, inner, border_radius=max(10, int(30 * scale)))
+        seal_h = max(12, int(20 * scale))
+        pygame.draw.rect(surface, (255, 210, 82), (inner.left, inner.top, inner.width, seal_h), border_radius=max(3, int(8 * scale)))
+        pygame.draw.rect(surface, (255, 210, 82), (inner.left, inner.bottom - seal_h, inner.width, seal_h), border_radius=max(3, int(8 * scale)))
+        label = pygame.Rect(0, 0, width * 0.64, height * 0.50)
+        label.center = (cx, cy)
+        pygame.draw.rect(surface, (255, 241, 191), label, border_radius=max(8, int(22 * scale)))
+        bowl = pygame.Rect(0, 0, label.width * 0.58, label.height * 0.40)
+        bowl.center = (cx, cy + label.height * 0.13)
+        pygame.draw.arc(surface, (218, 74, 49), bowl, 0, math.pi, max(3, int(7 * scale)))
+        for offset in (-0.16, 0.0, 0.16):
+            x = cx + label.width * offset
+            pygame.draw.arc(surface, (224, 154, 48), (x - 19 * scale, cy - 30 * scale, 38 * scale, 62 * scale), 0, math.pi, max(2, int(4 * scale)))
+        crinkle_count = 1 + int(s * 6)
+        for index in range(crinkle_count):
+            y = inner.top + (index + 1) * inner.height / (crinkle_count + 1)
+            side = -1 if index % 2 == 0 else 1
+            x1 = cx + side * width * 0.47
+            x2 = cx + side * width * (0.28 - 0.04 * s)
+            pygame.draw.line(surface, (171, 49, 47), (x1, y), (x2, y + (12 if index % 3 else -12) * scale), max(1, int(3 * scale)))
+        if s > 0.68:
+            pygame.draw.lines(surface, (94, 38, 42), False, [(cx, inner.top), (cx - 15 * scale, cy - height * 0.30), (cx + 8 * scale, cy - height * 0.20)], max(2, int(4 * scale)))
+        self.draw_face(surface, cx, cy + 22 * scale, width * 0.58, height * 0.46, scale, s)
+
     def draw_particles(self, surface: pygame.Surface) -> None:
         for p in self.particles:
             size = max(1, int(p.size * clamp(p.life * 2)))
@@ -342,7 +461,11 @@ class SquishApp:
         pygame.draw.rect(surface, (255, 255, 255), panel, border_radius=22)
         pygame.draw.rect(surface, (224, 213, 235), panel, 2, border_radius=22)
         surface.blit(self.font.render("1 hand: close fist   |   2 hands: move together", True, INK), (panel.x + 22, panel.y + 14))
-        line = "SPACE = squish  |  SHIFT + SPACE = side squeeze  |  1 2 3 toys  |  C camera  |  R reset  |  ESC quit"
+        if self.burst_sound is None:
+            sound_label = "sound unavailable"
+        else:
+            sound_label = "sound ON" if self.sound_on else "sound OFF"
+        line = f"SPACE squish  |  SHIFT + SPACE side squeeze  |  1–4 toys  |  M {sound_label}  |  C camera  |  R reset  |  ESC quit"
         surface.blit(self.font_tiny.render(line, True, (99, 80, 116)), (panel.x + 22, panel.y + 51))
 
     def draw(self, status: str, active: bool) -> None:
@@ -359,8 +482,10 @@ class SquishApp:
             self.draw_apple(self.screen, cx, cy, scale)
         elif self.toy_index == 1:
             self.draw_blob(self.screen, cx, cy, scale)
-        else:
+        elif self.toy_index == 2:
             self.draw_crispy(self.screen, cx, cy, scale)
+        else:
+            self.draw_ramen(self.screen, cx, cy, scale)
         self.draw_particles(self.screen)
         meter_w = min(300, int(w * 0.34))
         meter = pygame.Rect(w // 2 - meter_w // 2, int(h * 0.73), meter_w, 14)
@@ -369,7 +494,7 @@ class SquishApp:
         fill.width = int(meter.width * clamp(self.spring.value))
         pygame.draw.rect(self.screen, self.toy.accent, fill, border_radius=7)
         if self.shell_broken:
-            label = "CRACK! release to regrow the shell"
+            label = "POP! release to reseal the pack" if self.toy_index == 3 else "CRACK! release to regrow the shell"
         else:
             direction = "side squeeze" if self.squeeze_axis == "horizontal" else "squish level"
             label = f"{direction}  {round(clamp(self.spring.value) * 100):02d}%"

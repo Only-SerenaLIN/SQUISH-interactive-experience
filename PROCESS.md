@@ -58,16 +58,17 @@ With one hand, the program calculates an openness value from 0 to 1 and inverts 
 - [x] Keyboard and mouse fallback
 - [x] Camera pause/retry control
 - [x] Camera-free automated tests for core maths
-- [x] Three selectable tactile responses using the same input loop
+- [x] Four selectable tactile responses using the same input loop
 - [x] Progressive cracks, shell burst, soft core, and automatic repair
 - [x] Two-hand horizontal squeeze with distinct deformation feedback
 - [x] `Shift + Space` camera-free demonstration of two-hand mode
+- [x] Supermarket ramen pack with pressure wrinkles, burst state, and noodle debris
+- [x] Procedurally generated crinkle/pop audio, mute control, and silent fallback
 
 ### Optional — not implemented
 
 - [ ] Colour selection
-- [ ] Sound and haptic-like audio feedback
-- [ ] Sound feedback (deliberately deferred)
+- [ ] User-adjustable sound volume
 
 These remain optional so that testing and refinement can focus on the main gesture.
 
@@ -80,6 +81,7 @@ These remain optional so that testing and refinement can focus on the main gestu
 | Exponential signal smoothing | Reduces landmark jitter | Adds a small amount of lag |
 | Spring animation | Creates a soft rebound from a single number | Needs careful tuning to avoid excessive wobble |
 | Lazy camera imports/fallback | Keeps the artwork usable when camera access fails | Camera errors are shown as status text rather than a setup wizard |
+| Generated sound in memory | Adds tactile feedback without borrowed assets or missing files | It is deliberately short and synthetic rather than realistic |
 
 ### Privacy note
 
@@ -112,20 +114,28 @@ Camera frames are processed in memory and are not displayed, recorded, uploaded,
 - Made horizontal pressure visibly narrow and raise the toy instead of reusing the one-hand flattening animation.
 - Added a dedicated status message, meter label, on-screen instruction, keyboard fallback, screenshot, and automated mapping test.
 
+### Prototype 0.4 — supermarket ramen and sound
+
+- Added a fourth toy shaped like a supermarket instant-noodle packet.
+- Connected increasing pressure to visible wrapper wrinkles and three short crinkle sounds.
+- Added a higher burst threshold that tears the packet open, reveals a drawn noodle cake, launches crumbs, and plays a pop/crunch sound.
+- Generated all audio from code at launch instead of adding a downloaded recording.
+- Added `M` mute control and visible `sound unavailable` feedback so audio-device failure never blocks the experience.
+
 ### AI collaboration record
 
-OpenAI Codex was used to scaffold the Python project, implement and test the camera/fallback loop, propose visual feedback, and draft documentation. A suggestion that was **kept** was separating the gesture maths from the Pygame drawing code, because it makes the input-to-response logic testable without a webcam. An early suggestion to add only simple colour choices was **changed** after the student supplied a tactile reference: the final variants change rebound and fracture behaviour, not just decoration. Procedural crack audio was considered and **rejected for this version** because sound-device failure would add setup risk; staged visual cracks and fragments provide the required feedback more reliably.
+OpenAI Codex was used to scaffold the Python project, implement and test the camera/fallback loop, propose visual feedback, and draft documentation. A suggestion that was **kept** was separating the gesture maths from the Pygame drawing code, because it makes the input-to-response logic testable without a webcam. An early suggestion to add only simple colour choices was **changed** after the student supplied a tactile reference: the final variants change rebound and fracture behaviour, not just decoration. A first proposal to omit audio was later **rejected** after the student requested a supermarket ramen pack with sound; the revised design generates short sounds in memory and preserves a silent fallback.
 
 The student must review this account, edit it into their own voice, and ensure it matches the final work before submission.
 
 ### Known limitations before user testing
 
 - Hand openness is heuristic and may vary with hand angle, lighting, and distance.
-- The app tracks one hand only.
-- Visual feedback is the only sensory output; there is no sound in this version.
+- Two-hand distance is measured horizontally, so overlapping hands or strong camera angles can confuse it.
+- Sound depends on the computer providing an output device; visual feedback remains complete without it.
 - Camera access must be granted to the app that launches the Python process.
 - The visual design has been checked programmatically and by the developer, not evaluated by external users.
-- The brittle shell is a visual simulation; audio is not included.
+- The brittle shell and ramen burst are playful simulations, not physically realistic.
 
 ## 8. User trial — not conducted yet
 
