@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from squish.gesture import SpringValue, clamp, hand_openness, remap_clamped
+from squish.gesture import SpringValue, clamp, hand_openness, remap_clamped, two_hand_squish
 
 
 @dataclass
@@ -49,4 +49,15 @@ def test_spring_moves_toward_target() -> None:
     values = [spring.update(1.0, 1 / 60) for _ in range(20)]
     assert values[-1] > values[0]
     assert 0 <= values[-1] <= 1.08
+
+
+def shifted_hand(offset: float) -> list[Point]:
+    return [Point(point.x + offset, point.y) for point in make_hand(True)]
+
+
+def test_two_hands_get_more_pressure_as_they_move_together() -> None:
+    left = shifted_hand(-0.25)
+    far_right = shifted_hand(0.25)
+    near_right = shifted_hand(-0.05)
+    assert two_hand_squish(left, near_right) > two_hand_squish(left, far_right)
 

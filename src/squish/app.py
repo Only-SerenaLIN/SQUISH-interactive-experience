@@ -73,6 +73,7 @@ class SquishApp:
         self.help_visible = True
         self.particles: list[Particle] = []
         self.last_squish = 0.0
+        self.squeeze_axis = "vertical"
         self.toy_index = 0
         self.shell_broken = False
         self.heal_timer = 0.0
@@ -115,18 +116,19 @@ class SquishApp:
                 elif event.key == pygame.K_TAB:
                     self.select_toy(self.toy_index + 1)
 
-    def manual_input(self, dt: float) -> float | None:
+    def manual_input(self, dt: float) -> tuple[float, str] | None:
         keys = pygame.key.get_pressed()
         mouse_pressed = pygame.mouse.get_pressed(num_buttons=3)[0]
+        axis = "horizontal" if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT] else "vertical"
         if keys[pygame.K_SPACE] or mouse_pressed:
             self.manual_target = min(1.0, self.manual_target + dt * 3.8)
-            return self.manual_target
+            return self.manual_target, axis
         if keys[pygame.K_DOWN] or keys[pygame.K_RIGHT]:
             self.manual_target = min(1.0, self.manual_target + dt * 1.6)
-            return self.manual_target
+            return self.manual_target, "vertical"
         if keys[pygame.K_UP] or keys[pygame.K_LEFT]:
             self.manual_target = max(0.0, self.manual_target - dt * 1.6)
-            return self.manual_target
+            return self.manual_target, "vertical"
         self.manual_target = max(0.0, self.manual_target - dt * 2.7)
         return None
 
@@ -154,11 +156,19 @@ class SquishApp:
         camera_result = self.camera.read()
         manual = self.manual_input(dt)
         if manual is not None:
-            self.target, status, active = manual, "Manual squish", True
+            self.target, self.squeeze_axis = manual
+            status = "Manual side squeeze" if self.squeeze_axis == "horizontal" else "Manual squish"
+            active = True
+        elif camera_result.horizontal_squish is not None:
+            self.target = camera_result.horizontal_squish
+            self.manual_target = self.target
+            self.squeeze_axis = "horizontal"
+            status, active = camera_result.message, camera_result.hands_visible == 2
         elif camera_result.openness is not None:
             self.target = clamp(1.0 - camera_result.openness)
             self.manual_target = self.target
-            status, active = camera_result.message, camera_result.hand_visible
+            self.squeeze_axis = "vertical"
+            status, active = camera_result.message, camera_result.hands_visible == 1
         else:
             self.target, status, active = self.manual_target, camera_result.message, False
 
@@ -188,6 +198,19 @@ class SquishApp:
     def ellipse_points(cx: float, cy: float, width: float, height: float, count: int = 72) -> list[tuple[float, float]]:
         return [(cx + math.cos(i / count * math.tau) * width / 2, cy + math.sin(i / count * math.tau) * height / 2) for i in range(count)]
 
+    def deformed_size(
+        self,
+        base_width: float,
+        base_height: float,
+        s: float,
+        vertical_spread: float,
+        vertical_flatten: float,
+        scale: float,
+    ) -> tuple[float, float]:
+        if self.squeeze_axis == "horizontal":
+            return base_width * (1 - 0.40 * s) * scale, base_height * (1 + 0.28 * s) * scale
+        return base_width * (1 + vertical_spread * s) * scale, base_height * (1 - vertical_flatten * s) * scale
+
     def draw_face(self, surface: pygame.Surface, cx: float, cy: float, width: float, height: float, scale: float, s: float) -> None:
         eye_y = cy - height * (0.07 - 0.03 * s)
         eye_gap = width * 0.16
@@ -209,8 +232,8 @@ class SquishApp:
 
     def draw_blob(self, surface: pygame.Surface, cx: float, cy: float, scale: float) -> None:
         s = clamp(self.spring.value)
-        width, height = 290 * (1 + 0.46 * s) * scale, 300 * (1 - 0.48 * s) * scale
-        cy += 42 * s + math.sin(pygame.time.get_ticks() * 0.004) * 4 * (1 - s)
+        width, height = self.deformed_size(290, 300, s, 0.46, 0.48, scale)
+        cy += (42 * s if self.squeeze_axis == "vertical" else 0) + math.sin(pygame.time.get_ticks() * 0.004) * 4 * (1 - s)
         self.draw_shadow(surface, cx, cy + height * 0.5, width, scale)
         points, now = [], pygame.time.get_ticks() * 0.002
         for i in range(72):
@@ -226,8 +249,8 @@ class SquishApp:
 
     def draw_apple(self, surface: pygame.Surface, cx: float, cy: float, scale: float) -> None:
         s = clamp(self.spring.value)
-        width, height = 300 * (1 + 0.36 * s) * scale, 300 * (1 - 0.42 * s) * scale
-        cy += 40 * s + math.sin(pygame.time.get_ticks() * 0.003) * 3 * (1 - s)
+        width, height = self.deformed_size(300, 300, s, 0.36, 0.42, scale)
+        cy += (40 * s if self.squeeze_axis == "vertical" else 0) + math.sin(pygame.time.get_ticks() * 0.003) * 3 * (1 - s)
         self.draw_shadow(surface, cx, cy + height * 0.51, width, scale)
         points = []
         for i in range(84):
@@ -258,8 +281,8 @@ class SquishApp:
 
     def draw_crispy(self, surface: pygame.Surface, cx: float, cy: float, scale: float) -> None:
         s = clamp(self.spring.value)
-        width, height = 305 * (1 + 0.40 * s) * scale, 285 * (1 - 0.40 * s) * scale
-        cy += 40 * s
+        width, height = self.deformed_size(305, 285, s, 0.40, 0.40, scale)
+        cy += 40 * s if self.squeeze_axis == "vertical" else 0
         self.draw_shadow(surface, cx, cy + height * 0.53, width, scale)
         if not self.shell_broken:
             points = self.ellipse_points(cx, cy, width, height)
@@ -318,8 +341,8 @@ class SquishApp:
         panel = pygame.Rect(26, h - 112, min(735, w - 52), 84)
         pygame.draw.rect(surface, (255, 255, 255), panel, border_radius=22)
         pygame.draw.rect(surface, (224, 213, 235), panel, 2, border_radius=22)
-        surface.blit(self.font.render("Open hand = release   |   Close fist = squish", True, INK), (panel.x + 22, panel.y + 14))
-        line = "SPACE / mouse fallback  |  1 2 3 choose toy  |  C camera  |  R reset  |  H help  |  ESC quit"
+        surface.blit(self.font.render("1 hand: close fist   |   2 hands: move together", True, INK), (panel.x + 22, panel.y + 14))
+        line = "SPACE = squish  |  SHIFT + SPACE = side squeeze  |  1 2 3 toys  |  C camera  |  R reset  |  ESC quit"
         surface.blit(self.font_tiny.render(line, True, (99, 80, 116)), (panel.x + 22, panel.y + 51))
 
     def draw(self, status: str, active: bool) -> None:
@@ -345,7 +368,11 @@ class SquishApp:
         fill = meter.copy()
         fill.width = int(meter.width * clamp(self.spring.value))
         pygame.draw.rect(self.screen, self.toy.accent, fill, border_radius=7)
-        label = "CRACK! release to regrow the shell" if self.shell_broken else f"squish level  {round(clamp(self.spring.value) * 100):02d}%"
+        if self.shell_broken:
+            label = "CRACK! release to regrow the shell"
+        else:
+            direction = "side squeeze" if self.squeeze_axis == "horizontal" else "squish level"
+            label = f"{direction}  {round(clamp(self.spring.value) * 100):02d}%"
         text = self.font_small.render(label, True, INK)
         self.screen.blit(text, (meter.centerx - text.get_width() // 2, meter.y + 22))
         self.draw_status(self.screen, status, active, w)

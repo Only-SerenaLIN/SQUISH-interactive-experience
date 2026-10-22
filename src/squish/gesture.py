@@ -67,6 +67,21 @@ def hand_openness(landmarks: Sequence[PointLike]) -> float:
     return clamp(extensions[0] * 0.12 + sum(extensions[1:]) * 0.22)
 
 
+def two_hand_squish(hand_a: Sequence[PointLike], hand_b: Sequence[PointLike]) -> float:
+    """Return 0..1 horizontal pressure from the gap between two palms.
+
+    MediaPipe coordinates are normalised to the camera frame. Hands far apart
+    release the toy; bringing their palm centres together compresses it.
+    """
+    if len(hand_a) < 21 or len(hand_b) < 21:
+        raise ValueError("Each MediaPipe hand supplies 21 landmarks")
+    palm_ids = (0, 5, 9, 13, 17)
+    centre_a = sum(hand_a[i].x for i in palm_ids) / len(palm_ids)
+    centre_b = sum(hand_b[i].x for i in palm_ids) / len(palm_ids)
+    gap = abs(centre_a - centre_b)
+    return 1.0 - remap_clamped(gap, 0.13, 0.58)
+
+
 @dataclass
 class SpringValue:
     """A soft spring used for deformation and rebound."""
