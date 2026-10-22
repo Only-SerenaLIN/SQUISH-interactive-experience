@@ -25,7 +25,14 @@ Library versions used for a particular submission are recorded in `uv.lock` afte
 
 ## Visual and media assets
 
-All shapes, character graphics, particles, and interface elements are drawn procedurally by the Python code. There are no downloaded images, fonts, sounds, prerecorded camera clips, or third-party visual assets in version 0.1.
+All shapes, character graphics, particles, and interface elements are drawn procedurally by the Python code. There are no downloaded images, fonts, sounds, prerecorded camera clips, or third-party visual assets in prototype version 0.2.
+
+## Interaction references
+
+- A user-supplied Xiaohongshu post titled “捏一下赛博青苹果来哄自己开心” inspired the green-apple theme and the request for more tactile variation. The short link could not be fetched in the development environment, so no imagery, code, audio, or text was copied from it: <https://xhslink.cn/o/6Nkve3BQzjj>
+- CBNData's article on crispy squishies was consulted for general context about progressive breaking and immediate sensory feedback: <https://www.cbndata.com/information/295843>
+
+These are interaction references, not source assets.
 
 ## Data and privacy
 

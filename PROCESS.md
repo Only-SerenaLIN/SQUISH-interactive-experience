@@ -4,7 +4,7 @@
 
 ## 1. Concept
 
-SQUISH! turns a familiar physical stress-relief action into a screen-based interaction. A person opens and closes one hand; a soft character releases and compresses in response. The project aims to make computer vision feel playful and immediately understandable rather than technical.
+SQUISH! turns a familiar physical stress-relief action into a screen-based interaction. A person opens and closes one hand; a selected digital toy releases and compresses in response. The project aims to make computer vision feel playful and immediately understandable rather than technical.
 
 ### One-sentence pitch
 
@@ -58,12 +58,14 @@ The program calculates an openness value from 0 to 1. It inverts that value into
 - [x] Keyboard and mouse fallback
 - [x] Camera pause/retry control
 - [x] Camera-free automated tests for core maths
+- [x] Three selectable tactile responses using the same input loop
+- [x] Progressive cracks, shell burst, soft core, and automatic repair
 
 ### Optional — not implemented
 
 - [ ] Colour selection
 - [ ] Sound and haptic-like audio feedback
-- [ ] A second squishy character
+- [ ] Sound feedback (deliberately deferred)
 
 These remain optional so that testing and refinement can focus on the main gesture.
 
@@ -92,6 +94,21 @@ Camera frames are processed in memory and are not displayed, recorded, uploaded,
 - Added manual controls so the interaction can always be demonstrated.
 - Added beginner-facing setup and troubleshooting guidance.
 
+### Prototype 0.2 — implemented after visual-reference discussion
+
+- Reframed the original purple blob as a small tactile collection without changing the core loop.
+- Added a glossy green apple with slower, calmer rebound.
+- Added a crispy peach whose shell visibly cracks in three stages before bursting.
+- Added a soft inner core and an automatic repair state when the user releases.
+- Added number-key selection and distinct stiffness/damping for each variety.
+- Kept all visuals procedural; no imagery was copied from the reference post.
+
+### AI collaboration record
+
+OpenAI Codex was used to scaffold the Python project, implement and test the camera/fallback loop, propose visual feedback, and draft documentation. A suggestion that was **kept** was separating the gesture maths from the Pygame drawing code, because it makes the input-to-response logic testable without a webcam. An early suggestion to add only simple colour choices was **changed** after the student supplied a tactile reference: the final variants change rebound and fracture behaviour, not just decoration. Procedural crack audio was considered and **rejected for this version** because sound-device failure would add setup risk; staged visual cracks and fragments provide the required feedback more reliably.
+
+The student must review this account, edit it into their own voice, and ensure it matches the final work before submission.
+
 ### Known limitations before user testing
 
 - Hand openness is heuristic and may vary with hand angle, lighting, and distance.
@@ -99,6 +116,7 @@ Camera frames are processed in memory and are not displayed, recorded, uploaded,
 - Visual feedback is the only sensory output; there is no sound in this version.
 - Camera access must be granted to the app that launches the Python process.
 - The visual design has been checked programmatically and by the developer, not evaluated by external users.
+- The brittle shell is a visual simulation; audio is not included.
 
 ## 8. User trial — not conducted yet
 
@@ -131,7 +149,25 @@ Camera frames are processed in memory and are not displayed, recorded, uploaded,
 
 _Intentionally left blank until a real trial is completed._
 
-## 9. Reflection prompts for submission
+### Required iteration commit after the trial
+
+After recording the observation, make one justified change (or clearly explain why the evidence supports keeping the design) and commit it separately, for example: `fix: make crispy shell reset clearer after user trial`. This commit does not exist yet.
+
+## 9. Assignment submission checklist
+
+- [x] Working source and procedural assets are included.
+- [x] Exact `uv` setup and run commands are documented.
+- [x] Camera denial/unavailability has a keyboard and mouse fallback.
+- [x] README includes screenshots, intended audience, interaction, and limitations.
+- [x] AI assistance, kept/changed suggestions, and credits are documented.
+- [x] Development history contains multiple meaningful commits.
+- [ ] At least one other person has tried the experience.
+- [ ] Observation and one resulting decision are recorded above.
+- [ ] The post-trial change/decision is committed and pushed.
+- [ ] The public GitHub repository opens while signed out.
+- [ ] The repository URL is submitted to Canvas before 23:59 HKT on 1 November 2026.
+
+## 10. Reflection prompts for submission
 
 After the real trial, answer these in your own voice:
 

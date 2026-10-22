@@ -1,10 +1,14 @@
 # SQUISH!
 
-**SQUISH!** is a small interactive digital stress toy. Open your hand in front of the webcam to let the character rebound; close your fist to squash it. If the camera is unavailable, the complete interaction still works with the keyboard or mouse.
+**SQUISH!** is a small interactive digital stress-toy collection. Open your hand in front of the webcam to let the selected toy rebound; close your fist to squash it. If the camera is unavailable, the complete interaction still works with the keyboard or mouse.
 
 This is a deliberately manageable Assignment 3 prototype: one clear interaction, immediate visual feedback, a strong visual identity, and enough technical depth to demonstrate webcam-based embodied input without turning the project into a large game.
 
 ![SQUISH preview](docs/preview.png)
+
+The crispy variety has staged feedback: fine cracks appear under pressure, the shell bursts to reveal a soft core, and releasing the toy regrows its shell.
+
+![Crispy Peach after the shell breaks](docs/crispy-preview.png)
 
 ## 中文三步启动
 
@@ -18,8 +22,9 @@ This is a deliberately manageable Assignment 3 prototype: one clear interaction,
 
 - Live one-hand tracking with OpenCV and MediaPipe
 - Hand-open / hand-closed estimation, normalised for hand size
-- Soft spring deformation and visible rebound
-- A squish meter, tracking status, expressive face, and celebratory particles
+- Three tactile variations built around the same interaction: slow **Cyber Apple**, bouncy **Soft Blob**, and breakable **Crispy Peach**
+- Per-toy spring deformation, staged cracking, shell fragments, visible rebound, and automatic shell repair
+- A squish meter, tracking status, expressive faces, and celebratory particles
 - Automatic keyboard/mouse fallback
 - Resizable Pygame window
 - No photos or video frames are saved
@@ -64,6 +69,8 @@ uv run python run_squish.py --no-camera
 | Closed fist | Squish |
 | Hold `Space` or left mouse | Manual squish |
 | Arrow keys | Gradually adjust squish |
+| `1`, `2`, `3` | Select Cyber Apple, Soft Blob, or Crispy Peach |
+| `Tab` | Move to the next toy |
 | `C` | Pause or restart camera |
 | `H` | Hide/show instructions |
 | `R` | Reset the blob |
@@ -103,9 +110,20 @@ SQUISH/
 └── pyproject.toml          # Python and dependency setup
 ```
 
+## Assignment fit (15 marks)
+
+| Criterion | Evidence in this repository |
+|---|---|
+| Interaction and design — 5 | Deliberate hand/keyboard input continuously controls deformation; the meter, expression, cracks, particles, and rebound make the result legible. |
+| Working implementation — 4 | Reproducible `uv` setup, pinned compatible camera libraries, camera-free fallback, automated logic tests, and documented limitations. |
+| Usability and iteration — 3 | Visible controls, camera status, reset/quit paths, denied-camera fallback, and a trial procedure in `PROCESS.md`. **The real user trial is still required.** |
+| Process and communication — 3 | README screenshots, process decisions, AI-use record, credits, and a multi-commit Git history. |
+
+The work is due **Sunday 1 November 2026 at 23:59 Hong Kong time**. Before submitting, conduct the required real user trial, record one evidence-based decision in `PROCESS.md`, push that commit, and test the public GitHub URL while signed out.
+
 ## Sensible next steps
 
-Keep the submitted version focused. If the core interaction is reliable, one optional extension is to let the user choose between two blob colours. Avoid adding accounts, saved galleries, multiple scenes, or complex menus before the hand interaction has been observed with real users.
+Keep the submitted version focused. The three varieties change the tactile response but do not add separate scenes, scores, accounts, or menus. Prioritise the required user trial and tuning over adding more toys.
 
 ## Git checkpoint plan
 
