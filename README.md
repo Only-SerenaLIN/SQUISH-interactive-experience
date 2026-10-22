@@ -1,5 +1,7 @@
 # SQUISH!
 
+Public repository: <https://github.com/Only-SerenaLIN/SQUISH-interactive-experience>
+
 **SQUISH!** is a small interactive digital stress-toy collection. Open your hand in front of the webcam to let the selected toy rebound; close your fist to squash it. If the camera is unavailable, the complete interaction still works with the keyboard or mouse.
 
 This is a deliberately manageable Assignment 3 prototype: one clear interaction, immediate visual feedback, a strong visual identity, and enough technical depth to demonstrate webcam-based embodied input without turning the project into a large game.
