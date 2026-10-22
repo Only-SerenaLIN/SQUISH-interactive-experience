@@ -2,11 +2,15 @@
 
 Public repository: <https://github.com/Only-SerenaLIN/SQUISH-interactive-experience>
 
-**SQUISH!** is a small interactive digital stress-toy collection. Open your hand in front of the webcam to let the selected toy rebound; close your fist to squash it. If the camera is unavailable, the complete interaction still works with the keyboard or mouse.
+**SQUISH!** is a small interactive digital stress-toy collection. With one hand, close your fist to squash the selected toy and open it to release. With two hands, move your palms together to squeeze it from both sides and move them apart to rebound. If the camera is unavailable, the complete interaction still works with the keyboard or mouse.
 
 This is a deliberately manageable Assignment 3 prototype: one clear interaction, immediate visual feedback, a strong visual identity, and enough technical depth to demonstrate webcam-based embodied input without turning the project into a large game.
 
 ![SQUISH preview](docs/preview.png)
+
+Two-hand mode changes the deformation direction: the toy narrows horizontally and bulges upward as both hands move together.
+
+![Cyber Apple in two-hand side-squeeze mode](docs/two-hand-preview.png)
 
 The crispy variety has staged feedback: fine cracks appear under pressure, the shell bursts to reveal a soft core, and releasing the toy regrows its shell.
 
@@ -22,8 +26,9 @@ The crispy variety has staged feedback: fine cracks appear under pressure, the s
 
 ## What the prototype includes
 
-- Live one-hand tracking with OpenCV and MediaPipe
+- Live one-hand and two-hand tracking with OpenCV and MediaPipe
 - Hand-open / hand-closed estimation, normalised for hand size
+- Horizontal two-palm distance mapped to side pressure
 - Three tactile variations built around the same interaction: slow **Cyber Apple**, bouncy **Soft Blob**, and breakable **Crispy Peach**
 - Per-toy spring deformation, staged cracking, shell fragments, visible rebound, and automatic shell repair
 - A squish meter, tracking status, expressive faces, and celebratory particles
@@ -69,13 +74,15 @@ uv run python run_squish.py --no-camera
 |---|---|
 | Open hand | Release and rebound |
 | Closed fist | Squish |
+| Two hands moving together/apart | Horizontal squeeze/release |
 | Hold `Space` or left mouse | Manual squish |
+| Hold `Shift + Space` | Manual horizontal squeeze |
 | Arrow keys | Gradually adjust squish |
 | `1`, `2`, `3` | Select Cyber Apple, Soft Blob, or Crispy Peach |
 | `Tab` | Move to the next toy |
 | `C` | Pause or restart camera |
 | `H` | Hide/show instructions |
-| `R` | Reset the blob |
+| `R` | Reset the current toy |
 | `Esc` or `Q` | Quit |
 
 Keyboard and mouse input temporarily take priority over the camera, so you can demonstrate both modes during one run.
@@ -86,7 +93,7 @@ Keyboard and mouse input temporarily take priority over the camera, so you can d
 
 **The hand signal feels jumpy.** Keep one hand visible, face the palm toward the camera, use even lighting, and keep your wrist and fingertips inside the frame. The prototype smooths the reading but intentionally stays responsive.
 
-**The wrong gesture is detected.** Start with a clearly open palm, then make a clear fist. This version estimates openness from fingertip distances; unusual hand angles can confuse it. That limitation is documented honestly in `PROCESS.md`.
+**The wrong gesture is detected.** For one-hand mode, start with a clearly open palm, then make a clear fist. For two-hand mode, keep both palms visible and move them horizontally together or apart. Unusual angles, overlap, or a hand leaving the frame can confuse tracking. That limitation is documented honestly in `PROCESS.md`.
 
 **A package fails to install.** Confirm that `uv run python --version` reports Python 3.11 or 3.12. The project intentionally excludes Python 3.13 because MediaPipe wheel support varies by platform.
 
@@ -96,7 +103,7 @@ Keyboard and mouse input temporarily take priority over the camera, so you can d
 uv run pytest
 ```
 
-These tests cover the gesture score, range mapping, invalid input, and spring movement without needing a webcam or display.
+These tests cover the one-hand gesture score, two-hand distance mapping, range mapping, invalid input, and spring movement without needing a webcam or display.
 
 ## Project map
 
@@ -116,7 +123,7 @@ SQUISH/
 
 | Criterion | Evidence in this repository |
 |---|---|
-| Interaction and design — 5 | Deliberate hand/keyboard input continuously controls deformation; the meter, expression, cracks, particles, and rebound make the result legible. |
+| Interaction and design — 5 | One-hand closure controls vertical squish; two-hand distance controls horizontal compression. The meter, direction label, expression, cracks, particles, and rebound make the result legible. |
 | Working implementation — 4 | Reproducible `uv` setup, pinned compatible camera libraries, camera-free fallback, automated logic tests, and documented limitations. |
 | Usability and iteration — 3 | Visible controls, camera status, reset/quit paths, denied-camera fallback, and a trial procedure in `PROCESS.md`. **The real user trial is still required.** |
 | Process and communication — 3 | README screenshots, process decisions, AI-use record, credits, and a multi-commit Git history. |

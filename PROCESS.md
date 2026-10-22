@@ -29,12 +29,12 @@ This is a creative prototype, not a medical or therapeutic product.
 ## 3. Core interaction loop
 
 ```text
-show hand → system estimates openness → blob deforms → status confirms input
+show hand(s) → system estimates openness or palm gap → toy deforms → status confirms input
      ↑                                                   ↓
      └──────────── user changes hand after feedback ─────┘
 ```
 
-The program calculates an openness value from 0 to 1. It inverts that value into a squish target, then a spring animation eases the blob toward the target. A closed hand therefore compresses the blob; an open hand lets it rebound.
+With one hand, the program calculates an openness value from 0 to 1 and inverts it into a squish target. With two hands, it maps the horizontal gap between palm centres to side pressure. A spring animation eases the toy toward either target. The deformation direction itself is feedback: one hand makes the toy wider/flatter, while two hands make it narrower/taller.
 
 ## 4. Visual direction
 
@@ -60,6 +60,8 @@ The program calculates an openness value from 0 to 1. It inverts that value into
 - [x] Camera-free automated tests for core maths
 - [x] Three selectable tactile responses using the same input loop
 - [x] Progressive cracks, shell burst, soft core, and automatic repair
+- [x] Two-hand horizontal squeeze with distinct deformation feedback
+- [x] `Shift + Space` camera-free demonstration of two-hand mode
 
 ### Optional — not implemented
 
@@ -102,6 +104,13 @@ Camera frames are processed in memory and are not displayed, recorded, uploaded,
 - Added a soft inner core and an automatic repair state when the user releases.
 - Added number-key selection and distinct stiffness/damping for each variety.
 - Kept all visuals procedural; no imagery was copied from the reference post.
+
+### Prototype 0.3 — two-hand interaction
+
+- Increased MediaPipe tracking from one to two hands.
+- Mapped the normalised distance between palm centres to side pressure.
+- Made horizontal pressure visibly narrow and raise the toy instead of reusing the one-hand flattening animation.
+- Added a dedicated status message, meter label, on-screen instruction, keyboard fallback, screenshot, and automated mapping test.
 
 ### AI collaboration record
 
