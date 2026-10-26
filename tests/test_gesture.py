@@ -6,11 +6,13 @@ from squish.gesture import (
     SpringValue,
     clamp,
     hand_openness,
+    incompressible_deformation,
     is_pull_apart_tear,
     pressure_band,
     two_hand_roll_motion,
     remap_clamped,
     two_hand_squish,
+    update_burst_charge,
 )
 
 
@@ -90,3 +92,20 @@ def test_ripple_pressure_bands_have_equal_clear_ranges() -> None:
     assert pressure_band(0.2) == "light"
     assert pressure_band(0.5) == "medium"
     assert pressure_band(0.9) == "deep"
+
+
+def test_squashed_gel_preserves_approximate_volume() -> None:
+    width_scale, height_scale = incompressible_deformation(0.8)
+    assert width_scale < 1.0
+    assert height_scale > 1.0
+    assert width_scale * height_scale**2 == pytest.approx(1.0)
+
+
+def test_diamond_burst_requires_sustained_maximum_pressure() -> None:
+    charge = 0.0
+    for _ in range(10):
+        charge = update_burst_charge(charge, 1.0, 0.05)
+    assert 0.35 < charge < 0.5
+    for _ in range(8):
+        charge = update_burst_charge(charge, 0.7, 0.05)
+    assert charge < 0.1

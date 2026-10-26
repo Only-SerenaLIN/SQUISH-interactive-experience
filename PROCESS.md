@@ -185,6 +185,17 @@ Camera frames are mirrored and displayed live, then processed locally in memory 
 - Required pressure to return near zero before the ball reforms and the effect can trigger again, preventing an accidental continuous particle stream.
 - Added a test assertion that a practical close-palm pose now produces more than 90% pressure. The exact live-camera threshold still needs participant testing.
 
+### Prototype 0.10 — physical compression and delayed burst
+
+- Reversed the earlier pancake deformation after observing that it contradicted the visible hand force: palms approaching from the left and right must reduce horizontal width, not increase it.
+- Modelled the gel as an approximately incompressible ellipsoid. Horizontal scale decreases with pressure while both perpendicular axes expand by the inverse square root, keeping `x × y × z` volume approximately constant.
+- Replaced the squeezed ellipse with a pressure-dependent superellipse, producing flatter left/right contact surfaces and fuller top/bottom bulges.
+- Routed one-hand, two-hand, mouse, and keyboard pressure through the same deformation formula; input source no longer changes the material's physical response.
+- Replaced the immediate 91% burst with a sustained threshold: pressure must remain at or above 93% for about 1.25 seconds.
+- Added a pink crystallisation progress strip, percentage status, halo, and increasing micro-tremor. Progress retreats when pressure drops and fully resets on release.
+- Hid the central tutorial card after two palms are detected so the vertically bulging high-pressure form remains unobstructed.
+- Added automated tests for approximate volume conservation and for charge accumulation/rollback. Live threshold timing still requires user testing.
+
 ### AI collaboration record
 
 OpenAI Codex was used to scaffold the Python project, implement and test the camera/fallback loop, propose visual feedback, and draft documentation. A suggestion that was **kept** was separating the gesture maths from the Pygame drawing code, because it makes the input-to-response logic testable without a webcam. An early suggestion to add only simple colour choices was **changed** after the student supplied tactile references: later variants change rebound, fracture, ripple geometry, and sound rather than decoration alone. A first proposal to omit audio was later **rejected** after the student requested sound; the revised design generates sounds in memory and preserves a silent fallback. A points-based game direction was **rejected** in favour of equal-status pressure qualities and a shared generative canvas, because the student wanted a calmer co-creative experience.
@@ -195,7 +206,7 @@ The student must review this account, edit it into their own voice, and ensure i
 
 - Hand openness is heuristic and may vary with hand angle, lighting, and distance.
 - Two-hand distance is measured horizontally and rolling is estimated from frame-to-frame opposite vertical motion, so overlap, low frame rate, or strong camera angles can confuse it.
-- The 91% splash threshold is intentionally reachable, but perceived sensitivity will still vary with camera framing and palm angle.
+- The delayed splash requires 93% pressure to be held for about 1.25 seconds; perceived difficulty will still vary with camera framing and palm angle.
 - Sound depends on the computer providing an output device; visual feedback remains complete without it.
 - Live camera contrast varies by room; translucent white panels preserve the controls, but very bright backlighting can still reduce hand-tracking quality.
 - Co-creation is sequential on one device, not networked or simultaneous.

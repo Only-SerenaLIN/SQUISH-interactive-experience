@@ -134,6 +134,28 @@ def pressure_band(pressure: float) -> str:
     return "deep"
 
 
+def incompressible_deformation(pressure: float) -> tuple[float, float]:
+    """Return horizontal and vertical scales for a side-compressed soft sphere.
+
+    Hydrogel is treated as approximately incompressible: squeezing the x axis
+    displaces material into the two perpendicular axes. The returned scales
+    preserve ellipsoid volume because x_scale * y_scale**2 is approximately 1.
+    """
+    compression = 1.0 - clamp(pressure) * 0.44
+    expansion = 1.0 / (compression ** 0.5)
+    return compression, expansion
+
+
+def update_burst_charge(charge: float, pressure: float, dt: float) -> float:
+    """Accumulate a delayed burst only while near-maximum pressure is held."""
+    dt = max(0.0, min(dt, 0.1))
+    if pressure >= 0.93:
+        charge += dt / 1.25
+    else:
+        charge -= dt * 1.35
+    return clamp(charge)
+
+
 @dataclass
 class SpringValue:
     """A soft spring used for deformation and rebound."""

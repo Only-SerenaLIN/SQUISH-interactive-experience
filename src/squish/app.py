@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import pygame
 
 from .camera import HandCamera
-from .gesture import SpringValue, clamp, is_pull_apart_tear, pressure_band
+from .gesture import SpringValue, clamp, incompressible_deformation, is_pull_apart_tear, pressure_band, update_burst_charge
 
 
 WIDTH, HEIGHT = 1000, 700
@@ -137,6 +137,7 @@ class SquishApp:
         self.tracked_palms: tuple[tuple[float, float], ...] = ()
         self.jelly_burst_latched = False
         self.jelly_burst_timer = 0.0
+        self.jelly_burst_charge = 0.0
         self.crinkle_sound = self.make_sound("crinkle")
         self.burst_sound = self.make_sound("burst")
         self.ripple_sounds = {
@@ -245,6 +246,7 @@ class SquishApp:
             self.jelly_anchor = [0.5, 0.48]
             self.jelly_burst_latched = False
             self.jelly_burst_timer = 0.0
+            self.jelly_burst_charge = 0.0
 
     def release_ripple(self) -> None:
         pressure = clamp(self.jelly_peak)
@@ -476,18 +478,21 @@ class SquishApp:
                 self.jelly_roundness = clamp(self.jelly_roundness + dt * 0.055, 0.36, 1.0)
                 self.jelly_rotation = (self.jelly_rotation + dt * 0.10) % math.tau
             if not self.jelly_burst_latched:
+                self.jelly_burst_charge = update_burst_charge(self.jelly_burst_charge, clamp(squish), dt)
                 self.jelly_peak = max(self.jelly_peak, clamp(squish))
                 if self.jelly_peak > 0.16:
                     self.jelly_armed = True
-                if squish >= 0.91:
+                if self.jelly_burst_charge >= 1.0:
                     self.jelly_burst_latched = True
                     self.jelly_armed = False
                     self.jelly_peak = 0.0
                     self.spawn_diamond_splash()
                 elif self.jelly_armed and squish < 0.10 and self.target < 0.08:
+                    self.jelly_burst_charge = 0.0
                     self.release_ripple()
             elif squish < 0.12 and self.target < 0.08:
                 self.jelly_burst_latched = False
+                self.jelly_burst_charge = 0.0
                 self.jelly_peak = 0.0
                 self.jelly_armed = False
                 self.jelly_roundness = 1.0
@@ -541,6 +546,8 @@ class SquishApp:
         elif self.toy_index == 4:
             if self.jelly_burst_latched:
                 action = "DIAMOND SPLASH"
+            elif self.jelly_burst_charge > 0.02:
+                action = f"CRYSTALLISING {round(self.jelly_burst_charge * 100):02d}%"
             elif self.jelly_roll_strength > 0.20:
                 action = "ROLLING ROUND"
             elif squish > 0.12:
@@ -788,14 +795,15 @@ class SquishApp:
         surface.blit(layer, (0, 0))
 
     def draw_camera_prompt(self, surface: pygame.Surface, w: int) -> None:
-        title = self.font.render("PUT BOTH PALMS AROUND THE GEL", True, INK)
-        hint = self.font_tiny.render("move closer to flatten | rub one up and one down to roll round", True, (91, 76, 108))
-        prompt = pygame.Rect(0, 0, max(title.get_width(), hint.get_width()) + 34, 59)
-        prompt.midtop = (w // 2, 158)
-        pygame.draw.rect(surface, (255, 255, 255), prompt, border_radius=20)
-        pygame.draw.rect(surface, (216, 207, 230), prompt, 2, border_radius=20)
-        surface.blit(title, (prompt.centerx - title.get_width() // 2, prompt.y + 9))
-        surface.blit(hint, (prompt.centerx - hint.get_width() // 2, prompt.y + 37))
+        if len(self.tracked_palms) < 2:
+            title = self.font.render("PUT BOTH PALMS AROUND THE GEL", True, INK)
+            hint = self.font_tiny.render("move closer to flatten | rub one up and one down to roll round", True, (91, 76, 108))
+            prompt = pygame.Rect(0, 0, max(title.get_width(), hint.get_width()) + 34, 59)
+            prompt.midtop = (w // 2, 158)
+            pygame.draw.rect(surface, (255, 255, 255), prompt, border_radius=20)
+            pygame.draw.rect(surface, (216, 207, 230), prompt, 2, border_radius=20)
+            surface.blit(title, (prompt.centerx - title.get_width() // 2, prompt.y + 9))
+            surface.blit(hint, (prompt.centerx - hint.get_width() // 2, prompt.y + 37))
         participant = self.font_tiny.render(
             f"COLLABORATOR {chr(65 + self.collaborator)}  |  SHARED WAVES {self.ripple_layers:02d}",
             True,
@@ -811,11 +819,13 @@ class SquishApp:
         remembered_flatness = (1.0 - self.jelly_roundness) * 0.72
         pressure = max(spring_pressure, remembered_flatness) * (1.0 - self.jelly_roll_strength * 0.76)
         pressure = clamp(pressure)
-        # Keep the resting form close to a water-gel sphere. Pressure turns that
-        # sphere into a convincing squish without losing its glossy silhouette.
-        width = 252 * (1.0 + pressure * 0.43) * scale
-        height = 252 * (1.0 - pressure * 0.40) * scale
-        cy += pressure * 25 * scale
+        # Treat the gel as an incompressible ellipsoid squeezed from the sides:
+        # horizontal material moves into the vertical and depth axes instead of
+        # vanishing. This same pressure-to-shape relationship is used for every
+        # input method, whether one hand, two hands, keyboard, or mouse.
+        width_scale, height_scale = incompressible_deformation(pressure)
+        width = 252 * width_scale * scale
+        height = 252 * height_scale * scale
 
         layer = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         tint = RIPPLE_COLORS[self.collaborator]
@@ -836,13 +846,23 @@ class SquishApp:
         glow = pygame.Rect(0, 0, width + 64 * scale, height + 58 * scale)
         glow.center = (cx, cy + height * 0.03)
         pygame.draw.ellipse(layer, (*tint, 18), glow)
+        if self.jelly_burst_charge > 0.0:
+            charge_halo = pygame.Rect(0, 0, width + (35 + self.jelly_burst_charge * 35) * scale, height + (35 + self.jelly_burst_charge * 35) * scale)
+            charge_halo.center = (cx, cy)
+            pygame.draw.ellipse(layer, (226, 205, 255, int(28 + self.jelly_burst_charge * 58)), charge_halo, max(2, int(3 * scale)))
 
         now = pygame.time.get_ticks() * 0.0018
         points = []
         for index in range(96):
             angle = index / 96 * math.tau
             wobble = 1 + math.sin(angle * 6 + now) * (0.018 + pressure * 0.012)
-            points.append((cx + math.cos(angle) * width * 0.5 * wobble, cy + math.sin(angle) * height * 0.5 * wobble))
+            # A pressure-dependent superellipse creates flatter contact patches
+            # on the left and right and fuller bulges above and below.
+            shape_power = 2.0 / (2.0 + pressure * 1.7)
+            cosine, sine = math.cos(angle), math.sin(angle)
+            shaped_x = math.copysign(abs(cosine) ** shape_power, cosine)
+            shaped_y = math.copysign(abs(sine) ** shape_power, sine)
+            points.append((cx + shaped_x * width * 0.5 * wobble, cy + shaped_y * height * 0.5 * wobble))
         pygame.draw.polygon(layer, (*edge, 205), points)
 
         # Nested bodies act like a simple radial material: saturated at the rim,
@@ -1096,6 +1116,8 @@ class SquishApp:
             shake = (self.spring.value - 0.72) * 18
         if self.shake_timer > 0:
             shake = max(shake, self.shake_timer / 0.36 * 13)
+        if self.toy_index == 4 and self.jelly_burst_charge > 0.0 and not self.jelly_burst_latched:
+            shake = max(shake, self.jelly_burst_charge * 3.8)
         if shake > 0:
             cx += random.uniform(-shake, shake) * scale
             cy += random.uniform(-shake, shake) * scale
@@ -1118,9 +1140,14 @@ class SquishApp:
         meter_value = self.jelly_roundness if self.toy_index == 4 and self.jelly_roll_strength > 0.20 else clamp(self.spring.value)
         fill.width = int(meter.width * meter_value)
         pygame.draw.rect(self.screen, self.toy.accent, fill, border_radius=7)
+        if self.toy_index == 4 and self.jelly_burst_charge > 0.0 and not self.jelly_burst_latched:
+            charge_bar = pygame.Rect(meter.x, meter.y, int(meter.width * self.jelly_burst_charge), 5)
+            pygame.draw.rect(self.screen, (244, 155, 224), charge_bar, border_radius=3)
         if self.toy_index == 4:
             if self.jelly_burst_latched:
                 label = "DIAMOND SPLASH!  |  release to reform"
+            elif self.jelly_burst_charge > 0.02:
+                label = f"HOLD STEADY  |  crystallising {round(self.jelly_burst_charge * 100):02d}%"
             elif self.jelly_roll_strength > 0.20:
                 label = f"ROLLING ROUND  |  form {round(self.jelly_roundness * 100):02d}%"
             elif clamp(self.spring.value) > 0.12:

@@ -25,7 +25,7 @@ Library versions used for a particular submission are recorded in `uv.lock` afte
 
 ## Visual and media assets
 
-All shapes, character graphics, projected 3D jelly geometry, translucent material layers, pressure waves, faceted diamond fragments, water droplets, hand-tracking guides, supermarket elements, particles, interface elements, and short sound effects are generated procedurally by the Python code. There are no downloaded images, fonts, sounds, prerecorded camera clips, or third-party visual assets in prototype version 0.9.0.
+All shapes, character graphics, projected 3D jelly geometry, physical deformation curves, translucent material layers, pressure waves, faceted diamond fragments, water droplets, hand-tracking guides, supermarket elements, particles, interface elements, and short sound effects are generated procedurally by the Python code. There are no downloaded images, fonts, sounds, prerecorded camera clips, or third-party visual assets in prototype version 0.10.0.
 
 ## Interaction references
 

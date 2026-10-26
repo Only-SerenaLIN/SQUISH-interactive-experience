@@ -8,6 +8,10 @@ The default **Ripple Jelly** mode is the focused Assignment 3 experience. Earlie
 
 ![Camera Gel during a squeeze in privacy-safe fallback mode](docs/ripple-jelly-squeeze.png)
 
+The gel is treated as approximately incompressible. Side pressure reduces its horizontal axis while the displaced volume expands vertically and into the implied depth axis; a pressure-dependent superellipse creates flatter contact patches against the palms. One-hand, two-hand, mouse, and keyboard input all feed the same physical deformation.
+
+![Volume-preserving side compression](docs/physical-squeeze.png)
+
 Three collaborators produce different coloured layers. Light, medium, and deep pressure create equal-status wave qualities rather than a score hierarchy.
 
 ![Camera Gel after releasing a shared wave](docs/ripple-jelly-release.png)
@@ -18,7 +22,9 @@ The documentation screenshots use the camera-free fallback background so no pers
 
 ![3D jelly rolled back into a sphere](docs/3d-jelly-roll-round.png)
 
-At maximum pressure, the gel bursts into water droplets and rotating translucent diamond fragments. Releasing the gesture reforms the ball, so the effect cannot retrigger continuously.
+The gel does not burst immediately at maximum pressure. Pressure must remain above 93% for about 1.25 seconds while a pink crystallisation bar fills. Dropping the pressure makes that progress retreat; a full release resets it. Only a completed hold produces water droplets and rotating translucent diamond fragments.
+
+![Delayed crystallisation before the burst](docs/crystallising-delay.png)
 
 ![Maximum-pressure diamond splash](docs/diamond-splash.png)
 
@@ -77,8 +83,8 @@ The enhanced supermarket interaction adds anticipation before the burst and a di
 - Hand-open / hand-closed estimation, normalised for hand size
 - Horizontal two-palm distance mapped to side pressure
 - Opposing two-palm motion detection that separates rolling from shared camera drift and horizontal squeezing
-- A software-rendered 3D **Ripple Jelly** with rotating projected surface lines, coloured rim, transmitted light, specular highlights, persistent flattening, and roll-to-round recovery
-- A one-shot maximum-pressure water splash with rotating faceted diamond fragments, flash, deep ripple, and reform-on-release feedback
+- A software-rendered 3D **Ripple Jelly** with rotating projected surface lines, coloured rim, transmitted light, specular highlights, volume-preserving side compression, flat contact patches, and roll-to-round recovery
+- A 1.25-second near-maximum-pressure hold before the one-shot water splash, with visible crystallisation progress, rollback on lost pressure, rotating faceted diamonds, and reform-on-release feedback
 - A persistent eight-layer co-creation canvas for three sequential collaborators
 - Three pressure qualities mapped to distinct wave geometry and generated ambient chords
 - Four earlier tactile studies: **Cyber Apple**, **Soft Blob**, **Crispy Peach**, and **Ramen Pack**
@@ -151,7 +157,7 @@ Keyboard and mouse input temporarily take priority over the camera, so you can d
 
 **The hand signal feels jumpy.** Keep one hand visible, face the palm toward the camera, use even lighting, and keep your wrist and fingertips inside the frame. The prototype smooths the reading but intentionally stays responsive.
 
-**The ball does not reach the diamond splash.** Keep both palms facing the camera and bring their centres to roughly one hand-width apart. The wider v0.9 pressure range is intentionally more responsive, but very angled palms may still make the measured gap look larger.
+**The ball does not reach the diamond splash.** Keep both palms facing the camera and bring their centres to roughly one hand-width apart. When `HOLD STEADY` appears, maintain the pressure until crystallisation reaches 100%. Moving below 93% makes the progress retreat, so an unstable or angled pose may need adjustment.
 
 **The wrong gesture is detected.** For one-hand mode, start with a clearly open palm, then make a clear fist. To flatten, keep both palms visible and move them horizontally together. To roll round, hold the gap fairly steady while moving one palm up as the other moves down. Unusual angles, overlap, or a hand leaving the frame can confuse tracking. That limitation is documented honestly in `PROCESS.md`.
 
@@ -165,7 +171,7 @@ Keyboard and mouse input temporarily take priority over the camera, so you can d
 uv run pytest
 ```
 
-These tests cover the one-hand gesture score, two-hand distance mapping, opposite-motion roll detection, deliberate pull-apart detection, pressure bands, range mapping, invalid input, and spring movement without needing a webcam or display.
+These tests cover the one-hand gesture score, two-hand distance mapping, opposite-motion roll detection, volume-preserving deformation, delayed burst charging and rollback, deliberate pull-apart detection, pressure bands, range mapping, invalid input, and spring movement without needing a webcam or display.
 
 ## Project map
 
@@ -185,7 +191,7 @@ SQUISH/
 
 | Criterion | Evidence in this repository |
 |---|---|
-| Interaction and design — 5 | Hand closure builds pressure in a translucent jelly; release generates visibly different persistent ripples and musical chords. Breathing prompts, deformation, pressure text, collaborator identity, wave count, sound, and rebound make the loop legible. |
+| Interaction and design — 5 | Hand pressure reshapes a translucent 3D jelly; release generates visibly different persistent ripples and musical chords. Palm guides, physical deformation, delayed crystallisation, pressure text, collaborator identity, wave count, sound, and rebound make the loop legible. |
 | Working implementation — 4 | Reproducible `uv` setup, pinned compatible camera libraries, camera-free fallback, automated logic tests, and documented limitations. |
 | Usability and iteration — 3 | Visible controls, camera status, reset/quit paths, denied-camera fallback, and a trial procedure in `PROCESS.md`. **The real user trial is still required.** |
 | Process and communication — 3 | README screenshots, process decisions, AI-use record, credits, and a multi-commit Git history. |
