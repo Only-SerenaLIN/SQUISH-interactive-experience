@@ -15,6 +15,7 @@ class TrackingResult:
     hands_visible: int
     message: str
     roll_motion: float = 0.0
+    palm_centres: tuple[tuple[float, float], ...] = ()
 
 
 class HandCamera:
@@ -36,6 +37,7 @@ class HandCamera:
         self._smoothed_horizontal = 0.0
         self._smoothed_roll = 0.0
         self._previous_palms: tuple[tuple[float, float], tuple[float, float]] | None = None
+        self.latest_rgb = None
 
     def start(self) -> bool:
         if self.enabled:
@@ -79,6 +81,7 @@ class HandCamera:
             return TrackingResult(None, None, 0, self.error)
 
         rgb = self.cv2.cvtColor(self.cv2.flip(frame, 1), self.cv2.COLOR_BGR2RGB)
+        self.latest_rgb = rgb.copy()
         rgb.flags.writeable = False
         result = self.hands.process(rgb)
         if not result.multi_hand_landmarks:
@@ -102,14 +105,22 @@ class HandCamera:
             self._smoothed_roll += (raw_roll - self._smoothed_roll) * 0.32
             self._last_seen = time.monotonic()
             message = "Two hands: rolling round" if self._smoothed_roll > 0.24 else "Two hands: flattening"
-            return TrackingResult(None, self._smoothed_horizontal, 2, message, self._smoothed_roll)
+            return TrackingResult(
+                None,
+                self._smoothed_horizontal,
+                2,
+                message,
+                self._smoothed_roll,
+                palms,
+            )
 
         self._previous_palms = None
         self._smoothed_roll *= 0.72
         raw = hand_openness(result.multi_hand_landmarks[0].landmark)
         self._smoothed += (raw - self._smoothed) * 0.28
         self._last_seen = time.monotonic()
-        return TrackingResult(self._smoothed, None, 1, "One hand detected")
+        centre = palm_centre(result.multi_hand_landmarks[0].landmark)
+        return TrackingResult(self._smoothed, None, 1, "One hand detected", palm_centres=(centre,))
 
     def toggle(self) -> bool:
         if self.enabled:
@@ -126,4 +137,5 @@ class HandCamera:
         self.capture = None
         self.hands = None
         self.enabled = False
+        self.latest_rgb = None
 

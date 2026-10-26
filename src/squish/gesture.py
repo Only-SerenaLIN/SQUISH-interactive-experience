@@ -132,16 +132,6 @@ def pressure_band(pressure: float) -> str:
     return "deep"
 
 
-def breathing_phase(elapsed: float) -> tuple[str, float]:
-    """Return phase and 0..1 progress for a gentle 4–2–6 second cycle."""
-    position = max(0.0, elapsed) % 12.0
-    if position < 4.0:
-        return "inhale", position / 4.0
-    if position < 6.0:
-        return "hold", (position - 4.0) / 2.0
-    return "exhale", (position - 6.0) / 6.0
-
-
 @dataclass
 class SpringValue:
     """A soft spring used for deformation and rebound."""

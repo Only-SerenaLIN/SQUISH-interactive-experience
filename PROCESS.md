@@ -4,11 +4,11 @@
 
 ## 1. Concept
 
-SQUISH! turns breathing and a familiar stress-toy gesture into a shared visual composition. A participant follows a gentle prompt, closes one hand to compress a translucent jelly, and opens it to release a pressure-shaped ripple and musical chord. The next participant adds another layer to the same canvas.
+SQUISH! turns the live camera into an augmented-reality stress toy and shared visual composition. A glossy 3D jelly appears between two detected palms: bringing the palms together flattens it, opposite rubbing motion rolls it round, and releasing pressure leaves a ripple and musical chord for the next participant.
 
 ### One-sentence pitch
 
-Breathe with a translucent jelly, squeeze it gently, and leave a ripple for the next person.
+Hold a translucent 3D jelly between your on-screen hands, reshape it, and leave a ripple for the next person.
 
 ### Target audience
 
@@ -22,7 +22,7 @@ This is a calming creative prototype, not a medical or therapeutic product.
 
 1. **Immediate legibility:** the blob should visibly follow the user's hand within a fraction of a second.
 2. **Satisfying motion:** compression should feel elastic, with overshoot and rebound rather than a rigid resize.
-3. **Calm personality:** translucency, slow breathing motion, persistent waves, and gentle chords should communicate an instrument rather than a game.
+3. **Calm personality:** translucency, slow elastic motion, persistent waves, and gentle chords should communicate an instrument rather than a game.
 4. **Graceful failure:** camera problems should never prevent someone from trying the core experience.
 5. **Manageable scope:** one polished interaction is more important than many unfinished features.
 
@@ -34,13 +34,14 @@ show hand(s) → system estimates openness or palm gap → toy deforms → statu
      └──────────── user changes hand after feedback ─────┘
 ```
 
-With one hand, the program calculates an openness value from 0 to 1 and inverts it into a pressure target. A spring animation eases the jelly toward the target. The highest pressure in a squeeze determines the released wave's amplitude, ring count, line weight, and chord register. The wave persists and overlaps contributions from collaborators A, B, and C. Earlier modes also retain the two-hand horizontal-distance experiment.
+With two hands, the program measures horizontal palm distance for pressure and opposite vertical movement for rolling. A spring animation eases the jelly toward the target while the ball's position follows the smoothed midpoint between the palms. The highest pressure in a squeeze determines the released wave's amplitude, ring count, line weight, and chord register. The wave remains where it was created and overlaps contributions from collaborators A, B, and C. Earlier modes retain the one-hand openness experiment.
 
 ## 4. Visual direction
 
-- Pale atmospheric background with cyan, violet, and pink collaborator colours
+- Mirrored live-camera background with cyan, violet, and pink collaborator colours
 - Layered alpha surfaces create a translucent jelly body with internal light points
-- Breathing makes the body rise and expand before pressure deformation begins
+- A projected rotating sphere mesh communicates 3D volume beneath the translucent surface
+- Palm markers and a connecting line expose the tracking result
 - A pressure meter exposes the otherwise invisible gesture value
 - Wavy elliptical contours persist and overlap instead of rewarding a high score
 
@@ -66,11 +67,12 @@ With one hand, the program calculates an openness value from 0 to 1 and inverts 
 - [x] Procedurally generated crinkle/pop audio, mute control, and silent fallback
 - [x] Squeeze-then-pull two-hand packet opening with a camera-free keyboard equivalent
 - [x] Pre-burst warning, shake/flash feedback, changing flavours, random contents, and pop counter
-- [x] Default Ripple Jelly breathing and co-creation mode
+- [x] Default Camera Gel augmented-reality co-creation mode
+- [x] Mirrored live camera as the visual background
+- [x] Ball anchored to the midpoint between two detected palms
 - [x] Translucent deforming jelly with internal glow and floating light points
 - [x] Light, medium, and deep pressure-to-wave mappings
 - [x] Three procedurally generated chord registers that can overlap
-- [x] 4-2-6 breathing guide with non-punitive wording
 - [x] Three-person sequential handoff and persistent eight-wave canvas
 
 ### Optional — not implemented
@@ -89,13 +91,14 @@ These remain optional so that testing and refinement can focus on the main gestu
 | Exponential signal smoothing | Reduces landmark jitter | Adds a small amount of lag |
 | Spring animation | Creates a soft rebound from a single number | Needs careful tuning to avoid excessive wobble |
 | Lazy camera imports/fallback | Keeps the artwork usable when camera access fails | Camera errors are shown as status text rather than a setup wizard |
+| Camera-as-background compositing | Places the digital material in the same space as the user's hands | The live image can make text contrast less predictable, so interface panels use translucent white backing |
 | Generated sound in memory | Adds tactile feedback without borrowed assets or missing files | It is deliberately short and synthetic rather than realistic |
 | Sequential co-creation | Works with one camera and keeps each contribution visible | Participants take turns rather than appearing simultaneously |
 | Three equal pressure qualities | Makes different gestures expressive without rewarding force | Thresholds may need tuning for different hands |
 
 ### Privacy note
 
-Camera frames are processed in memory and are not displayed, recorded, uploaded, or saved by this project.
+Camera frames are mirrored and displayed live, then processed locally in memory for hand tracking. They are not recorded, uploaded, or saved by this project. Repository screenshots use the camera-free fallback so no participant image becomes a public asset.
 
 ## 7. Development log
 
@@ -162,6 +165,16 @@ Camera frames are processed in memory and are not displayed, recorded, uploaded,
 - Added `G` as the camera-free roll-round control and kept `Space` as the flatten/release control.
 - Added an automated comparison proving that opposite palm motion scores highly while shared camera drift does not. Live participant testing is still outstanding.
 
+### Prototype 0.8 — Camera Gel AR view
+
+- Removed the breathing timer, breathing progress bar, phase instructions, and automatic breathing-scale animation after the project direction changed.
+- Replaced the decorative background with the mirrored live camera feed, covered by a light contrast veil and readable interface panels.
+- Added smoothed palm-midpoint anchoring so the jelly appears between the participant's hands instead of remaining fixed at screen centre.
+- Added palm target markers and a connecting line so tracking errors are immediately visible.
+- Stored the creation position with every released ripple, allowing waves to remain where they were made while the hands and ball move elsewhere.
+- Kept a camera-free background and the `Space`/`G` controls so denied permission or an unavailable camera does not block assessment.
+- No live frames or participant images are written to disk; generated documentation screenshots use only fallback mode.
+
 ### AI collaboration record
 
 OpenAI Codex was used to scaffold the Python project, implement and test the camera/fallback loop, propose visual feedback, and draft documentation. A suggestion that was **kept** was separating the gesture maths from the Pygame drawing code, because it makes the input-to-response logic testable without a webcam. An early suggestion to add only simple colour choices was **changed** after the student supplied tactile references: later variants change rebound, fracture, ripple geometry, and sound rather than decoration alone. A first proposal to omit audio was later **rejected** after the student requested sound; the revised design generates sounds in memory and preserves a silent fallback. A points-based game direction was **rejected** in favour of equal-status pressure qualities and a shared generative canvas, because the student wanted a calmer co-creative experience.
@@ -173,7 +186,7 @@ The student must review this account, edit it into their own voice, and ensure i
 - Hand openness is heuristic and may vary with hand angle, lighting, and distance.
 - Two-hand distance is measured horizontally and rolling is estimated from frame-to-frame opposite vertical motion, so overlap, low frame rate, or strong camera angles can confuse it.
 - Sound depends on the computer providing an output device; visual feedback remains complete without it.
-- The breathing prompt offers a visual rhythm but is not health guidance; participants can release at any time.
+- Live camera contrast varies by room; translucent white panels preserve the controls, but very bright backlighting can still reduce hand-tracking quality.
 - Co-creation is sequential on one device, not networked or simultaneous.
 - Camera access must be granted to the app that launches the Python process.
 - The visual design has been checked programmatically and by the developer, not evaluated by external users.

@@ -4,7 +4,6 @@ import pytest
 
 from squish.gesture import (
     SpringValue,
-    breathing_phase,
     clamp,
     hand_openness,
     is_pull_apart_tear,
@@ -90,11 +89,3 @@ def test_ripple_pressure_bands_have_equal_clear_ranges() -> None:
     assert pressure_band(0.2) == "light"
     assert pressure_band(0.5) == "medium"
     assert pressure_band(0.9) == "deep"
-
-
-def test_breathing_cycle_uses_inhale_hold_and_exhale() -> None:
-    assert breathing_phase(2.0) == ("inhale", pytest.approx(0.5))
-    assert breathing_phase(5.0) == ("hold", pytest.approx(0.5))
-    assert breathing_phase(9.0) == ("exhale", pytest.approx(0.5))
-    assert breathing_phase(14.0)[0] == "inhale"
-

@@ -2,15 +2,17 @@
 
 Public repository: <https://github.com/Only-SerenaLIN/SQUISH-interactive-experience>
 
-**SQUISH!** is a webcam-controlled breathing and co-creation experience built around a glossy, translucent 3D hydrogel ball. Bring two palms together to flatten it, rub the palms in opposite vertical directions to roll it round again, and release pressure to create a visual ripple and generated musical chord. Each person's waves remain on the shared canvas long enough to meet the next participant's contribution.
+**SQUISH!** is a webcam-based augmented-reality co-creation experience built around a glossy, translucent 3D hydrogel ball. The mirrored live camera becomes the background and the ball follows the midpoint between two detected palms. Bring the palms together to flatten it, rub them in opposite vertical directions to roll it round again, and release pressure to create a visual ripple and generated musical chord.
 
 The default **Ripple Jelly** mode is the focused Assignment 3 experience. Earlier Cyber Apple, Soft Blob, Crispy Peach, and Ramen Pack studies remain available as development experiments. If the camera is unavailable, the complete main interaction still works with the keyboard or mouse.
 
-![Ripple Jelly during a guided squeeze](docs/ripple-jelly-squeeze.png)
+![Camera Gel during a squeeze in privacy-safe fallback mode](docs/ripple-jelly-squeeze.png)
 
 Three collaborators produce different coloured layers. Light, medium, and deep pressure create equal-status wave qualities rather than a score hierarchy.
 
-![Ripple Jelly after releasing a shared wave](docs/ripple-jelly-release.png)
+![Camera Gel after releasing a shared wave](docs/ripple-jelly-release.png)
+
+The documentation screenshots use the camera-free fallback background so no person's image is committed to the public repository. During normal use, this background is replaced by the mirrored live camera feed; frames are never saved or uploaded.
 
 ![3D jelly flattened by pressure](docs/3d-jelly-flatten.png)
 
@@ -26,11 +28,11 @@ two palms approach → jelly flattens → release → ripple and chord
         └── opposite rubbing motion → roll round again ─────┘
 ```
 
-- **Light pressure:** thin breathing waves and a bright, airy chord
+- **Light pressure:** thin ripples and a bright, airy chord
 - **Medium pressure:** layered connecting waves and a warm chord
 - **Deep pressure:** broad slow waves and a low resonant chord
 - Press `N` to hand the experience to collaborator A, B, or C; recent waves overlap on one shared composition
-- The breathing guide uses a gentle 4-second inhale, comfortable 2-second hold, and 6-second exhale. A participant can release whenever they need to.
+- White palm markers and a connecting line confirm where the system sees the hands; the ball follows their midpoint.
 
 ## Earlier tactile studies
 
@@ -67,13 +69,13 @@ The enhanced supermarket interaction adds anticipation before the burst and a di
 ## What the prototype includes
 
 - Live one-hand and two-hand tracking with OpenCV and MediaPipe
+- Mirrored live-camera background with a 3D ball anchored between the detected palms
 - Hand-open / hand-closed estimation, normalised for hand size
 - Horizontal two-palm distance mapped to side pressure
 - Opposing two-palm motion detection that separates rolling from shared camera drift and horizontal squeezing
 - A software-rendered 3D **Ripple Jelly** with rotating projected surface lines, coloured rim, transmitted light, specular highlights, persistent flattening, and roll-to-round recovery
 - A persistent eight-layer co-creation canvas for three sequential collaborators
 - Three pressure qualities mapped to distinct wave geometry and generated ambient chords
-- A 4-2-6 visual breathing guide that never treats timing variation as failure
 - Four earlier tactile studies: **Cyber Apple**, **Soft Blob**, **Crispy Peach**, and **Ramen Pack**
 - Per-toy spring deformation, staged cracking, wrapper crinkles, fragments, visible rebound, and automatic repair
 - Procedurally generated crinkle and pop sounds, with mute and audio-unavailable feedback
@@ -81,7 +83,7 @@ The enhanced supermarket interaction adds anticipation before the burst and a di
 - A squish meter, tracking status, expressive faces, and celebratory particles
 - Automatic keyboard/mouse fallback
 - Resizable Pygame window
-- No photos or video frames are saved
+- Camera frames are displayed and processed locally in memory but are never recorded, uploaded, or saved
 
 ## Quick start with `uv`
 
@@ -156,7 +158,7 @@ Keyboard and mouse input temporarily take priority over the camera, so you can d
 uv run pytest
 ```
 
-These tests cover the one-hand gesture score, two-hand distance mapping, deliberate pull-apart detection, pressure bands, breathing phases, range mapping, invalid input, and spring movement without needing a webcam or display.
+These tests cover the one-hand gesture score, two-hand distance mapping, opposite-motion roll detection, deliberate pull-apart detection, pressure bands, range mapping, invalid input, and spring movement without needing a webcam or display.
 
 ## Project map
 
@@ -185,7 +187,7 @@ The work is due **Sunday 1 November 2026 at 23:59 Hong Kong time**. Before submi
 
 ## Sensible next steps
 
-Keep the submitted version focused on Ripple Jelly. The four earlier varieties document exploration but should not replace testing and refining the breathing, release threshold, sound balance, and collaborator handoff.
+Keep the submitted version focused on Camera Gel. The four earlier varieties document exploration but should not replace testing and refining hand alignment, gesture thresholds, release feedback, sound balance, and collaborator handoff.
 
 ## Git checkpoint plan
 

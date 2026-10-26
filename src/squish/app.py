@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import pygame
 
 from .camera import HandCamera
-from .gesture import SpringValue, breathing_phase, clamp, is_pull_apart_tear, pressure_band
+from .gesture import SpringValue, clamp, is_pull_apart_tear, pressure_band
 
 
 WIDTH, HEIGHT = 1000, 700
@@ -56,7 +56,7 @@ TOYS = (
     ToySpec("SOFT BLOB", "bouncy original friend", PURPLE, PINK, 28.0, 8.0),
     ToySpec("CRISPY PEACH", "crack the shell, find the soft core", (255, 210, 157), (255, 116, 145), 38.0, 10.0),
     ToySpec("RAMEN PACK", "crinkle the bag, then pop the noodles", (255, 91, 68), (255, 190, 61), 42.0, 11.0),
-    ToySpec("RIPPLE JELLY", "breathe, squeeze, leave a shared ripple", (166, 218, 238), (129, 108, 225), 22.0, 8.0),
+    ToySpec("RIPPLE JELLY", "camera gel: flatten, roll, release", (166, 218, 238), (129, 108, 225), 22.0, 8.0),
 )
 
 
@@ -78,6 +78,8 @@ class Ripple:
     participant: int
     age: float
     phase: float
+    x: float = 0.5
+    y: float = 0.48
 
 
 class SquishApp:
@@ -119,7 +121,6 @@ class SquishApp:
         self.shake_timer = 0.0
         self.flash_timer = 0.0
         self.restock_timer = 0.0
-        self.breath_elapsed = 0.0
         self.jelly_peak = 0.0
         self.jelly_armed = False
         self.ripples: list[Ripple] = []
@@ -129,6 +130,8 @@ class SquishApp:
         self.jelly_roundness = 1.0
         self.jelly_rotation = 0.0
         self.jelly_roll_strength = 0.0
+        self.jelly_anchor = [0.5, 0.48]
+        self.tracked_palms: tuple[tuple[float, float], ...] = ()
         self.crinkle_sound = self.make_sound("crinkle")
         self.burst_sound = self.make_sound("burst")
         self.ripple_sounds = {
@@ -194,8 +197,8 @@ class SquishApp:
             attack = min(1.0, t / 0.10)
             release = max(0.0, 1.0 - t / duration) ** 1.7
             shimmer = sum(math.sin(math.tau * frequency * t) for frequency in frequencies) / len(frequencies)
-            breath = math.sin(math.tau * frequencies[0] * 0.5 * t) * 0.12
-            value = (shimmer * 0.42 + breath) * attack * release
+            undertone = math.sin(math.tau * frequencies[0] * 0.5 * t) * 0.12
+            value = (shimmer * 0.42 + undertone) * attack * release
             sample = int(max(-1.0, min(1.0, value)) * 32767)
             samples.extend((sample, sample))
         try:
@@ -226,7 +229,6 @@ class SquishApp:
         if self.toy_index == 3:
             self.prepare_ramen()
         if self.toy_index == 4:
-            self.breath_elapsed = 0.0
             self.jelly_peak = 0.0
             self.jelly_armed = False
             self.ripples.clear()
@@ -235,12 +237,22 @@ class SquishApp:
             self.jelly_roundness = 1.0
             self.jelly_rotation = 0.0
             self.jelly_roll_strength = 0.0
+            self.jelly_anchor = [0.5, 0.48]
 
     def release_ripple(self) -> None:
         pressure = clamp(self.jelly_peak)
         if pressure < 0.16:
             return
-        self.ripples.append(Ripple(pressure, self.collaborator, 0.0, random.uniform(0, math.tau)))
+        self.ripples.append(
+            Ripple(
+                pressure,
+                self.collaborator,
+                0.0,
+                random.uniform(0, math.tau),
+                self.jelly_anchor[0],
+                self.jelly_anchor[1],
+            )
+        )
         self.ripples = self.ripples[-8:]
         self.ripple_layers += 1
         self.ripple_flash = 0.55
@@ -355,6 +367,13 @@ class SquishApp:
 
     def update(self, dt: float) -> tuple[str, bool]:
         camera_result = self.camera.read()
+        self.tracked_palms = camera_result.palm_centres
+        if len(self.tracked_palms) >= 2:
+            target_x = clamp((self.tracked_palms[0][0] + self.tracked_palms[1][0]) * 0.5, 0.20, 0.80)
+            target_y = clamp((self.tracked_palms[0][1] + self.tracked_palms[1][1]) * 0.5, 0.30, 0.68)
+            anchor_smoothing = min(1.0, dt * 8.0)
+            self.jelly_anchor[0] += (target_x - self.jelly_anchor[0]) * anchor_smoothing
+            self.jelly_anchor[1] += (target_y - self.jelly_anchor[1]) * anchor_smoothing
         manual = self.manual_input(dt)
         roll_input = camera_result.roll_motion
         if manual is not None:
@@ -402,7 +421,6 @@ class SquishApp:
                 # deliberate and clearly visible way to restore a sphere.
                 self.jelly_roundness = clamp(self.jelly_roundness + dt * 0.055, 0.36, 1.0)
                 self.jelly_rotation = (self.jelly_rotation + dt * 0.10) % math.tau
-            self.breath_elapsed = (self.breath_elapsed + dt) % 12.0
             self.jelly_peak = max(self.jelly_peak, clamp(squish))
             if self.jelly_peak > 0.16:
                 self.jelly_armed = True
@@ -456,13 +474,14 @@ class SquishApp:
         if self.toy_index == 3 and self.shell_broken:
             status = self.ramen_reward
         elif self.toy_index == 4:
-            phase, _ = breathing_phase(self.breath_elapsed)
             if self.jelly_roll_strength > 0.20:
                 action = "ROLLING ROUND"
-            elif self.squeeze_axis == "horizontal" and squish > 0.12:
+            elif squish > 0.12:
                 action = "FLATTENING"
+            elif not self.camera.enabled:
+                action = "SPACE / G READY"
             else:
-                action = phase
+                action = "HANDS READY" if len(self.tracked_palms) >= 2 else "SHOW TWO HANDS"
             status = f"Collaborator {chr(65 + self.collaborator)} | {action}"
         return status, active
 
@@ -681,15 +700,13 @@ class SquishApp:
 
     def draw_ripples(self, surface: pygame.Surface, w: int, h: int, scale: float) -> None:
         layer = pygame.Surface((w, h), pygame.SRCALPHA)
-        centre_y = h * 0.48
-        offsets = (-115 * scale, 0, 115 * scale)
         for ripple in self.ripples:
             fade = max(0.0, 1.0 - ripple.age / 22.0)
             band = pressure_band(ripple.pressure)
             ring_count = {"light": 2, "medium": 4, "deep": 6}[band]
             lobes = {"light": 8, "medium": 6, "deep": 4}[band]
             amplitude = (2.0 + ripple.pressure * 10.0) * scale
-            cx = w * 0.5 + offsets[ripple.participant]
+            cx, centre_y = self.camera_point_to_screen(ripple.x, ripple.y, w, h)
             color = RIPPLE_COLORS[ripple.participant]
             for ring in range(ring_count):
                 radius = (40 + ripple.age * 13 + ring * (17 + ripple.pressure * 10)) * scale
@@ -703,31 +720,21 @@ class SquishApp:
                 pygame.draw.lines(layer, (*color, alpha), True, points, width)
         surface.blit(layer, (0, 0))
 
-    def draw_breath_prompt(self, surface: pygame.Surface, w: int, h: int) -> None:
-        phase, progress = breathing_phase(self.breath_elapsed)
-        copy = {
-            "inhale": ("BREATHE IN", "open your hand | let the jelly rise"),
-            "hold": ("HOLD SOFTLY", "stay comfortable | no need to be perfectly still"),
-            "exhale": ("BREATHE OUT & SQUEEZE", "close your hand slowly | release when ready"),
-        }
-        title, subtitle = copy[phase]
-        heading = self.font.render(title, True, (86, 67, 143))
-        hint = self.font_tiny.render(subtitle, True, (107, 102, 132))
-        surface.blit(heading, (w // 2 - heading.get_width() // 2, 157))
-        surface.blit(hint, (w // 2 - hint.get_width() // 2, 187))
-        track = pygame.Rect(w // 2 - 145, 211, 290, 7)
-        pygame.draw.rect(surface, (219, 216, 236), track, border_radius=4)
-        fill = track.copy()
-        fill.width = int(track.width * progress)
-        phase_color = {"inhale": RIPPLE_COLORS[0], "hold": RIPPLE_COLORS[1], "exhale": RIPPLE_COLORS[2]}[phase]
-        pygame.draw.rect(surface, phase_color, fill, border_radius=4)
-
+    def draw_camera_prompt(self, surface: pygame.Surface, w: int) -> None:
+        title = self.font.render("PUT BOTH PALMS AROUND THE GEL", True, INK)
+        hint = self.font_tiny.render("move closer to flatten | rub one up and one down to roll round", True, (91, 76, 108))
+        prompt = pygame.Rect(0, 0, max(title.get_width(), hint.get_width()) + 34, 59)
+        prompt.midtop = (w // 2, 158)
+        pygame.draw.rect(surface, (255, 255, 255), prompt, border_radius=20)
+        pygame.draw.rect(surface, (216, 207, 230), prompt, 2, border_radius=20)
+        surface.blit(title, (prompt.centerx - title.get_width() // 2, prompt.y + 9))
+        surface.blit(hint, (prompt.centerx - hint.get_width() // 2, prompt.y + 37))
         participant = self.font_tiny.render(
             f"COLLABORATOR {chr(65 + self.collaborator)}  |  SHARED WAVES {self.ripple_layers:02d}",
             True,
             (82, 73, 112),
         )
-        badge = pygame.Rect(30, 160, participant.get_width() + 26, 30)
+        badge = pygame.Rect(30, 224, participant.get_width() + 26, 30)
         pygame.draw.rect(surface, (255, 255, 255), badge, border_radius=15)
         pygame.draw.rect(surface, (*RIPPLE_COLORS[self.collaborator],), badge, 2, border_radius=15)
         surface.blit(participant, (badge.x + 13, badge.y + 8))
@@ -737,20 +744,11 @@ class SquishApp:
         remembered_flatness = (1.0 - self.jelly_roundness) * 0.72
         pressure = max(spring_pressure, remembered_flatness) * (1.0 - self.jelly_roll_strength * 0.76)
         pressure = clamp(pressure)
-        phase, progress = breathing_phase(self.breath_elapsed)
-        if phase == "inhale":
-            breath_scale = 0.94 + progress * 0.10
-        elif phase == "hold":
-            breath_scale = 1.04
-        else:
-            breath_scale = 1.04 - progress * 0.08
-
         # Keep the resting form close to a water-gel sphere. Pressure turns that
         # sphere into a convincing squish without losing its glossy silhouette.
-        width = 252 * (1.0 + pressure * 0.43) * scale * breath_scale
-        height = 252 * (1.0 - pressure * 0.40) * scale * breath_scale
+        width = 252 * (1.0 + pressure * 0.43) * scale
+        height = 252 * (1.0 - pressure * 0.40) * scale
         cy += pressure * 25 * scale
-        cy += math.sin(pygame.time.get_ticks() * 0.0016) * 5 * scale
 
         layer = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         tint = RIPPLE_COLORS[self.collaborator]
@@ -920,13 +918,57 @@ class SquishApp:
             line = f"SPACE squish  |  SHIFT + SPACE squeeze/release to tear  |  1-5 modes  |  M {sound_label}  |  C camera  |  R reset"
         surface.blit(self.font_tiny.render(line, True, (99, 80, 116)), (panel.x + 22, panel.y + 51))
 
+    def draw_camera_background(self, surface: pygame.Surface, w: int, h: int) -> bool:
+        """Draw the mirrored live frame as a cover-scaled AR background."""
+        frame = self.camera.latest_rgb
+        if frame is None:
+            surface.fill((233, 241, 248))
+            pygame.draw.circle(surface, (214, 232, 244), (70, 80), 145)
+            pygame.draw.circle(surface, (241, 218, 237), (w - 20, h - 10), 200)
+            pygame.draw.circle(surface, (208, 240, 234), (w - 75, 170), 90)
+            return False
+        frame_h, frame_w = frame.shape[:2]
+        camera_surface = pygame.image.frombuffer(frame.tobytes(), (frame_w, frame_h), "RGB")
+        cover_scale = max(w / frame_w, h / frame_h)
+        scaled_size = (max(1, int(frame_w * cover_scale)), max(1, int(frame_h * cover_scale)))
+        camera_surface = pygame.transform.smoothscale(camera_surface, scaled_size)
+        surface.blit(camera_surface, ((w - scaled_size[0]) // 2, (h - scaled_size[1]) // 2))
+        veil = pygame.Surface((w, h), pygame.SRCALPHA)
+        veil.fill((18, 24, 38, 42))
+        surface.blit(veil, (0, 0))
+        return True
+
+    def camera_point_to_screen(self, x: float, y: float, w: int, h: int) -> tuple[float, float]:
+        """Map normalised camera coordinates through the same cover crop as the video."""
+        frame = self.camera.latest_rgb
+        if frame is None:
+            return x * w, y * h
+        frame_h, frame_w = frame.shape[:2]
+        cover_scale = max(w / frame_w, h / frame_h)
+        offset_x = (w - frame_w * cover_scale) * 0.5
+        offset_y = (h - frame_h * cover_scale) * 0.5
+        return offset_x + x * frame_w * cover_scale, offset_y + y * frame_h * cover_scale
+
+    def draw_hand_guides(self, surface: pygame.Surface, w: int, h: int) -> None:
+        if not self.tracked_palms:
+            return
+        layer = pygame.Surface((w, h), pygame.SRCALPHA)
+        points = [tuple(map(int, self.camera_point_to_screen(x, y, w, h))) for x, y in self.tracked_palms]
+        if len(points) >= 2:
+            pygame.draw.line(layer, (*RIPPLE_COLORS[self.collaborator], 115), points[0], points[1], 3)
+        for point in points:
+            pygame.draw.circle(layer, (255, 255, 255, 180), point, 27, 3)
+            pygame.draw.circle(layer, (*RIPPLE_COLORS[self.collaborator], 170), point, 20, 2)
+            pygame.draw.circle(layer, (255, 255, 255, 220), point, 4)
+        surface.blit(layer, (0, 0))
+
     def draw(self, status: str, active: bool) -> None:
         w, h = self.screen.get_size()
         if self.toy_index == 4:
-            self.screen.fill((240, 246, 252))
-            pygame.draw.circle(self.screen, (226, 238, 250), (70, 80), 145)
-            pygame.draw.circle(self.screen, (246, 226, 243), (w - 20, h - 10), 200)
-            pygame.draw.circle(self.screen, (221, 246, 242), (w - 75, 170), 90)
+            self.draw_camera_background(self.screen, w, h)
+            header_glass = pygame.Surface((w, 151), pygame.SRCALPHA)
+            header_glass.fill((250, 248, 255, 218))
+            self.screen.blit(header_glass, (0, 0))
         else:
             self.screen.fill(BG)
             pygame.draw.circle(self.screen, (234, 225, 250), (80, 90), 120)
@@ -938,15 +980,20 @@ class SquishApp:
         if self.toy_index == 3:
             tagline = f"SUPERMARKET PACK | {self.ramen_flavor}"
         elif self.toy_index == 4:
-            tagline = "BREATHE & RIPPLE | a collaborative jelly instrument"
+            tagline = "CAMERA GEL | put your hands around the 3D jelly"
         else:
             tagline = self.toy.tagline
         self.screen.blit(self.font_small.render(tagline, True, (100, 82, 116)), (34, 79))
         self.draw_selector(self.screen)
-        scale, cx, cy = min(w / WIDTH, h / HEIGHT), w * 0.5, h * 0.48
+        scale = min(w / WIDTH, h / HEIGHT)
+        if self.toy_index == 4:
+            cx, cy = self.camera_point_to_screen(self.jelly_anchor[0], self.jelly_anchor[1], w, h)
+        else:
+            cx, cy = w * 0.5, h * 0.48
         if self.toy_index == 4:
             self.draw_ripples(self.screen, w, h, scale)
-            self.draw_breath_prompt(self.screen, w, h)
+            self.draw_hand_guides(self.screen, w, h)
+            self.draw_camera_prompt(self.screen, w)
         shake = 0.0
         if self.toy_index == 3 and not self.shell_broken and self.spring.value > 0.72:
             shake = (self.spring.value - 0.72) * 18
