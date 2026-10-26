@@ -126,6 +126,9 @@ class SquishApp:
         self.ripple_layers = 0
         self.ripple_flash = 0.0
         self.collaborator = 0
+        self.jelly_roundness = 1.0
+        self.jelly_rotation = 0.0
+        self.jelly_roll_strength = 0.0
         self.crinkle_sound = self.make_sound("crinkle")
         self.burst_sound = self.make_sound("burst")
         self.ripple_sounds = {
@@ -229,6 +232,9 @@ class SquishApp:
             self.ripples.clear()
             self.ripple_layers = 0
             self.ripple_flash = 0.0
+            self.jelly_roundness = 1.0
+            self.jelly_rotation = 0.0
+            self.jelly_roll_strength = 0.0
 
     def release_ripple(self) -> None:
         pressure = clamp(self.jelly_peak)
@@ -310,6 +316,9 @@ class SquishApp:
     def manual_input(self, dt: float) -> tuple[float, str] | None:
         keys = pygame.key.get_pressed()
         mouse_pressed = pygame.mouse.get_pressed(num_buttons=3)[0]
+        if self.toy_index == 4 and keys[pygame.K_g]:
+            self.manual_target = max(0.0, self.manual_target - dt * 4.8)
+            return self.manual_target, "rolling"
         axis = "horizontal" if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT] else "vertical"
         if keys[pygame.K_SPACE] or mouse_pressed:
             self.manual_target = min(1.0, self.manual_target + dt * 3.8)
@@ -347,12 +356,20 @@ class SquishApp:
     def update(self, dt: float) -> tuple[str, bool]:
         camera_result = self.camera.read()
         manual = self.manual_input(dt)
+        roll_input = camera_result.roll_motion
         if manual is not None:
             self.target, self.squeeze_axis = manual
-            status = "Manual side squeeze" if self.squeeze_axis == "horizontal" else "Manual squish"
+            if self.squeeze_axis == "rolling":
+                roll_input = 1.0
+                status = "Manual rolling round"
+            else:
+                roll_input = 0.0
+                status = "Manual side squeeze" if self.squeeze_axis == "horizontal" else "Manual squish"
             active = True
         elif camera_result.horizontal_squish is not None:
-            self.target = camera_result.horizontal_squish
+            # When opposing palm motion is strong, interpret the gesture as
+            # rolling rather than continuing to crush the ball.
+            self.target = camera_result.horizontal_squish * (1.0 - 0.82 * roll_input)
             self.manual_target = self.target
             self.squeeze_axis = "horizontal"
             status, active = camera_result.message, camera_result.hands_visible == 2
@@ -373,6 +390,18 @@ class SquishApp:
         self.restock_timer = max(0.0, self.restock_timer - dt)
         self.ripple_flash = max(0.0, self.ripple_flash - dt)
         if self.toy_index == 4:
+            self.jelly_roll_strength += (roll_input - self.jelly_roll_strength) * min(1.0, dt * 10.0)
+            if roll_input > 0.12:
+                self.jelly_roundness = clamp(self.jelly_roundness + dt * (0.75 + roll_input * 1.65))
+                self.jelly_rotation = (self.jelly_rotation + dt * (1.6 + roll_input * 5.2)) % math.tau
+            elif squish > 0.12:
+                self.jelly_roundness = clamp(self.jelly_roundness - dt * (0.34 + squish * 0.62), 0.36, 1.0)
+                self.jelly_rotation = (self.jelly_rotation + dt * 0.16) % math.tau
+            else:
+                # The gel very slowly relaxes by itself, but rolling is the
+                # deliberate and clearly visible way to restore a sphere.
+                self.jelly_roundness = clamp(self.jelly_roundness + dt * 0.055, 0.36, 1.0)
+                self.jelly_rotation = (self.jelly_rotation + dt * 0.10) % math.tau
             self.breath_elapsed = (self.breath_elapsed + dt) % 12.0
             self.jelly_peak = max(self.jelly_peak, clamp(squish))
             if self.jelly_peak > 0.16:
@@ -428,7 +457,13 @@ class SquishApp:
             status = self.ramen_reward
         elif self.toy_index == 4:
             phase, _ = breathing_phase(self.breath_elapsed)
-            status = f"Collaborator {chr(65 + self.collaborator)} | {phase}"
+            if self.jelly_roll_strength > 0.20:
+                action = "ROLLING ROUND"
+            elif self.squeeze_axis == "horizontal" and squish > 0.12:
+                action = "FLATTENING"
+            else:
+                action = phase
+            status = f"Collaborator {chr(65 + self.collaborator)} | {action}"
         return status, active
 
     @staticmethod
@@ -698,7 +733,10 @@ class SquishApp:
         surface.blit(participant, (badge.x + 13, badge.y + 8))
 
     def draw_jelly(self, surface: pygame.Surface, cx: float, cy: float, scale: float) -> None:
-        pressure = clamp(self.spring.value)
+        spring_pressure = clamp(self.spring.value)
+        remembered_flatness = (1.0 - self.jelly_roundness) * 0.72
+        pressure = max(spring_pressure, remembered_flatness) * (1.0 - self.jelly_roll_strength * 0.76)
+        pressure = clamp(pressure)
         phase, progress = breathing_phase(self.breath_elapsed)
         if phase == "inhale":
             breath_scale = 0.94 + progress * 0.10
@@ -709,9 +747,9 @@ class SquishApp:
 
         # Keep the resting form close to a water-gel sphere. Pressure turns that
         # sphere into a convincing squish without losing its glossy silhouette.
-        width, height = self.deformed_size(252, 252, pressure, 0.43, 0.38, scale * breath_scale)
-        if self.squeeze_axis == "vertical":
-            cy += pressure * 25 * scale
+        width = 252 * (1.0 + pressure * 0.43) * scale * breath_scale
+        height = 252 * (1.0 - pressure * 0.40) * scale * breath_scale
+        cy += pressure * 25 * scale
         cy += math.sin(pygame.time.get_ticks() * 0.0016) * 5 * scale
 
         layer = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
@@ -757,6 +795,36 @@ class SquishApp:
             ]
             pygame.draw.polygon(layer, color, inner)
 
+        # Project a sparse rotating sphere mesh in software. Only front-facing
+        # segments are drawn, so the material reads as a volume rather than a
+        # flat ellipse without adding an OpenGL dependency.
+        mesh_color = (*edge, 34)
+        for longitude in (-1.18, -0.43, 0.22, 0.91, 1.57):
+            segments: list[list[tuple[float, float]]] = []
+            segment: list[tuple[float, float]] = []
+            rotated_longitude = longitude + self.jelly_rotation
+            for step in range(33):
+                latitude = -math.pi / 2 + step / 32 * math.pi
+                x3 = math.cos(latitude) * math.cos(rotated_longitude)
+                z3 = math.cos(latitude) * math.sin(rotated_longitude)
+                point = (cx + x3 * width * 0.43, cy + math.sin(latitude) * height * 0.43)
+                if z3 > -0.04:
+                    segment.append(point)
+                elif len(segment) > 1:
+                    segments.append(segment)
+                    segment = []
+            if len(segment) > 1:
+                segments.append(segment)
+            for visible_segment in segments:
+                pygame.draw.lines(layer, mesh_color, False, visible_segment, max(1, int(scale)))
+        for latitude in (-0.48, 0.0, 0.48):
+            latitude_y = cy + math.sin(latitude) * height * 0.43
+            latitude_width = width * math.cos(latitude) * 0.86
+            latitude_height = max(5 * scale, height * 0.055 * math.cos(latitude))
+            latitude_rect = pygame.Rect(0, 0, latitude_width, latitude_height)
+            latitude_rect.center = (cx, latitude_y)
+            pygame.draw.arc(layer, (*pale, 30), latitude_rect, 0, math.pi, max(1, int(scale)))
+
         lower_refraction = pygame.Rect(0, 0, width * 0.61, height * 0.22)
         lower_refraction.center = (cx + width * 0.07, cy + height * 0.30)
         pygame.draw.ellipse(layer, (*tint, 112), lower_refraction)
@@ -775,7 +843,7 @@ class SquishApp:
         # A few barely visible inclusions add depth without turning the clean
         # gel material back into the earlier dotted, misty blob.
         for index in range(6):
-            angle = index * 2.399 + now * 0.12
+            angle = index * 2.399 + self.jelly_rotation
             distance = 0.12 + (index % 3) * 0.085
             px = cx + math.cos(angle) * width * distance
             py = cy + math.sin(angle) * height * distance * 0.72
@@ -788,7 +856,8 @@ class SquishApp:
         highlight = pygame.Surface(highlight_size, pygame.SRCALPHA)
         pygame.draw.ellipse(highlight, (255, 255, 255, 244), highlight.get_rect())
         highlight = pygame.transform.rotate(highlight, 24)
-        highlight_rect = highlight.get_rect(center=(cx - width * 0.20, cy - height * 0.27))
+        highlight_shift = math.sin(self.jelly_rotation) * width * 0.025
+        highlight_rect = highlight.get_rect(center=(cx - width * 0.20 + highlight_shift, cy - height * 0.27))
         layer.blit(highlight, highlight_rect)
         pygame.draw.ellipse(
             layer,
@@ -838,7 +907,7 @@ class SquishApp:
         pygame.draw.rect(surface, (255, 255, 255), panel, border_radius=22)
         pygame.draw.rect(surface, (224, 213, 235), panel, 2, border_radius=22)
         if self.toy_index == 4:
-            surface.blit(self.font.render("Follow the breath | squeeze gently | open your hand to release a wave", True, INK), (panel.x + 22, panel.y + 14))
+            surface.blit(self.font.render("Two hands: squeeze flat or rub in opposite directions to roll round", True, INK), (panel.x + 22, panel.y + 14))
         else:
             surface.blit(self.font.render("1 hand: close fist   |   2 hands: squeeze, then pull apart", True, INK), (panel.x + 22, panel.y + 14))
         if self.burst_sound is None:
@@ -846,7 +915,7 @@ class SquishApp:
         else:
             sound_label = "sound ON" if self.sound_on else "sound OFF"
         if self.toy_index == 4:
-            line = f"SPACE squeeze/release  |  N next collaborator  |  1-5 modes  |  M {sound_label}  |  C camera  |  R clear waves"
+            line = f"SPACE flatten/release  |  G roll round  |  N next collaborator  |  M {sound_label}  |  C camera  |  R clear"
         else:
             line = f"SPACE squish  |  SHIFT + SPACE squeeze/release to tear  |  1-5 modes  |  M {sound_label}  |  C camera  |  R reset"
         surface.blit(self.font_tiny.render(line, True, (99, 80, 116)), (panel.x + 22, panel.y + 51))
@@ -901,11 +970,17 @@ class SquishApp:
         meter = pygame.Rect(w // 2 - meter_w // 2, int(h * 0.73), meter_w, 14)
         pygame.draw.rect(self.screen, (223, 212, 235), meter, border_radius=7)
         fill = meter.copy()
-        fill.width = int(meter.width * clamp(self.spring.value))
+        meter_value = self.jelly_roundness if self.toy_index == 4 and self.jelly_roll_strength > 0.20 else clamp(self.spring.value)
+        fill.width = int(meter.width * meter_value)
         pygame.draw.rect(self.screen, self.toy.accent, fill, border_radius=7)
         if self.toy_index == 4:
-            level = pressure_band(clamp(self.spring.value)).upper()
-            label = f"{level} PRESSURE  |  release to leave a shared wave"
+            if self.jelly_roll_strength > 0.20:
+                label = f"ROLLING ROUND  |  form {round(self.jelly_roundness * 100):02d}%"
+            elif clamp(self.spring.value) > 0.12:
+                level = pressure_band(clamp(self.spring.value)).upper()
+                label = f"{level} PRESSURE  |  FLATTENING"
+            else:
+                label = f"FORM {round(self.jelly_roundness * 100):02d}% ROUND  |  squeeze or roll"
         elif self.shell_broken:
             label = "POP! release to reseal the pack" if self.toy_index == 3 else "CRACK! release to regrow the shell"
         elif self.toy_index == 3 and self.ramen_armed:

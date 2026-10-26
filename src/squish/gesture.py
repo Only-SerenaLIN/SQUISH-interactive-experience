@@ -82,6 +82,41 @@ def two_hand_squish(hand_a: Sequence[PointLike], hand_b: Sequence[PointLike]) ->
     return 1.0 - remap_clamped(gap, 0.13, 0.58)
 
 
+def palm_centre(landmarks: Sequence[PointLike]) -> tuple[float, float]:
+    """Return a stable normalised palm centre for motion tracking."""
+    if len(landmarks) < 21:
+        raise ValueError("Each MediaPipe hand supplies 21 landmarks")
+    palm_ids = (0, 5, 9, 13, 17)
+    return (
+        sum(landmarks[i].x for i in palm_ids) / len(palm_ids),
+        sum(landmarks[i].y for i in palm_ids) / len(palm_ids),
+    )
+
+
+def two_hand_roll_motion(
+    previous: tuple[tuple[float, float], tuple[float, float]],
+    current: tuple[tuple[float, float], tuple[float, float]],
+) -> float:
+    """Estimate a 0..1 two-palm rolling motion between consecutive frames.
+
+    A rolling gesture moves the two palms in opposite directions. Common camera
+    movement moves both palms together and therefore mostly cancels out here.
+    Both pairs should be ordered from left to right before calling this helper.
+    """
+    previous_left, previous_right = previous
+    current_left, current_right = current
+    left_dx = current_left[0] - previous_left[0]
+    left_dy = current_left[1] - previous_left[1]
+    right_dx = current_right[0] - previous_right[0]
+    right_dy = current_right[1] - previous_right[1]
+    opposing_vertical = abs(left_dy - right_dy)
+    opposing_horizontal = abs(left_dx - right_dx)
+    # Horizontal opposition mostly means the palms are simply closing around
+    # the ball. Vertical opposition is the distinctive rubbing/rolling cue.
+    motion = opposing_vertical + opposing_horizontal * 0.08
+    return remap_clamped(motion, 0.006, 0.060)
+
+
 def is_pull_apart_tear(peak_pressure: float, current_pressure: float, target_pressure: float) -> bool:
     """Detect a deliberate squeeze-then-release gesture for opening a packet."""
     return peak_pressure > 0.72 and peak_pressure - current_pressure > 0.27 and target_pressure < 0.42

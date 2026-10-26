@@ -2,7 +2,7 @@
 
 Public repository: <https://github.com/Only-SerenaLIN/SQUISH-interactive-experience>
 
-**SQUISH!** is a webcam-controlled breathing and co-creation experience built around a glossy, translucent digital hydrogel ball. Follow a gentle breathing prompt, close your hand to build pressure, and open it to release a visual ripple and a generated musical chord. Each person's waves remain on the shared canvas long enough to meet the next participant's contribution.
+**SQUISH!** is a webcam-controlled breathing and co-creation experience built around a glossy, translucent 3D hydrogel ball. Bring two palms together to flatten it, rub the palms in opposite vertical directions to roll it round again, and release pressure to create a visual ripple and generated musical chord. Each person's waves remain on the shared canvas long enough to meet the next participant's contribution.
 
 The default **Ripple Jelly** mode is the focused Assignment 3 experience. Earlier Cyber Apple, Soft Blob, Crispy Peach, and Ramen Pack studies remain available as development experiments. If the camera is unavailable, the complete main interaction still works with the keyboard or mouse.
 
@@ -12,14 +12,18 @@ Three collaborators produce different coloured layers. Light, medium, and deep p
 
 ![Ripple Jelly after releasing a shared wave](docs/ripple-jelly-release.png)
 
+![3D jelly flattened by pressure](docs/3d-jelly-flatten.png)
+
+![3D jelly rolled back into a sphere](docs/3d-jelly-roll-round.png)
+
 This is a calming interactive artwork, not a medical or therapeutic product.
 
 ## Main interaction
 
 ```text
-open hand / inhale → jelly expands → close hand / exhale → pressure builds
-        ↑                                                   ↓
-        └── release hand ← chord and shared ripple appear ──┘
+two palms approach → jelly flattens → release → ripple and chord
+        ↑                                      ↓
+        └── opposite rubbing motion → roll round again ─────┘
 ```
 
 - **Light pressure:** thin breathing waves and a bright, airy chord
@@ -56,16 +60,17 @@ The enhanced supermarket interaction adds anticipation before the burst and a di
 
 1. 在 Codex 中选择 **Open Folder**，打开这个 `SQUISH` 文件夹，再打开内置终端。
 2. 第一次运行 `uv sync`，等待依赖安装完成。
-3. 运行 `uv run python run_squish.py`。看到摄像头权限提示时选择允许；跟随呼吸提示，握拳积累压力，张开手释放波纹和音乐。
+3. 运行 `uv run python run_squish.py`。看到摄像头权限提示时选择允许；两手靠近把球捏扁，两手上下反向搓动把球搓圆，松手释放波纹和音乐。
 
-如果暂时不想开摄像头，运行 `uv run python run_squish.py --no-camera`，然后按住空格键积累压力、松开生成波纹。按 `N` 交给下一位共创者，按 `C` 暂停或重试摄像头，按 `H` 隐藏说明，按 `Esc` 退出。遇到问题时直接看下面的 **Troubleshooting**，不会因为摄像头不可用而无法完成演示。
+如果暂时不想开摄像头，运行 `uv run python run_squish.py --no-camera`，按住空格键捏扁、松开生成波纹，按住 `G` 把球搓圆。按 `N` 交给下一位共创者，按 `C` 暂停或重试摄像头，按 `H` 隐藏说明，按 `Esc` 退出。遇到问题时直接看下面的 **Troubleshooting**，不会因为摄像头不可用而无法完成演示。
 
 ## What the prototype includes
 
 - Live one-hand and two-hand tracking with OpenCV and MediaPipe
 - Hand-open / hand-closed estimation, normalised for hand size
 - Horizontal two-palm distance mapped to side pressure
-- A glossy translucent **Ripple Jelly** with a coloured rim, transmitted light, specular highlights, breathing expansion, pressure deformation, and spring rebound
+- Opposing two-palm motion detection that separates rolling from shared camera drift and horizontal squeezing
+- A software-rendered 3D **Ripple Jelly** with rotating projected surface lines, coloured rim, transmitted light, specular highlights, persistent flattening, and roll-to-round recovery
 - A persistent eight-layer co-creation canvas for three sequential collaborators
 - Three pressure qualities mapped to distinct wave geometry and generated ambient chords
 - A 4-2-6 visual breathing guide that never treats timing variation as failure
@@ -116,8 +121,10 @@ uv run python run_squish.py --no-camera
 |---|---|
 | Open hand | Release, rebound, and leave a wave in Ripple Jelly mode |
 | Closed fist | Build pressure while deforming the jelly |
-| Two hands moving together/apart | Horizontal squeeze/release; on Ramen Pack, squeeze until prompted and pull apart to tear |
-| Hold `Space` or left mouse | Manual squish |
+| Two palms moving horizontally together/apart | Flatten/release; on Ramen Pack, squeeze until prompted and pull apart to tear |
+| Two palms rubbing vertically in opposite directions | Rotate and roll Ripple Jelly back into a sphere |
+| Hold `Space` or left mouse | Manual flatten/squish |
+| Hold `G` | Manual roll-round gesture for Ripple Jelly |
 | Hold, then release `Shift + Space` | Manual horizontal squeeze; tears an armed Ramen Pack |
 | Arrow keys | Gradually adjust squish |
 | `1`, `2`, `3`, `4`, `5` | Select Cyber Apple, Soft Blob, Crispy Peach, Ramen Pack, or Ripple Jelly |
@@ -137,7 +144,7 @@ Keyboard and mouse input temporarily take priority over the camera, so you can d
 
 **The hand signal feels jumpy.** Keep one hand visible, face the palm toward the camera, use even lighting, and keep your wrist and fingertips inside the frame. The prototype smooths the reading but intentionally stays responsive.
 
-**The wrong gesture is detected.** For one-hand mode, start with a clearly open palm, then make a clear fist. For two-hand mode, keep both palms visible and move them horizontally together or apart. Unusual angles, overlap, or a hand leaving the frame can confuse tracking. That limitation is documented honestly in `PROCESS.md`.
+**The wrong gesture is detected.** For one-hand mode, start with a clearly open palm, then make a clear fist. To flatten, keep both palms visible and move them horizontally together. To roll round, hold the gap fairly steady while moving one palm up as the other moves down. Unusual angles, overlap, or a hand leaving the frame can confuse tracking. That limitation is documented honestly in `PROCESS.md`.
 
 **A package fails to install.** Confirm that `uv run python --version` reports Python 3.11 or 3.12. The project intentionally excludes Python 3.13 because MediaPipe wheel support varies by platform.
 

@@ -152,6 +152,16 @@ Camera frames are processed in memory and are not displayed, recorded, uploaded,
 - **0.6.1 material polish:** replaced the misty oval jelly with a rounder hydrogel-ball treatment after reviewing a user-supplied material reference. A saturated rim, transparent centre, sharp offset highlights, lower refraction colour, and a soft contact shadow make the squeeze response read more clearly. The reference image itself is not included or copied into the program.
 - Added automated tests for pressure classification and breathing phase timing.
 
+### Prototype 0.7 — 3D roll and flatten
+
+- Rebuilt the jelly presentation as a software-projected 3D volume. A sparse front-facing sphere mesh rotates beneath the translucent material, so the ball communicates depth without adding an OpenGL dependency.
+- Added a second two-hand relationship: horizontal palm distance flattens the ball, while opposite vertical palm movement is recognised as rolling it round.
+- Reduced false rolling triggers by largely ignoring opposite horizontal motion, since that motion belongs to the flatten gesture.
+- Added short-lived shape memory: a flattened ball relaxes only slowly, while a deliberate rolling gesture restores its roundness quickly.
+- Added visible `FLATTENING` and `ROLLING ROUND` feedback plus a form-roundness percentage.
+- Added `G` as the camera-free roll-round control and kept `Space` as the flatten/release control.
+- Added an automated comparison proving that opposite palm motion scores highly while shared camera drift does not. Live participant testing is still outstanding.
+
 ### AI collaboration record
 
 OpenAI Codex was used to scaffold the Python project, implement and test the camera/fallback loop, propose visual feedback, and draft documentation. A suggestion that was **kept** was separating the gesture maths from the Pygame drawing code, because it makes the input-to-response logic testable without a webcam. An early suggestion to add only simple colour choices was **changed** after the student supplied tactile references: later variants change rebound, fracture, ripple geometry, and sound rather than decoration alone. A first proposal to omit audio was later **rejected** after the student requested sound; the revised design generates sounds in memory and preserves a silent fallback. A points-based game direction was **rejected** in favour of equal-status pressure qualities and a shared generative canvas, because the student wanted a calmer co-creative experience.
@@ -161,7 +171,7 @@ The student must review this account, edit it into their own voice, and ensure i
 ### Known limitations before user testing
 
 - Hand openness is heuristic and may vary with hand angle, lighting, and distance.
-- Two-hand distance is measured horizontally, so overlapping hands or strong camera angles can confuse it.
+- Two-hand distance is measured horizontally and rolling is estimated from frame-to-frame opposite vertical motion, so overlap, low frame rate, or strong camera angles can confuse it.
 - Sound depends on the computer providing an output device; visual feedback remains complete without it.
 - The breathing prompt offers a visual rhythm but is not health guidance; participants can release at any time.
 - Co-creation is sequential on one device, not networked or simultaneous.

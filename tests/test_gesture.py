@@ -9,6 +9,7 @@ from squish.gesture import (
     hand_openness,
     is_pull_apart_tear,
     pressure_band,
+    two_hand_roll_motion,
     remap_clamped,
     two_hand_squish,
 )
@@ -69,6 +70,14 @@ def test_two_hands_get_more_pressure_as_they_move_together() -> None:
     far_right = shifted_hand(0.25)
     near_right = shifted_hand(-0.05)
     assert two_hand_squish(left, near_right) > two_hand_squish(left, far_right)
+
+
+def test_opposing_palm_motion_reads_as_rolling() -> None:
+    previous = ((0.30, 0.50), (0.70, 0.50))
+    rolling = ((0.30, 0.46), (0.70, 0.54))
+    camera_drift = ((0.30, 0.46), (0.70, 0.46))
+    assert two_hand_roll_motion(previous, rolling) > 0.8
+    assert two_hand_roll_motion(previous, camera_drift) < 0.1
 
 
 def test_packet_tears_only_after_a_strong_squeeze_and_clear_release() -> None:

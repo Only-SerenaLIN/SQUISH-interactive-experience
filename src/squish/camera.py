@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 
-from .gesture import hand_openness, two_hand_squish
+from .gesture import hand_openness, palm_centre, two_hand_roll_motion, two_hand_squish
 
 
 @dataclass
@@ -14,6 +14,7 @@ class TrackingResult:
     horizontal_squish: float | None
     hands_visible: int
     message: str
+    roll_motion: float = 0.0
 
 
 class HandCamera:
@@ -33,6 +34,8 @@ class HandCamera:
         self._last_seen = 0.0
         self._smoothed = 1.0
         self._smoothed_horizontal = 0.0
+        self._smoothed_roll = 0.0
+        self._previous_palms: tuple[tuple[float, float], tuple[float, float]] | None = None
 
     def start(self) -> bool:
         if self.enabled:
@@ -79,19 +82,30 @@ class HandCamera:
         rgb.flags.writeable = False
         result = self.hands.process(rgb)
         if not result.multi_hand_landmarks:
+            self._previous_palms = None
+            self._smoothed_roll *= 0.72
             elapsed = time.monotonic() - self._last_seen
             message = "Show one hand to the camera" if elapsed > 0.35 else "Tracking…"
             return TrackingResult(None, None, 0, message)
 
         if len(result.multi_hand_landmarks) >= 2:
+            hand_a = result.multi_hand_landmarks[0].landmark
+            hand_b = result.multi_hand_landmarks[1].landmark
             raw = two_hand_squish(
-                result.multi_hand_landmarks[0].landmark,
-                result.multi_hand_landmarks[1].landmark,
+                hand_a,
+                hand_b,
             )
+            palms = tuple(sorted((palm_centre(hand_a), palm_centre(hand_b)), key=lambda point: point[0]))
+            raw_roll = two_hand_roll_motion(self._previous_palms, palms) if self._previous_palms is not None else 0.0
+            self._previous_palms = palms
             self._smoothed_horizontal += (raw - self._smoothed_horizontal) * 0.25
+            self._smoothed_roll += (raw_roll - self._smoothed_roll) * 0.32
             self._last_seen = time.monotonic()
-            return TrackingResult(None, self._smoothed_horizontal, 2, "Two-hand side squeeze")
+            message = "Two hands: rolling round" if self._smoothed_roll > 0.24 else "Two hands: flattening"
+            return TrackingResult(None, self._smoothed_horizontal, 2, message, self._smoothed_roll)
 
+        self._previous_palms = None
+        self._smoothed_roll *= 0.72
         raw = hand_openness(result.multi_hand_landmarks[0].landmark)
         self._smoothed += (raw - self._smoothed) * 0.28
         self._last_seen = time.monotonic()
