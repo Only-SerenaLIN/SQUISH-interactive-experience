@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import pygame
 
 from .camera import HandCamera
-from .gesture import SpringValue, clamp, is_pull_apart_tear
+from .gesture import SpringValue, breathing_phase, clamp, is_pull_apart_tear, pressure_band
 
 
 WIDTH, HEIGHT = 1000, 700
@@ -22,6 +22,7 @@ INK = (46, 35, 61)
 PURPLE = (117, 82, 255)
 PINK = (255, 104, 166)
 MINT = (86, 218, 182)
+RIPPLE_COLORS = ((69, 190, 220), (137, 104, 225), (244, 119, 174))
 
 RAMEN_FLAVORS = (
     ("VOLCANO KIMCHI", (255, 91, 68), (255, 190, 61)),
@@ -55,6 +56,7 @@ TOYS = (
     ToySpec("SOFT BLOB", "bouncy original friend", PURPLE, PINK, 28.0, 8.0),
     ToySpec("CRISPY PEACH", "crack the shell, find the soft core", (255, 210, 157), (255, 116, 145), 38.0, 10.0),
     ToySpec("RAMEN PACK", "crinkle the bag, then pop the noodles", (255, 91, 68), (255, 190, 61), 42.0, 11.0),
+    ToySpec("RIPPLE JELLY", "breathe, squeeze, leave a shared ripple", (166, 218, 238), (129, 108, 225), 22.0, 8.0),
 )
 
 
@@ -68,6 +70,14 @@ class Particle:
     color: tuple[int, int, int]
     size: float
     shard: bool = False
+
+
+@dataclass
+class Ripple:
+    pressure: float
+    participant: int
+    age: float
+    phase: float
 
 
 class SquishApp:
@@ -93,7 +103,7 @@ class SquishApp:
         self.particles: list[Particle] = []
         self.last_squish = 0.0
         self.squeeze_axis = "vertical"
-        self.toy_index = 0
+        self.toy_index = 4
         self.shell_broken = False
         self.heal_timer = 0.0
         self.sound_on = True
@@ -109,12 +119,25 @@ class SquishApp:
         self.shake_timer = 0.0
         self.flash_timer = 0.0
         self.restock_timer = 0.0
+        self.breath_elapsed = 0.0
+        self.jelly_peak = 0.0
+        self.jelly_armed = False
+        self.ripples: list[Ripple] = []
+        self.ripple_layers = 0
+        self.ripple_flash = 0.0
+        self.collaborator = 0
         self.crinkle_sound = self.make_sound("crinkle")
         self.burst_sound = self.make_sound("burst")
+        self.ripple_sounds = {
+            band: self.make_chord(band) for band in ("light", "medium", "deep")
+        }
         if self.crinkle_sound is not None:
             self.crinkle_sound.set_volume(0.28)
         if self.burst_sound is not None:
             self.burst_sound.set_volume(0.48)
+        for sound in self.ripple_sounds.values():
+            if sound is not None:
+                sound.set_volume(0.24)
         self.running = True
 
     @staticmethod
@@ -151,6 +174,32 @@ class SquishApp:
         if self.sound_on and sound is not None:
             sound.play()
 
+    @staticmethod
+    def make_chord(band: str) -> pygame.mixer.Sound | None:
+        """Generate a soft layered chord for a released pressure wave."""
+        if pygame.mixer.get_init() is None:
+            return None
+        frequencies = {
+            "light": (523.25, 659.25, 783.99),
+            "medium": (392.00, 493.88, 587.33),
+            "deep": (261.63, 392.00, 523.25),
+        }[band]
+        sample_rate, duration = 44100, 1.65
+        samples = array.array("h")
+        for i in range(int(sample_rate * duration)):
+            t = i / sample_rate
+            attack = min(1.0, t / 0.10)
+            release = max(0.0, 1.0 - t / duration) ** 1.7
+            shimmer = sum(math.sin(math.tau * frequency * t) for frequency in frequencies) / len(frequencies)
+            breath = math.sin(math.tau * frequencies[0] * 0.5 * t) * 0.12
+            value = (shimmer * 0.42 + breath) * attack * release
+            sample = int(max(-1.0, min(1.0, value)) * 32767)
+            samples.extend((sample, sample))
+        try:
+            return pygame.mixer.Sound(buffer=samples.tobytes())
+        except pygame.error:
+            return None
+
     @property
     def toy(self) -> ToySpec:
         return TOYS[self.toy_index]
@@ -173,6 +222,25 @@ class SquishApp:
         self.restock_timer = 0.0
         if self.toy_index == 3:
             self.prepare_ramen()
+        if self.toy_index == 4:
+            self.breath_elapsed = 0.0
+            self.jelly_peak = 0.0
+            self.jelly_armed = False
+            self.ripples.clear()
+            self.ripple_layers = 0
+            self.ripple_flash = 0.0
+
+    def release_ripple(self) -> None:
+        pressure = clamp(self.jelly_peak)
+        if pressure < 0.16:
+            return
+        self.ripples.append(Ripple(pressure, self.collaborator, 0.0, random.uniform(0, math.tau)))
+        self.ripples = self.ripples[-8:]
+        self.ripple_layers += 1
+        self.ripple_flash = 0.55
+        self.play_sound(self.ripple_sounds[pressure_band(pressure)])
+        self.jelly_peak = 0.0
+        self.jelly_armed = False
 
     def prepare_ramen(self) -> None:
         self.ramen_flavor, self.ramen_color, self.ramen_accent = random.choice(RAMEN_FLAVORS)
@@ -230,6 +298,12 @@ class SquishApp:
                     self.select_toy(2)
                 elif event.key in (pygame.K_4, pygame.K_KP4):
                     self.select_toy(3)
+                elif event.key in (pygame.K_5, pygame.K_KP5):
+                    self.select_toy(4)
+                elif event.key == pygame.K_n and self.toy_index == 4:
+                    self.collaborator = (self.collaborator + 1) % 3
+                    self.jelly_peak = 0.0
+                    self.jelly_armed = False
                 elif event.key == pygame.K_TAB:
                     self.select_toy(self.toy_index + 1)
 
@@ -297,6 +371,17 @@ class SquishApp:
         self.shake_timer = max(0.0, self.shake_timer - dt)
         self.flash_timer = max(0.0, self.flash_timer - dt)
         self.restock_timer = max(0.0, self.restock_timer - dt)
+        self.ripple_flash = max(0.0, self.ripple_flash - dt)
+        if self.toy_index == 4:
+            self.breath_elapsed = (self.breath_elapsed + dt) % 12.0
+            self.jelly_peak = max(self.jelly_peak, clamp(squish))
+            if self.jelly_peak > 0.16:
+                self.jelly_armed = True
+            if self.jelly_armed and squish < 0.10 and self.target < 0.08:
+                self.release_ripple()
+            for ripple in self.ripples:
+                ripple.age += dt
+            self.ripples = [ripple for ripple in self.ripples if ripple.age < 22.0]
         if self.toy_index == 3 and not self.shell_broken:
             crossed_crinkle = any(self.last_squish <= level < squish for level in (0.22, 0.43, 0.64))
             if crossed_crinkle and self.crinkle_cooldown <= 0:
@@ -323,7 +408,7 @@ class SquishApp:
             w, h = self.screen.get_size()
             self.spawn_pop(w * 0.5, h * 0.49, crispy=True)
             self.play_sound(self.burst_sound)
-        elif self.toy_index not in (2, 3) and squish > 0.80 and self.last_squish <= 0.80:
+        elif self.toy_index not in (2, 3, 4) and squish > 0.80 and self.last_squish <= 0.80:
             w, h = self.screen.get_size()
             self.spawn_pop(w * 0.5, h * 0.52)
 
@@ -341,6 +426,9 @@ class SquishApp:
         self.update_particles(dt)
         if self.toy_index == 3 and self.shell_broken:
             status = self.ramen_reward
+        elif self.toy_index == 4:
+            phase, _ = breathing_phase(self.breath_elapsed)
+            status = f"Collaborator {chr(65 + self.collaborator)} | {phase}"
         return status, active
 
     @staticmethod
@@ -550,11 +638,114 @@ class SquishApp:
             pygame.draw.rect(surface, (255, 255, 255), pack, border_radius=9)
             pygame.draw.rect(surface, (222, 208, 232), pack, 2, border_radius=9)
             pygame.draw.line(surface, (255, 190, 61), (pack.left + 8, pack.centery), (pack.right - 8, pack.centery), 5)
-        count = self.font_tiny.render(f"AISLE 04  ·  PACKS POPPED {self.packs_popped:02d}", True, (93, 73, 111))
+        count = self.font_tiny.render(f"AISLE 04  |  PACKS POPPED {self.packs_popped:02d}", True, (93, 73, 111))
         badge = pygame.Rect(30, 160, count.get_width() + 26, 30)
         pygame.draw.rect(surface, (255, 255, 255), badge, border_radius=15)
         pygame.draw.rect(surface, (220, 207, 231), badge, 2, border_radius=15)
         surface.blit(count, (badge.x + 13, badge.y + 8))
+
+    def draw_ripples(self, surface: pygame.Surface, w: int, h: int, scale: float) -> None:
+        layer = pygame.Surface((w, h), pygame.SRCALPHA)
+        centre_y = h * 0.48
+        offsets = (-115 * scale, 0, 115 * scale)
+        for ripple in self.ripples:
+            fade = max(0.0, 1.0 - ripple.age / 22.0)
+            band = pressure_band(ripple.pressure)
+            ring_count = {"light": 2, "medium": 4, "deep": 6}[band]
+            lobes = {"light": 8, "medium": 6, "deep": 4}[band]
+            amplitude = (2.0 + ripple.pressure * 10.0) * scale
+            cx = w * 0.5 + offsets[ripple.participant]
+            color = RIPPLE_COLORS[ripple.participant]
+            for ring in range(ring_count):
+                radius = (40 + ripple.age * 13 + ring * (17 + ripple.pressure * 10)) * scale
+                points = []
+                for index in range(100):
+                    angle = index / 100 * math.tau
+                    warped = radius + math.sin(angle * lobes + ripple.phase + ring * 0.48) * amplitude
+                    points.append((cx + math.cos(angle) * warped, centre_y + math.sin(angle) * warped * 0.58))
+                alpha = int((82 - ring * 7) * fade)
+                width = max(1, int((1.2 + ripple.pressure * 3.6) * scale))
+                pygame.draw.lines(layer, (*color, alpha), True, points, width)
+        surface.blit(layer, (0, 0))
+
+    def draw_breath_prompt(self, surface: pygame.Surface, w: int, h: int) -> None:
+        phase, progress = breathing_phase(self.breath_elapsed)
+        copy = {
+            "inhale": ("BREATHE IN", "open your hand | let the jelly rise"),
+            "hold": ("HOLD SOFTLY", "stay comfortable | no need to be perfectly still"),
+            "exhale": ("BREATHE OUT & SQUEEZE", "close your hand slowly | release when ready"),
+        }
+        title, subtitle = copy[phase]
+        heading = self.font.render(title, True, (86, 67, 143))
+        hint = self.font_tiny.render(subtitle, True, (107, 102, 132))
+        surface.blit(heading, (w // 2 - heading.get_width() // 2, 157))
+        surface.blit(hint, (w // 2 - hint.get_width() // 2, 187))
+        track = pygame.Rect(w // 2 - 145, 211, 290, 7)
+        pygame.draw.rect(surface, (219, 216, 236), track, border_radius=4)
+        fill = track.copy()
+        fill.width = int(track.width * progress)
+        phase_color = {"inhale": RIPPLE_COLORS[0], "hold": RIPPLE_COLORS[1], "exhale": RIPPLE_COLORS[2]}[phase]
+        pygame.draw.rect(surface, phase_color, fill, border_radius=4)
+
+        participant = self.font_tiny.render(
+            f"COLLABORATOR {chr(65 + self.collaborator)}  |  SHARED WAVES {self.ripple_layers:02d}",
+            True,
+            (82, 73, 112),
+        )
+        badge = pygame.Rect(30, 160, participant.get_width() + 26, 30)
+        pygame.draw.rect(surface, (255, 255, 255), badge, border_radius=15)
+        pygame.draw.rect(surface, (*RIPPLE_COLORS[self.collaborator],), badge, 2, border_radius=15)
+        surface.blit(participant, (badge.x + 13, badge.y + 8))
+
+    def draw_jelly(self, surface: pygame.Surface, cx: float, cy: float, scale: float) -> None:
+        pressure = clamp(self.spring.value)
+        phase, progress = breathing_phase(self.breath_elapsed)
+        if phase == "inhale":
+            breath_scale = 0.94 + progress * 0.10
+        elif phase == "hold":
+            breath_scale = 1.04
+        else:
+            breath_scale = 1.04 - progress * 0.08
+
+        width, height = self.deformed_size(285, 230, pressure, 0.48, 0.40, scale * breath_scale)
+        if self.squeeze_axis == "vertical":
+            cy += pressure * 30 * scale
+        cy += math.sin(pygame.time.get_ticks() * 0.0016) * 5 * scale
+        shadow = pygame.Rect(0, 0, width * 0.73, 24 * scale)
+        shadow.center = (cx, cy + height * 0.53)
+        pygame.draw.ellipse(surface, (207, 211, 231), shadow)
+
+        layer = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        glow = pygame.Rect(0, 0, width + 95 * scale, height + 75 * scale)
+        glow.center = (cx, cy)
+        pygame.draw.ellipse(layer, (*RIPPLE_COLORS[self.collaborator], 24), glow)
+
+        now = pygame.time.get_ticks() * 0.0018
+        points = []
+        for index in range(96):
+            angle = index / 96 * math.tau
+            wobble = 1 + math.sin(angle * 6 + now) * (0.018 + pressure * 0.012)
+            points.append((cx + math.cos(angle) * width * 0.5 * wobble, cy + math.sin(angle) * height * 0.5 * wobble))
+        pygame.draw.polygon(layer, (112, 204, 232, 72), points)
+        inner = [(cx + (x - cx) * 0.88, cy + (y - cy) * 0.88) for x, y in points]
+        pygame.draw.polygon(layer, (203, 177, 246, 63), inner)
+        pygame.draw.lines(layer, (255, 255, 255, 175), True, points, max(2, int(3 * scale)))
+
+        for index in range(18):
+            angle = index * 2.399 + now * 0.22
+            distance = 0.20 + (index % 5) * 0.055
+            px = cx + math.cos(angle) * width * distance
+            py = cy + math.sin(angle) * height * distance * 0.72
+            radius = max(2, int((2 + index % 3) * scale))
+            color = (*RIPPLE_COLORS[index % 3], 90 + (index % 4) * 28)
+            pygame.draw.circle(layer, color, (int(px), int(py)), radius)
+
+        core_radius = int((24 + pressure * 15) * scale)
+        pygame.draw.circle(layer, (255, 255, 255, 92), (int(cx), int(cy)), core_radius)
+        shine = pygame.Rect(0, 0, width * 0.32, height * 0.16)
+        shine.center = (cx - width * 0.19, cy - height * 0.25)
+        pygame.draw.ellipse(layer, (255, 255, 255, 150), shine)
+        surface.blit(layer, (0, 0))
 
     def draw_particles(self, surface: pygame.Surface) -> None:
         for p in self.particles:
@@ -591,27 +782,47 @@ class SquishApp:
         panel = pygame.Rect(26, h - 112, min(735, w - 52), 84)
         pygame.draw.rect(surface, (255, 255, 255), panel, border_radius=22)
         pygame.draw.rect(surface, (224, 213, 235), panel, 2, border_radius=22)
-        surface.blit(self.font.render("1 hand: close fist   |   2 hands: squeeze, then pull apart", True, INK), (panel.x + 22, panel.y + 14))
+        if self.toy_index == 4:
+            surface.blit(self.font.render("Follow the breath | squeeze gently | open your hand to release a wave", True, INK), (panel.x + 22, panel.y + 14))
+        else:
+            surface.blit(self.font.render("1 hand: close fist   |   2 hands: squeeze, then pull apart", True, INK), (panel.x + 22, panel.y + 14))
         if self.burst_sound is None:
             sound_label = "sound unavailable"
         else:
             sound_label = "sound ON" if self.sound_on else "sound OFF"
-        line = f"SPACE squish  |  SHIFT + SPACE squeeze/release to tear  |  1–4 toys  |  M {sound_label}  |  C camera  |  R reset"
+        if self.toy_index == 4:
+            line = f"SPACE squeeze/release  |  N next collaborator  |  1-5 modes  |  M {sound_label}  |  C camera  |  R clear waves"
+        else:
+            line = f"SPACE squish  |  SHIFT + SPACE squeeze/release to tear  |  1-5 modes  |  M {sound_label}  |  C camera  |  R reset"
         surface.blit(self.font_tiny.render(line, True, (99, 80, 116)), (panel.x + 22, panel.y + 51))
 
     def draw(self, status: str, active: bool) -> None:
         w, h = self.screen.get_size()
-        self.screen.fill(BG)
-        pygame.draw.circle(self.screen, (234, 225, 250), (80, 90), 120)
-        pygame.draw.circle(self.screen, (255, 225, 238), (w - 45, h - 30), 170)
-        pygame.draw.circle(self.screen, (221, 247, 239), (w - 80, 150), 70)
+        if self.toy_index == 4:
+            self.screen.fill((240, 246, 252))
+            pygame.draw.circle(self.screen, (226, 238, 250), (70, 80), 145)
+            pygame.draw.circle(self.screen, (246, 226, 243), (w - 20, h - 10), 200)
+            pygame.draw.circle(self.screen, (221, 246, 242), (w - 75, 170), 90)
+        else:
+            self.screen.fill(BG)
+            pygame.draw.circle(self.screen, (234, 225, 250), (80, 90), 120)
+            pygame.draw.circle(self.screen, (255, 225, 238), (w - 45, h - 30), 170)
+            pygame.draw.circle(self.screen, (221, 247, 239), (w - 80, 150), 70)
         if self.toy_index == 3:
             self.draw_supermarket(self.screen, w, h)
         self.screen.blit(self.font_big.render("SQUISH!", True, INK), (30, 18))
-        tagline = f"SUPERMARKET PACK · {self.ramen_flavor}" if self.toy_index == 3 else self.toy.tagline
+        if self.toy_index == 3:
+            tagline = f"SUPERMARKET PACK | {self.ramen_flavor}"
+        elif self.toy_index == 4:
+            tagline = "BREATHE & RIPPLE | a collaborative jelly instrument"
+        else:
+            tagline = self.toy.tagline
         self.screen.blit(self.font_small.render(tagline, True, (100, 82, 116)), (34, 79))
         self.draw_selector(self.screen)
         scale, cx, cy = min(w / WIDTH, h / HEIGHT), w * 0.5, h * 0.48
+        if self.toy_index == 4:
+            self.draw_ripples(self.screen, w, h, scale)
+            self.draw_breath_prompt(self.screen, w, h)
         shake = 0.0
         if self.toy_index == 3 and not self.shell_broken and self.spring.value > 0.72:
             shake = (self.spring.value - 0.72) * 18
@@ -626,8 +837,10 @@ class SquishApp:
             self.draw_blob(self.screen, cx, cy, scale)
         elif self.toy_index == 2:
             self.draw_crispy(self.screen, cx, cy, scale)
-        else:
+        elif self.toy_index == 3:
             self.draw_ramen(self.screen, cx, cy, scale)
+        else:
+            self.draw_jelly(self.screen, cx, cy, scale)
         self.draw_particles(self.screen)
         meter_w = min(300, int(w * 0.34))
         meter = pygame.Rect(w // 2 - meter_w // 2, int(h * 0.73), meter_w, 14)
@@ -635,7 +848,10 @@ class SquishApp:
         fill = meter.copy()
         fill.width = int(meter.width * clamp(self.spring.value))
         pygame.draw.rect(self.screen, self.toy.accent, fill, border_radius=7)
-        if self.shell_broken:
+        if self.toy_index == 4:
+            level = pressure_band(clamp(self.spring.value)).upper()
+            label = f"{level} PRESSURE  |  release to leave a shared wave"
+        elif self.shell_broken:
             label = "POP! release to reseal the pack" if self.toy_index == 3 else "CRACK! release to regrow the shell"
         elif self.toy_index == 3 and self.ramen_armed:
             label = "READY! PULL YOUR HANDS APART"
@@ -658,6 +874,10 @@ class SquishApp:
         if self.flash_timer > 0:
             flash = pygame.Surface((w, h), pygame.SRCALPHA)
             flash.fill((255, 248, 205, int(175 * self.flash_timer / 0.11)))
+            self.screen.blit(flash, (0, 0))
+        if self.ripple_flash > 0 and self.toy_index == 4:
+            flash = pygame.Surface((w, h), pygame.SRCALPHA)
+            flash.fill((*RIPPLE_COLORS[self.collaborator], int(32 * self.ripple_flash / 0.55)))
             self.screen.blit(flash, (0, 0))
         pygame.display.flip()
 
