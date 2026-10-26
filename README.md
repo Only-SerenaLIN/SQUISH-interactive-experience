@@ -2,15 +2,17 @@
 
 Public repository: <https://github.com/Only-SerenaLIN/SQUISH-interactive-experience>
 
-**SQUISH!** is a webcam-based augmented-reality co-creation experience built around a glossy, translucent 3D hydrogel ball. The mirrored live camera becomes the background and the ball follows the midpoint between two detected palms. Bring the palms together to flatten it, rub them in opposite vertical directions to roll it round again, and release pressure to create a visual ripple and generated musical chord.
+**SQUISH!** is a webcam-based augmented-reality co-creation experience built around a glossy, translucent 3D hydrogel ball. The mirrored live camera becomes the background and the ball follows the midpoint between two detected palms. Bring the palms together from any angle to compress it along the palm-to-palm line, rub them in opposite directions across that line to roll it round again, and release pressure to create a visual ripple and generated musical chord.
 
 The default **Ripple Jelly** mode is the focused Assignment 3 experience. Earlier Cyber Apple, Soft Blob, Crispy Peach, and Ramen Pack studies remain available as development experiments. If the camera is unavailable, the complete main interaction still works with the keyboard or mouse.
 
 ![Camera Gel during a squeeze in privacy-safe fallback mode](docs/ripple-jelly-squeeze.png)
 
-The gel is treated as approximately incompressible. Side pressure reduces its horizontal axis while the displaced volume expands vertically and into the implied depth axis; a pressure-dependent superellipse creates flatter contact patches against the palms. One-hand, two-hand, mouse, and keyboard input all feed the same physical deformation.
+The gel is treated as approximately incompressible. Pressure shortens the live force axis while displaced volume expands perpendicular to it and into the implied depth axis; a pressure-dependent superellipse creates flatter contact patches against the palms. The outline, projected 3D mesh, refraction, and rim all follow this axis. One-hand, two-hand, mouse, and keyboard input feed the same deformation model.
 
-![Volume-preserving side compression](docs/physical-squeeze.png)
+| Side compression | Top/bottom compression | Diagonal compression |
+|---|---|---|
+| ![Gel narrowed by side pressure](docs/squeeze-horizontal.png) | ![Gel flattened by top and bottom pressure](docs/squeeze-vertical.png) | ![Gel compressed on a diagonal axis](docs/squeeze-diagonal.png) |
 
 Three collaborators produce different coloured layers. Light, medium, and deep pressure create equal-status wave qualities rather than a score hierarchy.
 
@@ -33,9 +35,9 @@ This is a calming interactive artwork, not a medical or therapeutic product.
 ## Main interaction
 
 ```text
-two palms approach → jelly flattens → release → ripple and chord
-        ↑                                      ↓
-        └── opposite rubbing motion → roll round again ─────┘
+palm-to-palm axis + approach → directional squash → release → ripple and chord
+              ↑                                           ↓
+              └── tangential opposite rubbing → roll round again ─────┘
 ```
 
 - **Light pressure:** thin ripples and a bright, airy chord
@@ -72,7 +74,7 @@ The enhanced supermarket interaction adds anticipation before the burst and a di
 
 1. 在 Codex 中选择 **Open Folder**，打开这个 `SQUISH` 文件夹，再打开内置终端。
 2. 第一次运行 `uv sync`，等待依赖安装完成。
-3. 运行 `uv run python run_squish.py`。看到摄像头权限提示时选择允许；两手靠近把球捏扁，两手上下反向搓动把球搓圆，松手释放波纹和音乐。
+3. 运行 `uv run python run_squish.py`。看到摄像头权限提示时选择允许；两手从左右、上下或斜向靠近，球会沿两手连线被压短并向受力轴的垂直方向鼓起。沿受力轴的切线方向反向搓动可把球搓圆，松手释放波纹和音乐。
 
 如果暂时不想开摄像头，运行 `uv run python run_squish.py --no-camera`，按住空格键捏扁、松开生成波纹，按住 `G` 把球搓圆。按 `N` 交给下一位共创者，按 `C` 暂停或重试摄像头，按 `H` 隐藏说明，按 `Esc` 退出。遇到问题时直接看下面的 **Troubleshooting**，不会因为摄像头不可用而无法完成演示。
 
@@ -81,9 +83,10 @@ The enhanced supermarket interaction adds anticipation before the burst and a di
 - Live one-hand and two-hand tracking with OpenCV and MediaPipe
 - Mirrored live-camera background with a 3D ball anchored between the detected palms
 - Hand-open / hand-closed estimation, normalised for hand size
-- Horizontal two-palm distance mapped to side pressure
-- Opposing two-palm motion detection that separates rolling from shared camera drift and horizontal squeezing
-- A software-rendered 3D **Ripple Jelly** with rotating projected surface lines, coloured rim, transmitted light, specular highlights, volume-preserving side compression, flat contact patches, and roll-to-round recovery
+- Direct two-palm distance mapped to pressure at any hand angle
+- Live palm-to-palm force-axis tracking with smoothed side, top/bottom, and diagonal deformation
+- Tangential opposing-palm motion detection that separates rolling from camera drift and radial squeezing
+- A software-rendered 3D **Ripple Jelly** with rotating projected surface lines, coloured rim, transmitted light, specular highlights, volume-preserving directional compression, flat contact patches, and roll-to-round recovery
 - A 1.25-second near-maximum-pressure hold before the one-shot water splash, with visible crystallisation progress, rollback on lost pressure, rotating faceted diamonds, and reform-on-release feedback
 - A persistent eight-layer co-creation canvas for three sequential collaborators
 - Three pressure qualities mapped to distinct wave geometry and generated ambient chords
@@ -134,11 +137,11 @@ uv run python run_squish.py --no-camera
 |---|---|
 | Open hand | Release, rebound, and leave a wave in Ripple Jelly mode |
 | Closed fist | Build pressure while deforming the jelly |
-| Two palms moving horizontally together/apart | Flatten/release; on Ramen Pack, squeeze until prompted and pull apart to tear |
-| Two palms rubbing vertically in opposite directions | Rotate and roll Ripple Jelly back into a sphere |
-| Hold `Space` or left mouse | Manual flatten/squish |
+| Two palms moving together/apart from any angle | Compress along the line between the palms, then release; on Ramen Pack, squeeze until prompted and pull apart to tear |
+| Two palms rubbing in opposite directions across their connecting line | Rotate and roll Ripple Jelly back into a sphere |
+| Hold `Space` or left mouse | Manual top/bottom compression |
 | Hold `G` | Manual roll-round gesture for Ripple Jelly |
-| Hold, then release `Shift + Space` | Manual horizontal squeeze; tears an armed Ramen Pack |
+| Hold, then release `Shift + Space` | Manual side compression; tears an armed Ramen Pack |
 | Arrow keys | Gradually adjust squish |
 | `1`, `2`, `3`, `4`, `5` | Select Cyber Apple, Soft Blob, Crispy Peach, Ramen Pack, or Ripple Jelly |
 | `Tab` | Move to the next toy |
@@ -159,7 +162,7 @@ Keyboard and mouse input temporarily take priority over the camera, so you can d
 
 **The ball does not reach the diamond splash.** Keep both palms facing the camera and bring their centres to roughly one hand-width apart. When `HOLD STEADY` appears, maintain the pressure until crystallisation reaches 100%. Moving below 93% makes the progress retreat, so an unstable or angled pose may need adjustment.
 
-**The wrong gesture is detected.** For one-hand mode, start with a clearly open palm, then make a clear fist. To flatten, keep both palms visible and move them horizontally together. To roll round, hold the gap fairly steady while moving one palm up as the other moves down. Unusual angles, overlap, or a hand leaving the frame can confuse tracking. That limitation is documented honestly in `PROCESS.md`.
+**The wrong gesture is detected.** For one-hand mode, start with a clearly open palm, then make a clear fist. With two hands, keep both palm centres visible and move them together along their connecting line. To roll round, hold the gap fairly steady while moving both palms in opposite directions perpendicular to that line. Overlap or a hand leaving the frame can confuse tracking. That limitation is documented honestly in `PROCESS.md`.
 
 **A package fails to install.** Confirm that `uv run python --version` reports Python 3.11 or 3.12. The project intentionally excludes Python 3.13 because MediaPipe wheel support varies by platform.
 
@@ -171,7 +174,7 @@ Keyboard and mouse input temporarily take priority over the camera, so you can d
 uv run pytest
 ```
 
-These tests cover the one-hand gesture score, two-hand distance mapping, opposite-motion roll detection, volume-preserving deformation, delayed burst charging and rollback, deliberate pull-apart detection, pressure bands, range mapping, invalid input, and spring movement without needing a webcam or display.
+These tests cover the one-hand gesture score, angle-independent two-hand distance mapping, direction labels, tangent-versus-radial roll detection, volume-preserving deformation, delayed burst charging and rollback, deliberate pull-apart detection, pressure bands, range mapping, invalid input, and spring movement without needing a webcam or display.
 
 ## Project map
 

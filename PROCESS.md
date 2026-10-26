@@ -196,6 +196,15 @@ Camera frames are mirrored and displayed live, then processed locally in memory 
 - Hid the central tutorial card after two palms are detected so the vertically bulging high-pressure form remains unobstructed.
 - Added automated tests for approximate volume conservation and for charge accumulation/rollback. Live threshold timing still requires user testing.
 
+### Prototype 0.11 — force-direction deformation
+
+- Replaced the fixed horizontal squeeze assumption with a live, undirected force axis measured between the two palm centres. The direct two-dimensional gap now controls pressure, so vertical and diagonal poses are not penalised.
+- Applied that axis to the outer superellipse, internal projected sphere mesh, refraction layers, inclusions, rim, and charge halo. Side pressure makes a tall form, top/bottom pressure makes a wide form, and diagonal pressure rotates the same volume-preserving response.
+- Smoothed the axis modulo 180 degrees, because swapping hand order must not make the ball suddenly rotate by a half-turn.
+- Reinterpreted rolling as opposite palm motion perpendicular to the current force axis. Opposite motion along the axis remains a squeeze/release rather than accidentally becoming a roll.
+- Added clear `SIDE`, `TOP/BOTTOM`, and `DIAGONAL COMPRESSION` feedback plus privacy-safe camera-free demonstrations for all three directions.
+- Added automated checks for direction classification and for rejecting radial squeeze motion as rolling. Exact live-camera angle stability still requires the honest user trial below.
+
 ### AI collaboration record
 
 OpenAI Codex was used to scaffold the Python project, implement and test the camera/fallback loop, propose visual feedback, and draft documentation. A suggestion that was **kept** was separating the gesture maths from the Pygame drawing code, because it makes the input-to-response logic testable without a webcam. An early suggestion to add only simple colour choices was **changed** after the student supplied tactile references: later variants change rebound, fracture, ripple geometry, and sound rather than decoration alone. A first proposal to omit audio was later **rejected** after the student requested sound; the revised design generates sounds in memory and preserves a silent fallback. A points-based game direction was **rejected** in favour of equal-status pressure qualities and a shared generative canvas, because the student wanted a calmer co-creative experience.
@@ -205,7 +214,7 @@ The student must review this account, edit it into their own voice, and ensure i
 ### Known limitations before user testing
 
 - Hand openness is heuristic and may vary with hand angle, lighting, and distance.
-- Two-hand distance is measured horizontally and rolling is estimated from frame-to-frame opposite vertical motion, so overlap, low frame rate, or strong camera angles can confuse it.
+- Two-hand pressure uses direct palm-centre distance and rolling uses motion perpendicular to the smoothed palm axis. Overlap, low frame rate, fast hand crossing, or a hand leaving the frame can still confuse identity tracking.
 - The delayed splash requires 93% pressure to be held for about 1.25 seconds; perceived difficulty will still vary with camera framing and palm angle.
 - Sound depends on the computer providing an output device; visual feedback remains complete without it.
 - Live camera contrast varies by room; translucent white panels preserve the controls, but very bright backlighting can still reduce hand-tracking quality.

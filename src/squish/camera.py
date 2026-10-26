@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+import math
 from dataclasses import dataclass
 
 from .gesture import hand_openness, palm_centre, two_hand_roll_motion, two_hand_squish
@@ -16,6 +17,7 @@ class TrackingResult:
     message: str
     roll_motion: float = 0.0
     palm_centres: tuple[tuple[float, float], ...] = ()
+    squeeze_angle: float | None = None
 
 
 class HandCamera:
@@ -36,7 +38,10 @@ class HandCamera:
         self._smoothed = 1.0
         self._smoothed_horizontal = 0.0
         self._smoothed_roll = 0.0
-        self._previous_palms: tuple[tuple[float, float], tuple[float, float]] | None = None
+        self._previous_palms: tuple[tuple[float, float], tuple[float, float]] | None = (
+            None
+        )
+        self._smoothed_angle = 0.0
         self.latest_rgb = None
 
     def start(self) -> bool:
@@ -99,13 +104,48 @@ class HandCamera:
                 hand_a,
                 hand_b,
             )
-            palms = tuple(sorted((palm_centre(hand_a), palm_centre(hand_b)), key=lambda point: point[0]))
-            raw_roll = two_hand_roll_motion(self._previous_palms, palms) if self._previous_palms is not None else 0.0
+            current_centres = (palm_centre(hand_a), palm_centre(hand_b))
+            had_previous_palms = self._previous_palms is not None
+            if not had_previous_palms:
+                palms = tuple(
+                    sorted(current_centres, key=lambda point: (point[0], point[1]))
+                )
+            else:
+                direct_cost = sum(
+                    (current_centres[index][0] - self._previous_palms[index][0]) ** 2
+                    + (current_centres[index][1] - self._previous_palms[index][1]) ** 2
+                    for index in (0, 1)
+                )
+                swapped = (current_centres[1], current_centres[0])
+                swapped_cost = sum(
+                    (swapped[index][0] - self._previous_palms[index][0]) ** 2
+                    + (swapped[index][1] - self._previous_palms[index][1]) ** 2
+                    for index in (0, 1)
+                )
+                palms = current_centres if direct_cost <= swapped_cost else swapped
+            raw_roll = (
+                two_hand_roll_motion(self._previous_palms, palms)
+                if self._previous_palms is not None
+                else 0.0
+            )
             self._previous_palms = palms
+            raw_angle = math.atan2(palms[1][1] - palms[0][1], palms[1][0] - palms[0][0])
+            if not had_previous_palms:
+                self._smoothed_angle = raw_angle
+            else:
+                angle_delta = 0.5 * math.atan2(
+                    math.sin(2.0 * (raw_angle - self._smoothed_angle)),
+                    math.cos(2.0 * (raw_angle - self._smoothed_angle)),
+                )
+                self._smoothed_angle += angle_delta * 0.38
             self._smoothed_horizontal += (raw - self._smoothed_horizontal) * 0.42
             self._smoothed_roll += (raw_roll - self._smoothed_roll) * 0.48
             self._last_seen = time.monotonic()
-            message = "Two hands: rolling round" if self._smoothed_roll > 0.24 else "Two hands: flattening"
+            message = (
+                "Two hands: rolling round"
+                if self._smoothed_roll > 0.24
+                else "Two hands: flattening"
+            )
             return TrackingResult(
                 None,
                 self._smoothed_horizontal,
@@ -113,6 +153,7 @@ class HandCamera:
                 message,
                 self._smoothed_roll,
                 palms,
+                self._smoothed_angle,
             )
 
         self._previous_palms = None
@@ -121,7 +162,23 @@ class HandCamera:
         self._smoothed += (raw - self._smoothed) * 0.36
         self._last_seen = time.monotonic()
         centre = palm_centre(result.multi_hand_landmarks[0].landmark)
-        return TrackingResult(self._smoothed, None, 1, "One hand detected", palm_centres=(centre,))
+        landmarks = result.multi_hand_landmarks[0].landmark
+        raw_angle = math.atan2(
+            landmarks[9].y - landmarks[0].y, landmarks[9].x - landmarks[0].x
+        )
+        angle_delta = 0.5 * math.atan2(
+            math.sin(2.0 * (raw_angle - self._smoothed_angle)),
+            math.cos(2.0 * (raw_angle - self._smoothed_angle)),
+        )
+        self._smoothed_angle += angle_delta * 0.28
+        return TrackingResult(
+            self._smoothed,
+            None,
+            1,
+            "One hand detected",
+            palm_centres=(centre,),
+            squeeze_angle=self._smoothed_angle,
+        )
 
     def toggle(self) -> bool:
         if self.enabled:
@@ -139,4 +196,3 @@ class HandCamera:
         self.hands = None
         self.enabled = False
         self.latest_rgb = None
-

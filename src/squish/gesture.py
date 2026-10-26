@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import hypot
+from math import cos, hypot, sin
 from typing import Protocol, Sequence
 
 
@@ -17,7 +17,11 @@ def clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
 
 
 def remap_clamped(
-    value: float, in_low: float, in_high: float, out_low: float = 0.0, out_high: float = 1.0
+    value: float,
+    in_low: float,
+    in_high: float,
+    out_low: float = 0.0,
+    out_high: float = 1.0,
 ) -> float:
     """Map a value between ranges, clamping at both ends."""
     if in_high == in_low:
@@ -68,7 +72,7 @@ def hand_openness(landmarks: Sequence[PointLike]) -> float:
 
 
 def two_hand_squish(hand_a: Sequence[PointLike], hand_b: Sequence[PointLike]) -> float:
-    """Return 0..1 horizontal pressure from the gap between two palms.
+    """Return 0..1 pressure from the direct gap between two palms.
 
     MediaPipe coordinates are normalised to the camera frame. Hands far apart
     release the toy; bringing their palm centres together compresses it.
@@ -76,12 +80,29 @@ def two_hand_squish(hand_a: Sequence[PointLike], hand_b: Sequence[PointLike]) ->
     if len(hand_a) < 21 or len(hand_b) < 21:
         raise ValueError("Each MediaPipe hand supplies 21 landmarks")
     palm_ids = (0, 5, 9, 13, 17)
-    centre_a = sum(hand_a[i].x for i in palm_ids) / len(palm_ids)
-    centre_b = sum(hand_b[i].x for i in palm_ids) / len(palm_ids)
-    gap = abs(centre_a - centre_b)
+    centre_a = (
+        sum(hand_a[i].x for i in palm_ids) / len(palm_ids),
+        sum(hand_a[i].y for i in palm_ids) / len(palm_ids),
+    )
+    centre_b = (
+        sum(hand_b[i].x for i in palm_ids) / len(palm_ids),
+        sum(hand_b[i].y for i in palm_ids) / len(palm_ids),
+    )
+    gap = hypot(centre_a[0] - centre_b[0], centre_a[1] - centre_b[1])
     # A wider active range reaches useful pressure sooner while still leaving
     # room for a clear release when the hands move apart.
     return 1.0 - remap_clamped(gap, 0.18, 0.66)
+
+
+def compression_direction(angle: float) -> str:
+    """Name the visible force direction represented by an undirected axis."""
+    horizontal = abs(cos(angle))
+    vertical = abs(sin(angle))
+    if horizontal > 0.87:
+        return "side"
+    if vertical > 0.87:
+        return "top/bottom"
+    return "diagonal"
 
 
 def palm_centre(landmarks: Sequence[PointLike]) -> tuple[float, float]:
@@ -103,25 +124,35 @@ def two_hand_roll_motion(
 
     A rolling gesture moves the two palms in opposite directions. Common camera
     movement moves both palms together and therefore mostly cancels out here.
-    Both pairs should be ordered from left to right before calling this helper.
+    Palm identities must stay in the same order between the two frames.
     """
-    previous_left, previous_right = previous
-    current_left, current_right = current
-    left_dx = current_left[0] - previous_left[0]
-    left_dy = current_left[1] - previous_left[1]
-    right_dx = current_right[0] - previous_right[0]
-    right_dy = current_right[1] - previous_right[1]
-    opposing_vertical = abs(left_dy - right_dy)
-    opposing_horizontal = abs(left_dx - right_dx)
-    # Horizontal opposition mostly means the palms are simply closing around
-    # the ball. Vertical opposition is the distinctive rubbing/rolling cue.
-    motion = opposing_vertical + opposing_horizontal * 0.08
+    previous_a, previous_b = previous
+    current_a, current_b = current
+    a_dx = current_a[0] - previous_a[0]
+    a_dy = current_a[1] - previous_a[1]
+    b_dx = current_b[0] - previous_b[0]
+    b_dy = current_b[1] - previous_b[1]
+    axis_x = current_b[0] - current_a[0]
+    axis_y = current_b[1] - current_a[1]
+    axis_length = max(hypot(axis_x, axis_y), 1e-5)
+    tangent_x, tangent_y = -axis_y / axis_length, axis_x / axis_length
+    relative_dx = a_dx - b_dx
+    relative_dy = a_dy - b_dy
+    # Only relative motion across the force axis counts as rubbing. Relative
+    # motion along the force axis is the squeeze itself and must not roll.
+    motion = abs(relative_dx * tangent_x + relative_dy * tangent_y)
     return remap_clamped(motion, 0.004, 0.042)
 
 
-def is_pull_apart_tear(peak_pressure: float, current_pressure: float, target_pressure: float) -> bool:
+def is_pull_apart_tear(
+    peak_pressure: float, current_pressure: float, target_pressure: float
+) -> bool:
     """Detect a deliberate squeeze-then-release gesture for opening a packet."""
-    return peak_pressure > 0.72 and peak_pressure - current_pressure > 0.27 and target_pressure < 0.42
+    return (
+        peak_pressure > 0.72
+        and peak_pressure - current_pressure > 0.27
+        and target_pressure < 0.42
+    )
 
 
 def pressure_band(pressure: float) -> str:
@@ -142,7 +173,7 @@ def incompressible_deformation(pressure: float) -> tuple[float, float]:
     preserve ellipsoid volume because x_scale * y_scale**2 is approximately 1.
     """
     compression = 1.0 - clamp(pressure) * 0.44
-    expansion = 1.0 / (compression ** 0.5)
+    expansion = 1.0 / (compression**0.5)
     return compression, expansion
 
 
@@ -173,4 +204,3 @@ class SpringValue:
         self.value += self.velocity * dt
         self.value = clamp(self.value, -0.08, 1.08)
         return self.value
-

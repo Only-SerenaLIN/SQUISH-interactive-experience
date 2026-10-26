@@ -5,6 +5,7 @@ import pytest
 from squish.gesture import (
     SpringValue,
     clamp,
+    compression_direction,
     hand_openness,
     incompressible_deformation,
     is_pull_apart_tear,
@@ -66,6 +67,10 @@ def shifted_hand(offset: float) -> list[Point]:
     return [Point(point.x + offset, point.y) for point in make_hand(True)]
 
 
+def shifted_hand_2d(offset_x: float, offset_y: float) -> list[Point]:
+    return [Point(point.x + offset_x, point.y + offset_y) for point in make_hand(True)]
+
+
 def test_two_hands_get_more_pressure_as_they_move_together() -> None:
     left = shifted_hand(-0.25)
     far_right = shifted_hand(0.25)
@@ -74,12 +79,26 @@ def test_two_hands_get_more_pressure_as_they_move_together() -> None:
     assert two_hand_squish(left, near_right) > 0.9
 
 
+def test_two_hand_pressure_is_not_limited_to_horizontal_poses() -> None:
+    upper = shifted_hand_2d(0.0, -0.10)
+    lower = shifted_hand_2d(0.0, 0.10)
+    diagonal = shifted_hand_2d(0.14, 0.14)
+    assert two_hand_squish(upper, lower) > 0.9
+    assert two_hand_squish(make_hand(True), diagonal) > 0.9
+
+
 def test_opposing_palm_motion_reads_as_rolling() -> None:
     previous = ((0.30, 0.50), (0.70, 0.50))
     rolling = ((0.30, 0.46), (0.70, 0.54))
     camera_drift = ((0.30, 0.46), (0.70, 0.46))
     assert two_hand_roll_motion(previous, rolling) > 0.8
     assert two_hand_roll_motion(previous, camera_drift) < 0.1
+    horizontal_squeeze = ((0.34, 0.50), (0.66, 0.50))
+    assert two_hand_roll_motion(previous, horizontal_squeeze) < 0.1
+
+    diagonal_previous = ((0.30, 0.30), (0.70, 0.70))
+    diagonal_roll = ((0.27, 0.33), (0.73, 0.67))
+    assert two_hand_roll_motion(diagonal_previous, diagonal_roll) > 0.8
 
 
 def test_packet_tears_only_after_a_strong_squeeze_and_clear_release() -> None:
@@ -99,6 +118,12 @@ def test_squashed_gel_preserves_approximate_volume() -> None:
     assert width_scale < 1.0
     assert height_scale > 1.0
     assert width_scale * height_scale**2 == pytest.approx(1.0)
+
+
+def test_compression_direction_names_axis_not_hand_count() -> None:
+    assert compression_direction(0.0) == "side"
+    assert compression_direction(3.14159265 / 2) == "top/bottom"
+    assert compression_direction(3.14159265 / 4) == "diagonal"
 
 
 def test_diamond_burst_requires_sustained_maximum_pressure() -> None:

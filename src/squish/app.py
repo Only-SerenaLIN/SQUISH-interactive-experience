@@ -12,7 +12,15 @@ from dataclasses import dataclass
 import pygame
 
 from .camera import HandCamera
-from .gesture import SpringValue, clamp, incompressible_deformation, is_pull_apart_tear, pressure_band, update_burst_charge
+from .gesture import (
+    SpringValue,
+    clamp,
+    compression_direction,
+    incompressible_deformation,
+    is_pull_apart_tear,
+    pressure_band,
+    update_burst_charge,
+)
 
 
 WIDTH, HEIGHT = 1000, 700
@@ -52,11 +60,39 @@ class ToySpec:
 
 
 TOYS = (
-    ToySpec("CYBER APPLE", "slow, glossy, reassuring", (147, 224, 63), (74, 180, 83), 22.0, 7.5),
+    ToySpec(
+        "CYBER APPLE",
+        "slow, glossy, reassuring",
+        (147, 224, 63),
+        (74, 180, 83),
+        22.0,
+        7.5,
+    ),
     ToySpec("SOFT BLOB", "bouncy original friend", PURPLE, PINK, 28.0, 8.0),
-    ToySpec("CRISPY PEACH", "crack the shell, find the soft core", (255, 210, 157), (255, 116, 145), 38.0, 10.0),
-    ToySpec("RAMEN PACK", "crinkle the bag, then pop the noodles", (255, 91, 68), (255, 190, 61), 42.0, 11.0),
-    ToySpec("RIPPLE JELLY", "camera gel: flatten, roll, release", (166, 218, 238), (129, 108, 225), 34.0, 9.0),
+    ToySpec(
+        "CRISPY PEACH",
+        "crack the shell, find the soft core",
+        (255, 210, 157),
+        (255, 116, 145),
+        38.0,
+        10.0,
+    ),
+    ToySpec(
+        "RAMEN PACK",
+        "crinkle the bag, then pop the noodles",
+        (255, 91, 68),
+        (255, 190, 61),
+        42.0,
+        11.0,
+    ),
+    ToySpec(
+        "RIPPLE JELLY",
+        "camera gel: flatten, roll, release",
+        (166, 218, 238),
+        (129, 108, 225),
+        34.0,
+        9.0,
+    ),
 )
 
 
@@ -108,6 +144,7 @@ class SquishApp:
         self.particles: list[Particle] = []
         self.last_squish = 0.0
         self.squeeze_axis = "vertical"
+        self.squeeze_angle = math.pi / 2
         self.toy_index = 4
         self.shell_broken = False
         self.heal_timer = 0.0
@@ -202,7 +239,9 @@ class SquishApp:
             t = i / sample_rate
             attack = min(1.0, t / 0.10)
             release = max(0.0, 1.0 - t / duration) ** 1.7
-            shimmer = sum(math.sin(math.tau * frequency * t) for frequency in frequencies) / len(frequencies)
+            shimmer = sum(
+                math.sin(math.tau * frequency * t) for frequency in frequencies
+            ) / len(frequencies)
             undertone = math.sin(math.tau * frequencies[0] * 0.5 * t) * 0.12
             value = (shimmer * 0.42 + undertone) * attack * release
             sample = int(max(-1.0, min(1.0, value)) * 32767)
@@ -247,6 +286,7 @@ class SquishApp:
             self.jelly_burst_latched = False
             self.jelly_burst_timer = 0.0
             self.jelly_burst_charge = 0.0
+            self.squeeze_angle = math.pi / 2
 
     def release_ripple(self) -> None:
         pressure = clamp(self.jelly_peak)
@@ -270,7 +310,9 @@ class SquishApp:
         self.jelly_armed = False
 
     def prepare_ramen(self) -> None:
-        self.ramen_flavor, self.ramen_color, self.ramen_accent = random.choice(RAMEN_FLAVORS)
+        self.ramen_flavor, self.ramen_color, self.ramen_accent = random.choice(
+            RAMEN_FLAVORS
+        )
         self.ramen_reward = "SQUEEZE, THEN PULL APART"
         self.ramen_reward_kind = "classic"
 
@@ -340,7 +382,11 @@ class SquishApp:
         if self.toy_index == 4 and keys[pygame.K_g]:
             self.manual_target = max(0.0, self.manual_target - dt * 6.0)
             return self.manual_target, "rolling"
-        axis = "horizontal" if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT] else "vertical"
+        axis = (
+            "horizontal"
+            if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
+            else "vertical"
+        )
         if keys[pygame.K_SPACE] or mouse_pressed:
             self.manual_target = min(1.0, self.manual_target + dt * 5.0)
             return self.manual_target, axis
@@ -353,19 +399,43 @@ class SquishApp:
         self.manual_target = max(0.0, self.manual_target - dt * 2.7)
         return None
 
-    def spawn_pop(self, cx: float, cy: float, *, crispy: bool = False, ramen: bool = False) -> None:
-        palette = ((244, 190, 75), (255, 226, 135), (213, 55, 45), (255, 247, 201)) if ramen else (self.toy.color, self.toy.accent, MINT, (255, 245, 200))
+    def spawn_pop(
+        self, cx: float, cy: float, *, crispy: bool = False, ramen: bool = False
+    ) -> None:
+        palette = (
+            ((244, 190, 75), (255, 226, 135), (213, 55, 45), (255, 247, 201))
+            if ramen
+            else (self.toy.color, self.toy.accent, MINT, (255, 245, 200))
+        )
         count = 38 if ramen else 28 if crispy else 18
         for _ in range(count):
             angle = random.uniform(math.pi, 2 * math.pi)
             speed = random.uniform(100, 330 if ramen else 290 if crispy else 230)
-            self.particles.append(Particle(cx, cy, math.cos(angle) * speed, math.sin(angle) * speed, random.uniform(0.55, 1.0), random.choice(palette), random.uniform(4, 11 if crispy or ramen else 8), crispy or ramen))
+            self.particles.append(
+                Particle(
+                    cx,
+                    cy,
+                    math.cos(angle) * speed,
+                    math.sin(angle) * speed,
+                    random.uniform(0.55, 1.0),
+                    random.choice(palette),
+                    random.uniform(4, 11 if crispy or ramen else 8),
+                    crispy or ramen,
+                )
+            )
 
     def spawn_diamond_splash(self) -> None:
         """Burst the gel into water droplets and rotating faceted jewels."""
         w, h = self.screen.get_size()
-        cx, cy = self.camera_point_to_screen(self.jelly_anchor[0], self.jelly_anchor[1], w, h)
-        jewel_palette = ((158, 239, 255), (204, 188, 255), (255, 191, 229), (236, 252, 255))
+        cx, cy = self.camera_point_to_screen(
+            self.jelly_anchor[0], self.jelly_anchor[1], w, h
+        )
+        jewel_palette = (
+            (158, 239, 255),
+            (204, 188, 255),
+            (255, 191, 229),
+            (236, 252, 255),
+        )
         water_palette = ((112, 218, 246), (164, 236, 252), (216, 249, 255))
         for _ in range(30):
             angle = random.uniform(0, math.tau)
@@ -399,7 +469,16 @@ class SquishApp:
                 )
             )
 
-        self.ripples.append(Ripple(1.0, self.collaborator, 0.0, random.uniform(0, math.tau), self.jelly_anchor[0], self.jelly_anchor[1]))
+        self.ripples.append(
+            Ripple(
+                1.0,
+                self.collaborator,
+                0.0,
+                random.uniform(0, math.tau),
+                self.jelly_anchor[0],
+                self.jelly_anchor[1],
+            )
+        )
         self.ripples = self.ripples[-8:]
         self.ripple_layers += 1
         self.ripple_flash = 0.85
@@ -424,8 +503,12 @@ class SquishApp:
         camera_result = self.camera.read()
         self.tracked_palms = camera_result.palm_centres
         if len(self.tracked_palms) >= 2:
-            target_x = clamp((self.tracked_palms[0][0] + self.tracked_palms[1][0]) * 0.5, 0.20, 0.80)
-            target_y = clamp((self.tracked_palms[0][1] + self.tracked_palms[1][1]) * 0.5, 0.30, 0.68)
+            target_x = clamp(
+                (self.tracked_palms[0][0] + self.tracked_palms[1][0]) * 0.5, 0.20, 0.80
+            )
+            target_y = clamp(
+                (self.tracked_palms[0][1] + self.tracked_palms[1][1]) * 0.5, 0.30, 0.68
+            )
             anchor_smoothing = min(1.0, dt * 13.0)
             self.jelly_anchor[0] += (target_x - self.jelly_anchor[0]) * anchor_smoothing
             self.jelly_anchor[1] += (target_y - self.jelly_anchor[1]) * anchor_smoothing
@@ -438,7 +521,14 @@ class SquishApp:
                 status = "Manual rolling round"
             else:
                 roll_input = 0.0
-                status = "Manual side squeeze" if self.squeeze_axis == "horizontal" else "Manual squish"
+                self.squeeze_angle = (
+                    0.0 if self.squeeze_axis == "horizontal" else math.pi / 2
+                )
+                status = (
+                    "Manual side squeeze"
+                    if self.squeeze_axis == "horizontal"
+                    else "Manual squish"
+                )
             active = True
         elif camera_result.horizontal_squish is not None:
             # When opposing palm motion is strong, interpret the gesture as
@@ -446,14 +536,22 @@ class SquishApp:
             self.target = camera_result.horizontal_squish * (1.0 - 0.82 * roll_input)
             self.manual_target = self.target
             self.squeeze_axis = "horizontal"
+            if camera_result.squeeze_angle is not None:
+                self.squeeze_angle = camera_result.squeeze_angle
             status, active = camera_result.message, camera_result.hands_visible == 2
         elif camera_result.openness is not None:
             self.target = clamp(1.0 - camera_result.openness)
             self.manual_target = self.target
             self.squeeze_axis = "vertical"
+            if camera_result.squeeze_angle is not None:
+                self.squeeze_angle = camera_result.squeeze_angle
             status, active = camera_result.message, camera_result.hands_visible == 1
         else:
-            self.target, status, active = self.manual_target, camera_result.message, False
+            self.target, status, active = (
+                self.manual_target,
+                camera_result.message,
+                False,
+            )
 
         self.spring.stiffness = self.toy.stiffness
         self.spring.damping = self.toy.damping
@@ -465,20 +563,32 @@ class SquishApp:
         self.ripple_flash = max(0.0, self.ripple_flash - dt)
         self.jelly_burst_timer = max(0.0, self.jelly_burst_timer - dt)
         if self.toy_index == 4:
-            self.jelly_roll_strength += (roll_input - self.jelly_roll_strength) * min(1.0, dt * 14.0)
+            self.jelly_roll_strength += (roll_input - self.jelly_roll_strength) * min(
+                1.0, dt * 14.0
+            )
             if roll_input > 0.12:
-                self.jelly_roundness = clamp(self.jelly_roundness + dt * (0.75 + roll_input * 1.65))
-                self.jelly_rotation = (self.jelly_rotation + dt * (1.6 + roll_input * 5.2)) % math.tau
+                self.jelly_roundness = clamp(
+                    self.jelly_roundness + dt * (0.75 + roll_input * 1.65)
+                )
+                self.jelly_rotation = (
+                    self.jelly_rotation + dt * (1.6 + roll_input * 5.2)
+                ) % math.tau
             elif squish > 0.12:
-                self.jelly_roundness = clamp(self.jelly_roundness - dt * (0.34 + squish * 0.62), 0.36, 1.0)
+                self.jelly_roundness = clamp(
+                    self.jelly_roundness - dt * (0.34 + squish * 0.62), 0.36, 1.0
+                )
                 self.jelly_rotation = (self.jelly_rotation + dt * 0.16) % math.tau
             else:
                 # The gel very slowly relaxes by itself, but rolling is the
                 # deliberate and clearly visible way to restore a sphere.
-                self.jelly_roundness = clamp(self.jelly_roundness + dt * 0.055, 0.36, 1.0)
+                self.jelly_roundness = clamp(
+                    self.jelly_roundness + dt * 0.055, 0.36, 1.0
+                )
                 self.jelly_rotation = (self.jelly_rotation + dt * 0.10) % math.tau
             if not self.jelly_burst_latched:
-                self.jelly_burst_charge = update_burst_charge(self.jelly_burst_charge, clamp(squish), dt)
+                self.jelly_burst_charge = update_burst_charge(
+                    self.jelly_burst_charge, clamp(squish), dt
+                )
                 self.jelly_peak = max(self.jelly_peak, clamp(squish))
                 if self.jelly_peak > 0.16:
                     self.jelly_armed = True
@@ -500,7 +610,9 @@ class SquishApp:
                 ripple.age += dt
             self.ripples = [ripple for ripple in self.ripples if ripple.age < 22.0]
         if self.toy_index == 3 and not self.shell_broken:
-            crossed_crinkle = any(self.last_squish <= level < squish for level in (0.22, 0.43, 0.64))
+            crossed_crinkle = any(
+                self.last_squish <= level < squish for level in (0.22, 0.43, 0.64)
+            )
             if crossed_crinkle and self.crinkle_cooldown <= 0:
                 self.play_sound(self.crinkle_sound)
                 self.crinkle_cooldown = 0.12
@@ -510,7 +622,9 @@ class SquishApp:
                 if self.ramen_peak > 0.72:
                     self.ramen_armed = True
                     status = "PULL HANDS APART!"
-                if self.ramen_armed and is_pull_apart_tear(self.ramen_peak, squish, self.target):
+                if self.ramen_armed and is_pull_apart_tear(
+                    self.ramen_peak, squish, self.target
+                ):
                     self.burst_ramen()
                     status = self.ramen_reward
             elif squish > 0.92:
@@ -525,7 +639,11 @@ class SquishApp:
             w, h = self.screen.get_size()
             self.spawn_pop(w * 0.5, h * 0.49, crispy=True)
             self.play_sound(self.burst_sound)
-        elif self.toy_index not in (2, 3, 4) and squish > 0.80 and self.last_squish <= 0.80:
+        elif (
+            self.toy_index not in (2, 3, 4)
+            and squish > 0.80
+            and self.last_squish <= 0.80
+        ):
             w, h = self.screen.get_size()
             self.spawn_pop(w * 0.5, h * 0.52)
 
@@ -551,17 +669,29 @@ class SquishApp:
             elif self.jelly_roll_strength > 0.20:
                 action = "ROLLING ROUND"
             elif squish > 0.12:
-                action = "FLATTENING"
+                action = (
+                    f"{compression_direction(self.squeeze_angle).upper()} COMPRESSION"
+                )
             elif not self.camera.enabled:
                 action = "SPACE / G READY"
             else:
-                action = "HANDS READY" if len(self.tracked_palms) >= 2 else "SHOW TWO HANDS"
+                action = (
+                    "HANDS READY" if len(self.tracked_palms) >= 2 else "SHOW TWO HANDS"
+                )
             status = f"Collaborator {chr(65 + self.collaborator)} | {action}"
         return status, active
 
     @staticmethod
-    def ellipse_points(cx: float, cy: float, width: float, height: float, count: int = 72) -> list[tuple[float, float]]:
-        return [(cx + math.cos(i / count * math.tau) * width / 2, cy + math.sin(i / count * math.tau) * height / 2) for i in range(count)]
+    def ellipse_points(
+        cx: float, cy: float, width: float, height: float, count: int = 72
+    ) -> list[tuple[float, float]]:
+        return [
+            (
+                cx + math.cos(i / count * math.tau) * width / 2,
+                cy + math.sin(i / count * math.tau) * height / 2,
+            )
+            for i in range(count)
+        ]
 
     def deformed_size(
         self,
@@ -573,49 +703,91 @@ class SquishApp:
         scale: float,
     ) -> tuple[float, float]:
         if self.squeeze_axis == "horizontal":
-            return base_width * (1 - 0.40 * s) * scale, base_height * (1 + 0.28 * s) * scale
-        return base_width * (1 + vertical_spread * s) * scale, base_height * (1 - vertical_flatten * s) * scale
+            return base_width * (1 - 0.40 * s) * scale, base_height * (
+                1 + 0.28 * s
+            ) * scale
+        return base_width * (1 + vertical_spread * s) * scale, base_height * (
+            1 - vertical_flatten * s
+        ) * scale
 
-    def draw_face(self, surface: pygame.Surface, cx: float, cy: float, width: float, height: float, scale: float, s: float) -> None:
+    def draw_face(
+        self,
+        surface: pygame.Surface,
+        cx: float,
+        cy: float,
+        width: float,
+        height: float,
+        scale: float,
+        s: float,
+    ) -> None:
         eye_y = cy - height * (0.07 - 0.03 * s)
         eye_gap = width * 0.16
         eye_h = max(6 * scale, 23 * (1 - 0.72 * s) * scale)
         for eye_x in (cx - eye_gap, cx + eye_gap):
-            pygame.draw.ellipse(surface, INK, pygame.Rect(eye_x - 7 * scale, eye_y - eye_h / 2, 14 * scale, eye_h))
+            pygame.draw.ellipse(
+                surface,
+                INK,
+                pygame.Rect(eye_x - 7 * scale, eye_y - eye_h / 2, 14 * scale, eye_h),
+            )
         mouth_w = (36 + 42 * s) * scale
         mouth = pygame.Rect(cx - mouth_w / 2, cy + height * 0.10, mouth_w, 18 * scale)
-        pygame.draw.arc(surface, INK, mouth, math.pi * 0.08, math.pi * 0.92, max(3, int(5 * scale)))
+        pygame.draw.arc(
+            surface, INK, mouth, math.pi * 0.08, math.pi * 0.92, max(3, int(5 * scale))
+        )
         if s > 0.48:
             r = max(5, int(9 * scale))
-            pygame.draw.circle(surface, PINK, (int(cx - width * 0.28), int(eye_y + 24 * scale)), r)
-            pygame.draw.circle(surface, PINK, (int(cx + width * 0.28), int(eye_y + 24 * scale)), r)
+            pygame.draw.circle(
+                surface, PINK, (int(cx - width * 0.28), int(eye_y + 24 * scale)), r
+            )
+            pygame.draw.circle(
+                surface, PINK, (int(cx + width * 0.28), int(eye_y + 24 * scale)), r
+            )
 
-    def draw_shadow(self, surface: pygame.Surface, cx: float, y: float, width: float, scale: float) -> None:
+    def draw_shadow(
+        self, surface: pygame.Surface, cx: float, y: float, width: float, scale: float
+    ) -> None:
         shadow = pygame.Rect(0, 0, width * 0.76, 30 * scale)
         shadow.center = (cx, y)
         pygame.draw.ellipse(surface, (218, 203, 231), shadow)
 
-    def draw_blob(self, surface: pygame.Surface, cx: float, cy: float, scale: float) -> None:
+    def draw_blob(
+        self, surface: pygame.Surface, cx: float, cy: float, scale: float
+    ) -> None:
         s = clamp(self.spring.value)
         width, height = self.deformed_size(290, 300, s, 0.46, 0.48, scale)
-        cy += (42 * s if self.squeeze_axis == "vertical" else 0) + math.sin(pygame.time.get_ticks() * 0.004) * 4 * (1 - s)
+        cy += (42 * s if self.squeeze_axis == "vertical" else 0) + math.sin(
+            pygame.time.get_ticks() * 0.004
+        ) * 4 * (1 - s)
         self.draw_shadow(surface, cx, cy + height * 0.5, width, scale)
         points, now = [], pygame.time.get_ticks() * 0.002
         for i in range(72):
             a = i / 72 * math.tau
             wobble = 1 + 0.025 * math.sin(a * 5 + now) * (0.4 + s)
-            points.append((cx + math.cos(a) * width * 0.5 * wobble, cy + math.sin(a) * height * 0.5 * wobble))
+            points.append(
+                (
+                    cx + math.cos(a) * width * 0.5 * wobble,
+                    cy + math.sin(a) * height * 0.5 * wobble,
+                )
+            )
         pygame.draw.polygon(surface, INK, points)
-        pygame.draw.polygon(surface, self.toy.color, [(cx + (x - cx) * 0.955, cy + (y - cy) * 0.955) for x, y in points])
+        pygame.draw.polygon(
+            surface,
+            self.toy.color,
+            [(cx + (x - cx) * 0.955, cy + (y - cy) * 0.955) for x, y in points],
+        )
         highlight = pygame.Rect(0, 0, width * 0.33, height * 0.13)
         highlight.center = (cx - width * 0.17, cy - height * 0.25)
         pygame.draw.ellipse(surface, (175, 151, 255), highlight)
         self.draw_face(surface, cx, cy, width, height, scale, s)
 
-    def draw_apple(self, surface: pygame.Surface, cx: float, cy: float, scale: float) -> None:
+    def draw_apple(
+        self, surface: pygame.Surface, cx: float, cy: float, scale: float
+    ) -> None:
         s = clamp(self.spring.value)
         width, height = self.deformed_size(300, 300, s, 0.36, 0.42, scale)
-        cy += (40 * s if self.squeeze_axis == "vertical" else 0) + math.sin(pygame.time.get_ticks() * 0.003) * 3 * (1 - s)
+        cy += (40 * s if self.squeeze_axis == "vertical" else 0) + math.sin(
+            pygame.time.get_ticks() * 0.003
+        ) * 3 * (1 - s)
         self.draw_shadow(surface, cx, cy + height * 0.51, width, scale)
         points = []
         for i in range(84):
@@ -623,14 +795,30 @@ class SquishApp:
             xu, yu = math.cos(a), math.sin(a)
             indent = 0.20 * math.exp(-((xu / 0.20) ** 2)) * max(0.0, -yu) ** 6
             lobes = 1 + 0.055 * max(0.0, -yu) * abs(xu)
-            points.append((cx + xu * width * 0.5 * lobes, cy + (yu + indent) * height * 0.5))
+            points.append(
+                (cx + xu * width * 0.5 * lobes, cy + (yu + indent) * height * 0.5)
+            )
         pygame.draw.polygon(surface, INK, points)
-        pygame.draw.polygon(surface, self.toy.color, [(cx + (x - cx) * 0.952, cy + (y - cy) * 0.952) for x, y in points])
+        pygame.draw.polygon(
+            surface,
+            self.toy.color,
+            [(cx + (x - cx) * 0.952, cy + (y - cy) * 0.952) for x, y in points],
+        )
         stem_h = 54 * (1 - 0.38 * s) * scale
-        pygame.draw.line(surface, INK, (cx + 2 * scale, cy - height * 0.46), (cx + 14 * scale, cy - height * 0.46 - stem_h), max(5, int(9 * scale)))
-        leaf = pygame.Rect(cx + 5 * scale, cy - height * 0.54 - stem_h * 0.55, 74 * scale, 35 * scale)
+        pygame.draw.line(
+            surface,
+            INK,
+            (cx + 2 * scale, cy - height * 0.46),
+            (cx + 14 * scale, cy - height * 0.46 - stem_h),
+            max(5, int(9 * scale)),
+        )
+        leaf = pygame.Rect(
+            cx + 5 * scale, cy - height * 0.54 - stem_h * 0.55, 74 * scale, 35 * scale
+        )
         pygame.draw.ellipse(surface, INK, leaf)
-        pygame.draw.ellipse(surface, (64, 168, 91), leaf.inflate(-7 * scale, -7 * scale))
+        pygame.draw.ellipse(
+            surface, (64, 168, 91), leaf.inflate(-7 * scale, -7 * scale)
+        )
         shine = pygame.Rect(0, 0, width * 0.18, height * 0.32)
         shine.center = (cx - width * 0.24, cy - height * 0.16)
         pygame.draw.ellipse(surface, (221, 255, 163), shine)
@@ -639,12 +827,33 @@ class SquishApp:
         pygame.draw.ellipse(surface, (245, 255, 222), small)
         self.draw_face(surface, cx, cy + 7 * scale, width, height, scale, s)
 
-    def draw_cracks(self, surface: pygame.Surface, cx: float, cy: float, width: float, height: float, stage: int, scale: float) -> None:
-        paths = (((-0.05, -0.42), (-0.02, -0.24), (-0.11, -0.11), (-0.02, 0.02)), ((0.31, -0.15), (0.18, -0.05), (0.26, 0.09), (0.12, 0.20)), ((-0.34, 0.02), (-0.20, 0.10), (-0.27, 0.25), (-0.10, 0.33)))
+    def draw_cracks(
+        self,
+        surface: pygame.Surface,
+        cx: float,
+        cy: float,
+        width: float,
+        height: float,
+        stage: int,
+        scale: float,
+    ) -> None:
+        paths = (
+            ((-0.05, -0.42), (-0.02, -0.24), (-0.11, -0.11), (-0.02, 0.02)),
+            ((0.31, -0.15), (0.18, -0.05), (0.26, 0.09), (0.12, 0.20)),
+            ((-0.34, 0.02), (-0.20, 0.10), (-0.27, 0.25), (-0.10, 0.33)),
+        )
         for path in paths[:stage]:
-            pygame.draw.lines(surface, (137, 82, 78), False, [(cx + x * width, cy + y * height) for x, y in path], max(2, int(4 * scale)))
+            pygame.draw.lines(
+                surface,
+                (137, 82, 78),
+                False,
+                [(cx + x * width, cy + y * height) for x, y in path],
+                max(2, int(4 * scale)),
+            )
 
-    def draw_crispy(self, surface: pygame.Surface, cx: float, cy: float, scale: float) -> None:
+    def draw_crispy(
+        self, surface: pygame.Surface, cx: float, cy: float, scale: float
+    ) -> None:
         s = clamp(self.spring.value)
         width, height = self.deformed_size(305, 285, s, 0.40, 0.40, scale)
         cy += 40 * s if self.squeeze_axis == "vertical" else 0
@@ -652,7 +861,11 @@ class SquishApp:
         if not self.shell_broken:
             points = self.ellipse_points(cx, cy, width, height)
             pygame.draw.polygon(surface, INK, points)
-            pygame.draw.polygon(surface, self.toy.color, [(cx + (x - cx) * 0.95, cy + (y - cy) * 0.95) for x, y in points])
+            pygame.draw.polygon(
+                surface,
+                self.toy.color,
+                [(cx + (x - cx) * 0.95, cy + (y - cy) * 0.95) for x, y in points],
+            )
             glow = pygame.Rect(0, 0, width * 0.32, height * 0.12)
             glow.center = (cx - width * 0.18, cy - height * 0.28)
             pygame.draw.ellipse(surface, (255, 239, 205), glow)
@@ -663,12 +876,27 @@ class SquishApp:
         core_w, core_h = width * 0.77, max(height * 0.82, 95 * scale)
         core = self.ellipse_points(cx, cy + 7 * scale, core_w, core_h)
         pygame.draw.polygon(surface, INK, core)
-        pygame.draw.polygon(surface, self.toy.accent, [(cx + (x - cx) * 0.94, cy + 7 * scale + (y - (cy + 7 * scale)) * 0.94) for x, y in core])
-        pieces = (((-0.50, -0.12), (-0.29, -0.38), (-0.20, -0.08), (-0.36, 0.13)), ((0.49, -0.15), (0.27, -0.39), (0.19, -0.07), (0.36, 0.15)), ((-0.24, -0.46), (0.00, -0.55), (0.20, -0.43), (0.04, -0.28)))
+        pygame.draw.polygon(
+            surface,
+            self.toy.accent,
+            [
+                (cx + (x - cx) * 0.94, cy + 7 * scale + (y - (cy + 7 * scale)) * 0.94)
+                for x, y in core
+            ],
+        )
+        pieces = (
+            ((-0.50, -0.12), (-0.29, -0.38), (-0.20, -0.08), (-0.36, 0.13)),
+            ((0.49, -0.15), (0.27, -0.39), (0.19, -0.07), (0.36, 0.15)),
+            ((-0.24, -0.46), (0.00, -0.55), (0.20, -0.43), (0.04, -0.28)),
+        )
         for piece in pieces:
             poly = [(cx + x * width, cy + y * height) for x, y in piece]
             pygame.draw.polygon(surface, INK, poly)
-            pygame.draw.polygon(surface, (255, 218, 173), [(cx + (x - cx) * 0.93, cy + (y - cy) * 0.93) for x, y in poly])
+            pygame.draw.polygon(
+                surface,
+                (255, 218, 173),
+                [(cx + (x - cx) * 0.93, cy + (y - cy) * 0.93) for x, y in poly],
+            )
         self.draw_face(surface, cx, cy + 8 * scale, core_w, core_h, scale, s)
 
     def draw_ramen_cake(
@@ -690,11 +918,19 @@ class SquishApp:
             points = []
             for column in range(18):
                 x = inner.left + column / 17 * inner.width
-                y = inner.top + (row + 0.6) / 7 * inner.height + math.sin(column * 1.75 + row) * 4 * scale
+                y = (
+                    inner.top
+                    + (row + 0.6) / 7 * inner.height
+                    + math.sin(column * 1.75 + row) * 4 * scale
+                )
                 points.append((x, y))
-            pygame.draw.lines(surface, (196, 132, 45), False, points, max(1, int(3 * scale)))
+            pygame.draw.lines(
+                surface, (196, 132, 45), False, points, max(1, int(3 * scale))
+            )
 
-    def draw_ramen(self, surface: pygame.Surface, cx: float, cy: float, scale: float) -> None:
+    def draw_ramen(
+        self, surface: pygame.Surface, cx: float, cy: float, scale: float
+    ) -> None:
         s = clamp(self.spring.value)
         width, height = self.deformed_size(330, 285, s, 0.30, 0.36, scale)
         cy += 38 * s if self.squeeze_axis == "vertical" else 0
@@ -704,58 +940,162 @@ class SquishApp:
         self.draw_shadow(surface, cx, cy + height * 0.54, width, scale)
         if self.shell_broken:
             if self.ramen_reward_kind == "double":
-                self.draw_ramen_cake(surface, cx - 32 * scale, cy + 1 * scale, width * 0.57, height * 0.47, scale)
-                self.draw_ramen_cake(surface, cx + 35 * scale, cy + 35 * scale, width * 0.57, height * 0.47, scale)
+                self.draw_ramen_cake(
+                    surface,
+                    cx - 32 * scale,
+                    cy + 1 * scale,
+                    width * 0.57,
+                    height * 0.47,
+                    scale,
+                )
+                self.draw_ramen_cake(
+                    surface,
+                    cx + 35 * scale,
+                    cy + 35 * scale,
+                    width * 0.57,
+                    height * 0.47,
+                    scale,
+                )
             elif self.ramen_reward_kind == "apple":
-                pygame.draw.circle(surface, INK, (int(cx), int(cy + 10 * scale)), int(78 * scale))
-                pygame.draw.circle(surface, (143, 225, 64), (int(cx), int(cy + 10 * scale)), int(71 * scale))
-                pygame.draw.line(surface, INK, (cx, cy - 55 * scale), (cx + 12 * scale, cy - 88 * scale), max(4, int(8 * scale)))
+                pygame.draw.circle(
+                    surface, INK, (int(cx), int(cy + 10 * scale)), int(78 * scale)
+                )
+                pygame.draw.circle(
+                    surface,
+                    (143, 225, 64),
+                    (int(cx), int(cy + 10 * scale)),
+                    int(71 * scale),
+                )
+                pygame.draw.line(
+                    surface,
+                    INK,
+                    (cx, cy - 55 * scale),
+                    (cx + 12 * scale, cy - 88 * scale),
+                    max(4, int(8 * scale)),
+                )
             elif self.ramen_reward_kind != "empty":
-                cake_color = (255, 220, 58) if self.ramen_reward_kind == "golden" else (247, 201, 91)
-                self.draw_ramen_cake(surface, cx, cy + 8 * scale, width * 0.70, height * 0.62, scale, cake_color)
+                cake_color = (
+                    (255, 220, 58)
+                    if self.ramen_reward_kind == "golden"
+                    else (247, 201, 91)
+                )
+                self.draw_ramen_cake(
+                    surface,
+                    cx,
+                    cy + 8 * scale,
+                    width * 0.70,
+                    height * 0.62,
+                    scale,
+                    cake_color,
+                )
             else:
                 ghost = pygame.Rect(0, 0, width * 0.50, height * 0.40)
                 ghost.center = (cx, cy + 8 * scale)
-                pygame.draw.rect(surface, (218, 203, 231), ghost, max(2, int(4 * scale)), border_radius=max(8, int(18 * scale)))
+                pygame.draw.rect(
+                    surface,
+                    (218, 203, 231),
+                    ghost,
+                    max(2, int(4 * scale)),
+                    border_radius=max(8, int(18 * scale)),
+                )
             tear = 30 * scale
-            left = [(cx - width * 0.48, cy - height * 0.44), (cx - width * 0.18, cy - height * 0.34), (cx - width * 0.29, cy + height * 0.39), (cx - width * 0.58, cy + height * 0.26)]
-            right = [(cx + width * 0.48, cy - height * 0.44), (cx + width * 0.18, cy - height * 0.34), (cx + width * 0.29, cy + height * 0.39), (cx + width * 0.58, cy + height * 0.26)]
+            left = [
+                (cx - width * 0.48, cy - height * 0.44),
+                (cx - width * 0.18, cy - height * 0.34),
+                (cx - width * 0.29, cy + height * 0.39),
+                (cx - width * 0.58, cy + height * 0.26),
+            ]
+            right = [
+                (cx + width * 0.48, cy - height * 0.44),
+                (cx + width * 0.18, cy - height * 0.34),
+                (cx + width * 0.29, cy + height * 0.39),
+                (cx + width * 0.58, cy + height * 0.26),
+            ]
             for piece in (left, right):
                 pygame.draw.polygon(surface, INK, piece)
                 inset = [(x + (cx - x) * 0.035, y + (cy - y) * 0.035) for x, y in piece]
                 pygame.draw.polygon(surface, self.ramen_color, inset)
-            pygame.draw.line(surface, (255, 225, 140), (cx - tear, cy - height * 0.36), (cx, cy - height * 0.25), max(3, int(5 * scale)))
+            pygame.draw.line(
+                surface,
+                (255, 225, 140),
+                (cx - tear, cy - height * 0.36),
+                (cx, cy - height * 0.25),
+                max(3, int(5 * scale)),
+            )
             if self.ramen_reward_kind != "empty":
-                self.draw_face(surface, cx, cy + 10 * scale, width * 0.62, height * 0.54, scale, s)
+                self.draw_face(
+                    surface, cx, cy + 10 * scale, width * 0.62, height * 0.54, scale, s
+                )
             return
 
         bag = pygame.Rect(0, 0, width, height)
         bag.center = (cx, cy)
         pygame.draw.rect(surface, INK, bag, border_radius=max(12, int(35 * scale)))
         inner = bag.inflate(-10 * scale, -10 * scale)
-        pygame.draw.rect(surface, self.ramen_color, inner, border_radius=max(10, int(30 * scale)))
+        pygame.draw.rect(
+            surface, self.ramen_color, inner, border_radius=max(10, int(30 * scale))
+        )
         seal_h = max(12, int(20 * scale))
-        pygame.draw.rect(surface, self.ramen_accent, (inner.left, inner.top, inner.width, seal_h), border_radius=max(3, int(8 * scale)))
-        pygame.draw.rect(surface, self.ramen_accent, (inner.left, inner.bottom - seal_h, inner.width, seal_h), border_radius=max(3, int(8 * scale)))
+        pygame.draw.rect(
+            surface,
+            self.ramen_accent,
+            (inner.left, inner.top, inner.width, seal_h),
+            border_radius=max(3, int(8 * scale)),
+        )
+        pygame.draw.rect(
+            surface,
+            self.ramen_accent,
+            (inner.left, inner.bottom - seal_h, inner.width, seal_h),
+            border_radius=max(3, int(8 * scale)),
+        )
         label = pygame.Rect(0, 0, width * 0.64, height * 0.50)
         label.center = (cx, cy)
-        pygame.draw.rect(surface, (255, 241, 191), label, border_radius=max(8, int(22 * scale)))
+        pygame.draw.rect(
+            surface, (255, 241, 191), label, border_radius=max(8, int(22 * scale))
+        )
         bowl = pygame.Rect(0, 0, label.width * 0.58, label.height * 0.40)
         bowl.center = (cx, cy + label.height * 0.13)
-        pygame.draw.arc(surface, (218, 74, 49), bowl, 0, math.pi, max(3, int(7 * scale)))
+        pygame.draw.arc(
+            surface, (218, 74, 49), bowl, 0, math.pi, max(3, int(7 * scale))
+        )
         for offset in (-0.16, 0.0, 0.16):
             x = cx + label.width * offset
-            pygame.draw.arc(surface, (224, 154, 48), (x - 19 * scale, cy - 30 * scale, 38 * scale, 62 * scale), 0, math.pi, max(2, int(4 * scale)))
+            pygame.draw.arc(
+                surface,
+                (224, 154, 48),
+                (x - 19 * scale, cy - 30 * scale, 38 * scale, 62 * scale),
+                0,
+                math.pi,
+                max(2, int(4 * scale)),
+            )
         crinkle_count = 1 + int(s * 6)
         for index in range(crinkle_count):
             y = inner.top + (index + 1) * inner.height / (crinkle_count + 1)
             side = -1 if index % 2 == 0 else 1
             x1 = cx + side * width * 0.47
             x2 = cx + side * width * (0.28 - 0.04 * s)
-            pygame.draw.line(surface, (171, 49, 47), (x1, y), (x2, y + (12 if index % 3 else -12) * scale), max(1, int(3 * scale)))
+            pygame.draw.line(
+                surface,
+                (171, 49, 47),
+                (x1, y),
+                (x2, y + (12 if index % 3 else -12) * scale),
+                max(1, int(3 * scale)),
+            )
         if s > 0.68:
-            pygame.draw.lines(surface, (94, 38, 42), False, [(cx, inner.top), (cx - 15 * scale, cy - height * 0.30), (cx + 8 * scale, cy - height * 0.20)], max(2, int(4 * scale)))
-        self.draw_face(surface, cx, cy + 22 * scale, width * 0.58, height * 0.46, scale, s)
+            pygame.draw.lines(
+                surface,
+                (94, 38, 42),
+                False,
+                [
+                    (cx, inner.top),
+                    (cx - 15 * scale, cy - height * 0.30),
+                    (cx + 8 * scale, cy - height * 0.20),
+                ],
+                max(2, int(4 * scale)),
+            )
+        self.draw_face(
+            surface, cx, cy + 22 * scale, width * 0.58, height * 0.46, scale, s
+        )
 
     def draw_supermarket(self, surface: pygame.Surface, w: int, h: int) -> None:
         shelf_y = int(h * 0.61)
@@ -765,14 +1105,24 @@ class SquishApp:
             pack = pygame.Rect(x, shelf_y - 52, 82, 48)
             pygame.draw.rect(surface, (255, 255, 255), pack, border_radius=9)
             pygame.draw.rect(surface, (222, 208, 232), pack, 2, border_radius=9)
-            pygame.draw.line(surface, (255, 190, 61), (pack.left + 8, pack.centery), (pack.right - 8, pack.centery), 5)
-        count = self.font_tiny.render(f"AISLE 04  |  PACKS POPPED {self.packs_popped:02d}", True, (93, 73, 111))
+            pygame.draw.line(
+                surface,
+                (255, 190, 61),
+                (pack.left + 8, pack.centery),
+                (pack.right - 8, pack.centery),
+                5,
+            )
+        count = self.font_tiny.render(
+            f"AISLE 04  |  PACKS POPPED {self.packs_popped:02d}", True, (93, 73, 111)
+        )
         badge = pygame.Rect(30, 160, count.get_width() + 26, 30)
         pygame.draw.rect(surface, (255, 255, 255), badge, border_radius=15)
         pygame.draw.rect(surface, (220, 207, 231), badge, 2, border_radius=15)
         surface.blit(count, (badge.x + 13, badge.y + 8))
 
-    def draw_ripples(self, surface: pygame.Surface, w: int, h: int, scale: float) -> None:
+    def draw_ripples(
+        self, surface: pygame.Surface, w: int, h: int, scale: float
+    ) -> None:
         layer = pygame.Surface((w, h), pygame.SRCALPHA)
         for ripple in self.ripples:
             fade = max(0.0, 1.0 - ripple.age / 22.0)
@@ -783,12 +1133,23 @@ class SquishApp:
             cx, centre_y = self.camera_point_to_screen(ripple.x, ripple.y, w, h)
             color = RIPPLE_COLORS[ripple.participant]
             for ring in range(ring_count):
-                radius = (40 + ripple.age * 13 + ring * (17 + ripple.pressure * 10)) * scale
+                radius = (
+                    40 + ripple.age * 13 + ring * (17 + ripple.pressure * 10)
+                ) * scale
                 points = []
                 for index in range(100):
                     angle = index / 100 * math.tau
-                    warped = radius + math.sin(angle * lobes + ripple.phase + ring * 0.48) * amplitude
-                    points.append((cx + math.cos(angle) * warped, centre_y + math.sin(angle) * warped * 0.58))
+                    warped = (
+                        radius
+                        + math.sin(angle * lobes + ripple.phase + ring * 0.48)
+                        * amplitude
+                    )
+                    points.append(
+                        (
+                            cx + math.cos(angle) * warped,
+                            centre_y + math.sin(angle) * warped * 0.58,
+                        )
+                    )
                 alpha = int((82 - ring * 7) * fade)
                 width = max(1, int((1.2 + ripple.pressure * 3.6) * scale))
                 pygame.draw.lines(layer, (*color, alpha), True, points, width)
@@ -797,8 +1158,14 @@ class SquishApp:
     def draw_camera_prompt(self, surface: pygame.Surface, w: int) -> None:
         if len(self.tracked_palms) < 2:
             title = self.font.render("PUT BOTH PALMS AROUND THE GEL", True, INK)
-            hint = self.font_tiny.render("move closer to flatten | rub one up and one down to roll round", True, (91, 76, 108))
-            prompt = pygame.Rect(0, 0, max(title.get_width(), hint.get_width()) + 34, 59)
+            hint = self.font_tiny.render(
+                "change hand angle to change the squash | rub across that angle to roll",
+                True,
+                (91, 76, 108),
+            )
+            prompt = pygame.Rect(
+                0, 0, max(title.get_width(), hint.get_width()) + 34, 59
+            )
             prompt.midtop = (w // 2, 158)
             pygame.draw.rect(surface, (255, 255, 255), prompt, border_radius=20)
             pygame.draw.rect(surface, (216, 207, 230), prompt, 2, border_radius=20)
@@ -811,45 +1178,91 @@ class SquishApp:
         )
         badge = pygame.Rect(30, 224, participant.get_width() + 26, 30)
         pygame.draw.rect(surface, (255, 255, 255), badge, border_radius=15)
-        pygame.draw.rect(surface, (*RIPPLE_COLORS[self.collaborator],), badge, 2, border_radius=15)
+        pygame.draw.rect(
+            surface, (*RIPPLE_COLORS[self.collaborator],), badge, 2, border_radius=15
+        )
         surface.blit(participant, (badge.x + 13, badge.y + 8))
 
-    def draw_jelly(self, surface: pygame.Surface, cx: float, cy: float, scale: float) -> None:
+    def draw_jelly(
+        self, surface: pygame.Surface, cx: float, cy: float, scale: float
+    ) -> None:
         spring_pressure = clamp(self.spring.value)
         remembered_flatness = (1.0 - self.jelly_roundness) * 0.72
-        pressure = max(spring_pressure, remembered_flatness) * (1.0 - self.jelly_roll_strength * 0.76)
+        pressure = max(spring_pressure, remembered_flatness) * (
+            1.0 - self.jelly_roll_strength * 0.76
+        )
         pressure = clamp(pressure)
-        # Treat the gel as an incompressible ellipsoid squeezed from the sides:
-        # horizontal material moves into the vertical and depth axes instead of
-        # vanishing. This same pressure-to-shape relationship is used for every
-        # input method, whether one hand, two hands, keyboard, or mouse.
+        # Treat the gel as an incompressible ellipsoid. ``squeeze_angle`` is the
+        # live force axis between the palms: material shortens along that axis
+        # and expands across it. It therefore behaves differently for side,
+        # top/bottom, and diagonal pressure without separate animation presets.
         width_scale, height_scale = incompressible_deformation(pressure)
         width = 252 * width_scale * scale
         height = 252 * height_scale * scale
+        axis_cos, axis_sin = math.cos(self.squeeze_angle), math.sin(self.squeeze_angle)
+
+        def transform(local_x: float, local_y: float) -> tuple[float, float]:
+            return (
+                cx + local_x * axis_cos - local_y * axis_sin,
+                cy + local_x * axis_sin + local_y * axis_cos,
+            )
+
+        def rotated_ellipse(
+            local_cx: float,
+            local_cy: float,
+            ellipse_width: float,
+            ellipse_height: float,
+            count: int = 64,
+        ) -> list[tuple[float, float]]:
+            return [
+                transform(
+                    local_cx + math.cos(index / count * math.tau) * ellipse_width * 0.5,
+                    local_cy
+                    + math.sin(index / count * math.tau) * ellipse_height * 0.5,
+                )
+                for index in range(count)
+            ]
 
         layer = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         tint = RIPPLE_COLORS[self.collaborator]
         edge = tuple(max(0, int(channel * 0.67)) for channel in tint)
-        pale = tuple(min(255, int(channel + (255 - channel) * 0.45)) for channel in tint)
-        light = tuple(min(255, int(channel + (255 - channel) * 0.67)) for channel in tint)
+        pale = tuple(
+            min(255, int(channel + (255 - channel) * 0.45)) for channel in tint
+        )
+        light = tuple(
+            min(255, int(channel + (255 - channel) * 0.67)) for channel in tint
+        )
 
         # A layered contact shadow and a small coloured caustic sell the sense
         # that the translucent ball is resting just above a surface.
         for step in range(6, 0, -1):
-            shadow = pygame.Rect(0, 0, width * (0.55 + step * 0.045), (10 + step * 4) * scale)
+            shadow = pygame.Rect(
+                0, 0, width * (0.55 + step * 0.045), (10 + step * 4) * scale
+            )
             shadow.center = (cx + width * 0.035, cy + height * 0.51)
             pygame.draw.ellipse(layer, (66, 58, 92, 7 + step * 4), shadow)
         caustic = pygame.Rect(0, 0, width * 0.48, height * 0.12)
         caustic.center = (cx + width * 0.08, cy + height * 0.48)
         pygame.draw.ellipse(layer, (*tint, 42), caustic)
 
-        glow = pygame.Rect(0, 0, width + 64 * scale, height + 58 * scale)
-        glow.center = (cx, cy + height * 0.03)
-        pygame.draw.ellipse(layer, (*tint, 18), glow)
+        glow = rotated_ellipse(
+            0, height * 0.03, width + 64 * scale, height + 58 * scale
+        )
+        pygame.draw.polygon(layer, (*tint, 18), glow)
         if self.jelly_burst_charge > 0.0:
-            charge_halo = pygame.Rect(0, 0, width + (35 + self.jelly_burst_charge * 35) * scale, height + (35 + self.jelly_burst_charge * 35) * scale)
-            charge_halo.center = (cx, cy)
-            pygame.draw.ellipse(layer, (226, 205, 255, int(28 + self.jelly_burst_charge * 58)), charge_halo, max(2, int(3 * scale)))
+            charge_halo = rotated_ellipse(
+                0,
+                0,
+                width + (35 + self.jelly_burst_charge * 35) * scale,
+                height + (35 + self.jelly_burst_charge * 35) * scale,
+            )
+            pygame.draw.lines(
+                layer,
+                (226, 205, 255, int(28 + self.jelly_burst_charge * 58)),
+                True,
+                charge_halo,
+                max(2, int(3 * scale)),
+            )
 
         now = pygame.time.get_ticks() * 0.0018
         points = []
@@ -862,7 +1275,11 @@ class SquishApp:
             cosine, sine = math.cos(angle), math.sin(angle)
             shaped_x = math.copysign(abs(cosine) ** shape_power, cosine)
             shaped_y = math.copysign(abs(sine) ** shape_power, sine)
-            points.append((cx + shaped_x * width * 0.5 * wobble, cy + shaped_y * height * 0.5 * wobble))
+            points.append(
+                transform(
+                    shaped_x * width * 0.5 * wobble, shaped_y * height * 0.5 * wobble
+                )
+            )
         pygame.draw.polygon(layer, (*edge, 205), points)
 
         # Nested bodies act like a simple radial material: saturated at the rim,
@@ -875,7 +1292,10 @@ class SquishApp:
         )
         for factor, color, shift_x, shift_y in body_layers:
             inner = [
-                (cx + (x - cx) * factor + width * shift_x, cy + (y - cy) * factor + height * shift_y)
+                (
+                    cx + (x - cx) * factor + width * shift_x,
+                    cy + (y - cy) * factor + height * shift_y,
+                )
                 for x, y in points
             ]
             pygame.draw.polygon(layer, color, inner)
@@ -892,7 +1312,7 @@ class SquishApp:
                 latitude = -math.pi / 2 + step / 32 * math.pi
                 x3 = math.cos(latitude) * math.cos(rotated_longitude)
                 z3 = math.cos(latitude) * math.sin(rotated_longitude)
-                point = (cx + x3 * width * 0.43, cy + math.sin(latitude) * height * 0.43)
+                point = transform(x3 * width * 0.43, math.sin(latitude) * height * 0.43)
                 if z3 > -0.04:
                     segment.append(point)
                 elif len(segment) > 1:
@@ -901,28 +1321,49 @@ class SquishApp:
             if len(segment) > 1:
                 segments.append(segment)
             for visible_segment in segments:
-                pygame.draw.lines(layer, mesh_color, False, visible_segment, max(1, int(scale)))
+                pygame.draw.lines(
+                    layer, mesh_color, False, visible_segment, max(1, int(scale))
+                )
         for latitude in (-0.48, 0.0, 0.48):
-            latitude_y = cy + math.sin(latitude) * height * 0.43
+            latitude_y = math.sin(latitude) * height * 0.43
             latitude_width = width * math.cos(latitude) * 0.86
             latitude_height = max(5 * scale, height * 0.055 * math.cos(latitude))
-            latitude_rect = pygame.Rect(0, 0, latitude_width, latitude_height)
-            latitude_rect.center = (cx, latitude_y)
-            pygame.draw.arc(layer, (*pale, 30), latitude_rect, 0, math.pi, max(1, int(scale)))
+            latitude_points = [
+                transform(
+                    math.cos(step / 24 * math.pi) * latitude_width * 0.5,
+                    latitude_y - math.sin(step / 24 * math.pi) * latitude_height * 0.5,
+                )
+                for step in range(25)
+            ]
+            pygame.draw.lines(
+                layer, (*pale, 30), False, latitude_points, max(1, int(scale))
+            )
 
-        lower_refraction = pygame.Rect(0, 0, width * 0.61, height * 0.22)
-        lower_refraction.center = (cx + width * 0.07, cy + height * 0.30)
-        pygame.draw.ellipse(layer, (*tint, 112), lower_refraction)
-        lower_light = pygame.Rect(0, 0, width * 0.35, height * 0.075)
-        lower_light.center = (cx - width * 0.09, cy + height * 0.34)
-        pygame.draw.ellipse(layer, (255, 255, 255, 105), lower_light)
+        pygame.draw.polygon(
+            layer,
+            (*tint, 112),
+            rotated_ellipse(width * 0.07, height * 0.30, width * 0.61, height * 0.22),
+        )
+        pygame.draw.polygon(
+            layer,
+            (255, 255, 255, 105),
+            rotated_ellipse(-width * 0.09, height * 0.34, width * 0.35, height * 0.075),
+        )
 
         # A darker lower rim and bright upper rim mimic refraction through a
         # thick hydrogel skin while still allowing the ripples to show through.
-        rim_rect = pygame.Rect(0, 0, width * 0.96, height * 0.96)
-        rim_rect.center = (cx, cy)
-        pygame.draw.arc(layer, (*edge, 96), rim_rect, math.radians(12), math.radians(166), max(2, int(4 * scale)))
-        pygame.draw.arc(layer, (255, 255, 255, 210), rim_rect, math.radians(196), math.radians(330), max(2, int(4 * scale)))
+        lower_rim = [
+            transform(math.cos(a) * width * 0.48, math.sin(a) * height * 0.48)
+            for a in [math.radians(12 + step * 154 / 30) for step in range(31)]
+        ]
+        upper_rim = [
+            transform(math.cos(a) * width * 0.48, math.sin(a) * height * 0.48)
+            for a in [math.radians(196 + step * 134 / 30) for step in range(31)]
+        ]
+        pygame.draw.lines(layer, (*edge, 96), False, lower_rim, max(2, int(4 * scale)))
+        pygame.draw.lines(
+            layer, (255, 255, 255, 210), False, upper_rim, max(2, int(4 * scale))
+        )
         pygame.draw.lines(layer, (*pale, 122), True, points, max(1, int(2 * scale)))
 
         # A few barely visible inclusions add depth without turning the clean
@@ -930,8 +1371,10 @@ class SquishApp:
         for index in range(6):
             angle = index * 2.399 + self.jelly_rotation
             distance = 0.12 + (index % 3) * 0.085
-            px = cx + math.cos(angle) * width * distance
-            py = cy + math.sin(angle) * height * distance * 0.72
+            px, py = transform(
+                math.cos(angle) * width * distance,
+                math.sin(angle) * height * distance * 0.72,
+            )
             radius = max(2, int((2 + index % 2) * scale))
             pygame.draw.circle(layer, (255, 255, 255, 52), (int(px), int(py)), radius)
 
@@ -942,17 +1385,23 @@ class SquishApp:
         pygame.draw.ellipse(highlight, (255, 255, 255, 244), highlight.get_rect())
         highlight = pygame.transform.rotate(highlight, 24)
         highlight_shift = math.sin(self.jelly_rotation) * width * 0.025
-        highlight_rect = highlight.get_rect(center=(cx - width * 0.20 + highlight_shift, cy - height * 0.27))
+        highlight_rect = highlight.get_rect(
+            center=(cx - width * 0.20 + highlight_shift, cy - height * 0.27)
+        )
         layer.blit(highlight, highlight_rect)
         pygame.draw.ellipse(
             layer,
             (255, 255, 255, 235),
-            pygame.Rect(cx + width * 0.10, cy - height * 0.36, width * 0.095, height * 0.06),
+            pygame.Rect(
+                cx + width * 0.10, cy - height * 0.36, width * 0.095, height * 0.06
+            ),
         )
         pygame.draw.ellipse(
             layer,
             (*pale, 90),
-            pygame.Rect(cx - width * 0.23, cy + height * 0.30, width * 0.48, height * 0.095),
+            pygame.Rect(
+                cx - width * 0.23, cy + height * 0.30, width * 0.48, height * 0.095
+            ),
         )
         surface.blit(layer, (0, 0))
 
@@ -977,63 +1426,142 @@ class SquishApp:
                 )
                 alpha = int(225 * clamp(p.life / 0.65))
                 pygame.draw.polygon(jewel_layer, (*p.color, alpha), points)
-                pygame.draw.polygon(jewel_layer, (90, 106, 184, alpha), points, max(2, size // 4))
-                pygame.draw.polygon(jewel_layer, (255, 255, 255, min(245, alpha + 20)), points, 1)
+                pygame.draw.polygon(
+                    jewel_layer, (90, 106, 184, alpha), points, max(2, size // 4)
+                )
+                pygame.draw.polygon(
+                    jewel_layer, (255, 255, 255, min(245, alpha + 20)), points, 1
+                )
                 centre = (p.x, p.y)
-                pygame.draw.polygon(jewel_layer, (255, 255, 255, alpha // 2), (points[0], points[1], centre))
-                pygame.draw.polygon(jewel_layer, (*RIPPLE_COLORS[self.collaborator], alpha // 2), (points[2], points[3], centre))
+                pygame.draw.polygon(
+                    jewel_layer,
+                    (255, 255, 255, alpha // 2),
+                    (points[0], points[1], centre),
+                )
+                pygame.draw.polygon(
+                    jewel_layer,
+                    (*RIPPLE_COLORS[self.collaborator], alpha // 2),
+                    (points[2], points[3], centre),
+                )
                 if size >= 5:
-                    pygame.draw.line(jewel_layer, (255, 255, 255, alpha), (p.x - size * 0.55, p.y), (p.x + size * 0.55, p.y), 1)
-                    pygame.draw.line(jewel_layer, (255, 255, 255, alpha), (p.x, p.y - size * 0.55), (p.x, p.y + size * 0.55), 1)
+                    pygame.draw.line(
+                        jewel_layer,
+                        (255, 255, 255, alpha),
+                        (p.x - size * 0.55, p.y),
+                        (p.x + size * 0.55, p.y),
+                        1,
+                    )
+                    pygame.draw.line(
+                        jewel_layer,
+                        (255, 255, 255, alpha),
+                        (p.x, p.y - size * 0.55),
+                        (p.x, p.y + size * 0.55),
+                        1,
+                    )
             elif p.shard:
-                pygame.draw.polygon(surface, p.color, ((p.x, p.y - size), (p.x + size, p.y), (p.x, p.y + size), (p.x - size, p.y)))
+                pygame.draw.polygon(
+                    surface,
+                    p.color,
+                    (
+                        (p.x, p.y - size),
+                        (p.x + size, p.y),
+                        (p.x, p.y + size),
+                        (p.x - size, p.y),
+                    ),
+                )
             else:
                 alpha = int(195 * clamp(p.life / 0.45))
-                pygame.draw.circle(jewel_layer, (*p.color, alpha), (int(p.x), int(p.y)), size)
+                pygame.draw.circle(
+                    jewel_layer, (*p.color, alpha), (int(p.x), int(p.y)), size
+                )
                 if size > 3:
-                    pygame.draw.circle(jewel_layer, (255, 255, 255, min(230, alpha + 25)), (int(p.x - size * 0.28), int(p.y - size * 0.28)), max(1, size // 3))
+                    pygame.draw.circle(
+                        jewel_layer,
+                        (255, 255, 255, min(230, alpha + 25)),
+                        (int(p.x - size * 0.28), int(p.y - size * 0.28)),
+                        max(1, size // 3),
+                    )
         surface.blit(jewel_layer, (0, 0))
 
     def draw_selector(self, surface: pygame.Surface) -> None:
         x = 30
         for index, toy in enumerate(TOYS):
-            text = self.font_tiny.render(f"{index + 1}  {toy.name}", True, INK if index == self.toy_index else (111, 93, 126))
+            text = self.font_tiny.render(
+                f"{index + 1}  {toy.name}",
+                True,
+                INK if index == self.toy_index else (111, 93, 126),
+            )
             width = text.get_width() + 28
             box = pygame.Rect(x, 112, width, 34)
-            pygame.draw.rect(surface, (255, 255, 255) if index != self.toy_index else toy.color, box, border_radius=17)
-            pygame.draw.rect(surface, INK if index == self.toy_index else (218, 207, 229), box, 2, border_radius=17)
+            pygame.draw.rect(
+                surface,
+                (255, 255, 255) if index != self.toy_index else toy.color,
+                box,
+                border_radius=17,
+            )
+            pygame.draw.rect(
+                surface,
+                INK if index == self.toy_index else (218, 207, 229),
+                box,
+                2,
+                border_radius=17,
+            )
             surface.blit(text, (box.x + 14, box.y + 9))
             x += width + 10
 
-    def draw_status(self, surface: pygame.Surface, status: str, active: bool, w: int) -> None:
+    def draw_status(
+        self, surface: pygame.Surface, status: str, active: bool, w: int
+    ) -> None:
         text = self.font_small.render(status, True, INK)
         box_w = min(text.get_width() + 54, w - 40)
         box = pygame.Rect(w - box_w - 28, 26, box_w, 38)
         pygame.draw.rect(surface, (255, 255, 255), box, border_radius=19)
         pygame.draw.rect(surface, (220, 210, 232), box, 2, border_radius=19)
-        pygame.draw.circle(surface, MINT if active else (255, 185, 84), (box.x + 21, box.centery), 6)
+        pygame.draw.circle(
+            surface, MINT if active else (255, 185, 84), (box.x + 21, box.centery), 6
+        )
         surface.blit(text, (box.x + 36, box.y + 10))
 
     def draw_help(self, surface: pygame.Surface, w: int, h: int) -> None:
         if not self.help_visible:
-            surface.blit(self.font_small.render("H  show controls", True, (118, 101, 133)), (26, h - 35))
+            surface.blit(
+                self.font_small.render("H  show controls", True, (118, 101, 133)),
+                (26, h - 35),
+            )
             return
         panel = pygame.Rect(26, h - 112, min(735, w - 52), 84)
         pygame.draw.rect(surface, (255, 255, 255), panel, border_radius=22)
         pygame.draw.rect(surface, (224, 213, 235), panel, 2, border_radius=22)
         if self.toy_index == 4:
-            surface.blit(self.font.render("Two hands: squeeze flat or rub in opposite directions to roll round", True, INK), (panel.x + 22, panel.y + 14))
+            surface.blit(
+                self.font.render(
+                    "Aim the palm-to-palm line, then squeeze: the gel follows that axis",
+                    True,
+                    INK,
+                ),
+                (panel.x + 22, panel.y + 14),
+            )
         else:
-            surface.blit(self.font.render("1 hand: close fist   |   2 hands: squeeze, then pull apart", True, INK), (panel.x + 22, panel.y + 14))
+            surface.blit(
+                self.font.render(
+                    "1 hand: close fist   |   2 hands: squeeze, then pull apart",
+                    True,
+                    INK,
+                ),
+                (panel.x + 22, panel.y + 14),
+            )
         if self.burst_sound is None:
             sound_label = "sound unavailable"
         else:
             sound_label = "sound ON" if self.sound_on else "sound OFF"
         if self.toy_index == 4:
-            line = f"SPACE flatten/release  |  G roll round  |  N next collaborator  |  M {sound_label}  |  C camera  |  R clear"
+            line = f"SPACE top/bottom  |  SHIFT+SPACE side  |  G roll  |  N collaborator  |  M {sound_label}  |  C camera  |  R clear"
         else:
             line = f"SPACE squish  |  SHIFT + SPACE squeeze/release to tear  |  1-5 modes  |  M {sound_label}  |  C camera  |  R reset"
-        surface.blit(self.font_tiny.render(line, True, (99, 80, 116)), (panel.x + 22, panel.y + 51))
+        surface.blit(
+            self.font_tiny.render(line, True, (99, 80, 116)),
+            (panel.x + 22, panel.y + 51),
+        )
 
     def draw_camera_background(self, surface: pygame.Surface, w: int, h: int) -> bool:
         """Draw the mirrored live frame as a cover-scaled AR background."""
@@ -1045,17 +1573,26 @@ class SquishApp:
             pygame.draw.circle(surface, (208, 240, 234), (w - 75, 170), 90)
             return False
         frame_h, frame_w = frame.shape[:2]
-        camera_surface = pygame.image.frombuffer(frame.tobytes(), (frame_w, frame_h), "RGB")
+        camera_surface = pygame.image.frombuffer(
+            frame.tobytes(), (frame_w, frame_h), "RGB"
+        )
         cover_scale = max(w / frame_w, h / frame_h)
-        scaled_size = (max(1, int(frame_w * cover_scale)), max(1, int(frame_h * cover_scale)))
+        scaled_size = (
+            max(1, int(frame_w * cover_scale)),
+            max(1, int(frame_h * cover_scale)),
+        )
         camera_surface = pygame.transform.smoothscale(camera_surface, scaled_size)
-        surface.blit(camera_surface, ((w - scaled_size[0]) // 2, (h - scaled_size[1]) // 2))
+        surface.blit(
+            camera_surface, ((w - scaled_size[0]) // 2, (h - scaled_size[1]) // 2)
+        )
         veil = pygame.Surface((w, h), pygame.SRCALPHA)
         veil.fill((18, 24, 38, 42))
         surface.blit(veil, (0, 0))
         return True
 
-    def camera_point_to_screen(self, x: float, y: float, w: int, h: int) -> tuple[float, float]:
+    def camera_point_to_screen(
+        self, x: float, y: float, w: int, h: int
+    ) -> tuple[float, float]:
         """Map normalised camera coordinates through the same cover crop as the video."""
         frame = self.camera.latest_rgb
         if frame is None:
@@ -1064,18 +1601,28 @@ class SquishApp:
         cover_scale = max(w / frame_w, h / frame_h)
         offset_x = (w - frame_w * cover_scale) * 0.5
         offset_y = (h - frame_h * cover_scale) * 0.5
-        return offset_x + x * frame_w * cover_scale, offset_y + y * frame_h * cover_scale
+        return (
+            offset_x + x * frame_w * cover_scale,
+            offset_y + y * frame_h * cover_scale,
+        )
 
     def draw_hand_guides(self, surface: pygame.Surface, w: int, h: int) -> None:
         if not self.tracked_palms:
             return
         layer = pygame.Surface((w, h), pygame.SRCALPHA)
-        points = [tuple(map(int, self.camera_point_to_screen(x, y, w, h))) for x, y in self.tracked_palms]
+        points = [
+            tuple(map(int, self.camera_point_to_screen(x, y, w, h)))
+            for x, y in self.tracked_palms
+        ]
         if len(points) >= 2:
-            pygame.draw.line(layer, (*RIPPLE_COLORS[self.collaborator], 115), points[0], points[1], 3)
+            pygame.draw.line(
+                layer, (*RIPPLE_COLORS[self.collaborator], 115), points[0], points[1], 3
+            )
         for point in points:
             pygame.draw.circle(layer, (255, 255, 255, 180), point, 27, 3)
-            pygame.draw.circle(layer, (*RIPPLE_COLORS[self.collaborator], 170), point, 20, 2)
+            pygame.draw.circle(
+                layer, (*RIPPLE_COLORS[self.collaborator], 170), point, 20, 2
+            )
             pygame.draw.circle(layer, (255, 255, 255, 220), point, 4)
         surface.blit(layer, (0, 0))
 
@@ -1100,11 +1647,15 @@ class SquishApp:
             tagline = "CAMERA GEL | put your hands around the 3D jelly"
         else:
             tagline = self.toy.tagline
-        self.screen.blit(self.font_small.render(tagline, True, (100, 82, 116)), (34, 79))
+        self.screen.blit(
+            self.font_small.render(tagline, True, (100, 82, 116)), (34, 79)
+        )
         self.draw_selector(self.screen)
         scale = min(w / WIDTH, h / HEIGHT)
         if self.toy_index == 4:
-            cx, cy = self.camera_point_to_screen(self.jelly_anchor[0], self.jelly_anchor[1], w, h)
+            cx, cy = self.camera_point_to_screen(
+                self.jelly_anchor[0], self.jelly_anchor[1], w, h
+            )
         else:
             cx, cy = w * 0.5, h * 0.48
         if self.toy_index == 4:
@@ -1116,7 +1667,11 @@ class SquishApp:
             shake = (self.spring.value - 0.72) * 18
         if self.shake_timer > 0:
             shake = max(shake, self.shake_timer / 0.36 * 13)
-        if self.toy_index == 4 and self.jelly_burst_charge > 0.0 and not self.jelly_burst_latched:
+        if (
+            self.toy_index == 4
+            and self.jelly_burst_charge > 0.0
+            and not self.jelly_burst_latched
+        ):
             shake = max(shake, self.jelly_burst_charge * 3.8)
         if shake > 0:
             cx += random.uniform(-shake, shake) * scale
@@ -1137,11 +1692,21 @@ class SquishApp:
         meter = pygame.Rect(w // 2 - meter_w // 2, int(h * 0.73), meter_w, 14)
         pygame.draw.rect(self.screen, (223, 212, 235), meter, border_radius=7)
         fill = meter.copy()
-        meter_value = self.jelly_roundness if self.toy_index == 4 and self.jelly_roll_strength > 0.20 else clamp(self.spring.value)
+        meter_value = (
+            self.jelly_roundness
+            if self.toy_index == 4 and self.jelly_roll_strength > 0.20
+            else clamp(self.spring.value)
+        )
         fill.width = int(meter.width * meter_value)
         pygame.draw.rect(self.screen, self.toy.accent, fill, border_radius=7)
-        if self.toy_index == 4 and self.jelly_burst_charge > 0.0 and not self.jelly_burst_latched:
-            charge_bar = pygame.Rect(meter.x, meter.y, int(meter.width * self.jelly_burst_charge), 5)
+        if (
+            self.toy_index == 4
+            and self.jelly_burst_charge > 0.0
+            and not self.jelly_burst_latched
+        ):
+            charge_bar = pygame.Rect(
+                meter.x, meter.y, int(meter.width * self.jelly_burst_charge), 5
+            )
             pygame.draw.rect(self.screen, (244, 155, 224), charge_bar, border_radius=3)
         if self.toy_index == 4:
             if self.jelly_burst_latched:
@@ -1149,20 +1714,29 @@ class SquishApp:
             elif self.jelly_burst_charge > 0.02:
                 label = f"HOLD STEADY  |  crystallising {round(self.jelly_burst_charge * 100):02d}%"
             elif self.jelly_roll_strength > 0.20:
-                label = f"ROLLING ROUND  |  form {round(self.jelly_roundness * 100):02d}%"
+                label = (
+                    f"ROLLING ROUND  |  form {round(self.jelly_roundness * 100):02d}%"
+                )
             elif clamp(self.spring.value) > 0.12:
                 level = pressure_band(clamp(self.spring.value)).upper()
-                label = f"{level} PRESSURE  |  FLATTENING"
+                direction = compression_direction(self.squeeze_angle).upper()
+                label = f"{level} PRESSURE  |  {direction} COMPRESSION"
             else:
                 label = f"FORM {round(self.jelly_roundness * 100):02d}% ROUND  |  squeeze or roll"
         elif self.shell_broken:
-            label = "POP! release to reseal the pack" if self.toy_index == 3 else "CRACK! release to regrow the shell"
+            label = (
+                "POP! release to reseal the pack"
+                if self.toy_index == 3
+                else "CRACK! release to regrow the shell"
+            )
         elif self.toy_index == 3 and self.ramen_armed:
             label = "READY! PULL YOUR HANDS APART"
         elif self.toy_index == 3 and self.spring.value > 0.72:
             label = "CAREFUL... THE SEAM IS READY"
         else:
-            direction = "side squeeze" if self.squeeze_axis == "horizontal" else "squish level"
+            direction = (
+                "side squeeze" if self.squeeze_axis == "horizontal" else "squish level"
+            )
             label = f"{direction}  {round(clamp(self.spring.value) * 100):02d}%"
         text = self.font_small.render(label, True, INK)
         self.screen.blit(text, (meter.centerx - text.get_width() // 2, meter.y + 22))
@@ -1181,7 +1755,9 @@ class SquishApp:
             self.screen.blit(flash, (0, 0))
         if self.ripple_flash > 0 and self.toy_index == 4:
             flash = pygame.Surface((w, h), pygame.SRCALPHA)
-            flash.fill((*RIPPLE_COLORS[self.collaborator], int(32 * self.ripple_flash / 0.55)))
+            flash.fill(
+                (*RIPPLE_COLORS[self.collaborator], int(32 * self.ripple_flash / 0.55))
+            )
             self.screen.blit(flash, (0, 0))
         if self.jelly_burst_timer > 0.88 and self.toy_index == 4:
             flash = pygame.Surface((w, h), pygame.SRCALPHA)
@@ -1203,9 +1779,20 @@ class SquishApp:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="SQUISH! interactive digital stress toy")
-    parser.add_argument("--no-camera", action="store_true", help="start in keyboard/mouse mode without requesting webcam access")
-    parser.add_argument("--camera-index", type=int, default=0, help="OpenCV camera number to use (default: 0)")
+    parser = argparse.ArgumentParser(
+        description="SQUISH! interactive digital stress toy"
+    )
+    parser.add_argument(
+        "--no-camera",
+        action="store_true",
+        help="start in keyboard/mouse mode without requesting webcam access",
+    )
+    parser.add_argument(
+        "--camera-index",
+        type=int,
+        default=0,
+        help="OpenCV camera number to use (default: 0)",
+    )
     args = parser.parse_args()
     try:
         SquishApp(camera_index=args.camera_index, use_camera=not args.no_camera).run()
