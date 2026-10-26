@@ -82,6 +82,11 @@ def two_hand_squish(hand_a: Sequence[PointLike], hand_b: Sequence[PointLike]) ->
     return 1.0 - remap_clamped(gap, 0.13, 0.58)
 
 
+def is_pull_apart_tear(peak_pressure: float, current_pressure: float, target_pressure: float) -> bool:
+    """Detect a deliberate squeeze-then-release gesture for opening a packet."""
+    return peak_pressure > 0.72 and peak_pressure - current_pressure > 0.27 and target_pressure < 0.42
+
+
 @dataclass
 class SpringValue:
     """A soft spring used for deformation and rebound."""

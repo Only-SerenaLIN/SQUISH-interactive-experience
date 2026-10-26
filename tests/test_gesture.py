@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from squish.gesture import SpringValue, clamp, hand_openness, remap_clamped, two_hand_squish
+from squish.gesture import SpringValue, clamp, hand_openness, is_pull_apart_tear, remap_clamped, two_hand_squish
 
 
 @dataclass
@@ -60,4 +60,10 @@ def test_two_hands_get_more_pressure_as_they_move_together() -> None:
     far_right = shifted_hand(0.25)
     near_right = shifted_hand(-0.05)
     assert two_hand_squish(left, near_right) > two_hand_squish(left, far_right)
+
+
+def test_packet_tears_only_after_a_strong_squeeze_and_clear_release() -> None:
+    assert is_pull_apart_tear(0.86, 0.48, 0.20)
+    assert not is_pull_apart_tear(0.60, 0.20, 0.10)
+    assert not is_pull_apart_tear(0.86, 0.70, 0.20)
 
