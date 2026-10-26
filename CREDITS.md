@@ -25,13 +25,13 @@ Library versions used for a particular submission are recorded in `uv.lock` afte
 
 ## Visual and media assets
 
-All shapes, character graphics, translucent jelly layers, pressure waves, supermarket elements, particles, interface elements, and short sound effects are generated procedurally by the Python code. There are no downloaded images, fonts, sounds, prerecorded camera clips, or third-party visual assets in prototype version 0.6.
+All shapes, character graphics, translucent jelly layers, pressure waves, supermarket elements, particles, interface elements, and short sound effects are generated procedurally by the Python code. There are no downloaded images, fonts, sounds, prerecorded camera clips, or third-party visual assets in prototype version 0.6.1.
 
 ## Interaction references
 
 - A user-supplied Xiaohongshu post titled “捏一下赛博青苹果来哄自己开心” inspired the green-apple theme and the request for more tactile variation. The short link could not be fetched in the development environment, so no imagery, code, audio, or text was copied from it: <https://xhslink.cn/o/6Nkve3BQzjj>
 - CBNData's article on crispy squishies was consulted for general context about progressive breaking and immediate sensory feedback: <https://www.cbndata.com/information/295843>
-- User-supplied screenshots of gesture-controlled music and breathing-oriented generative artwork informed the later request for a translucent jelly, breathing prompts, musical feedback, and collaborative pressure waves. No imagery, interface, text, music, or code was copied from those screenshots.
+- User-supplied screenshots of gesture-controlled music, breathing-oriented generative artwork, and coloured hydrogel stress balls informed the translucent jelly, breathing prompts, musical feedback, collaborative pressure waves, and glossy material treatment. No imagery, interface, text, music, or code was copied from those screenshots.
 
 These are interaction references, not source assets.
 

@@ -149,6 +149,7 @@ Camera frames are processed in memory and are not displayed, recorded, uploaded,
 - Kept the eight most recent waves visible so three sequential collaborators can build one shared composition.
 - Added `N` handoff, collaborator colours, a shared-wave count, keyboard fallback, and a clear-canvas reset.
 - Retained the four earlier toys as visible development experiments while making Ripple Jelly the launch default.
+- **0.6.1 material polish:** replaced the misty oval jelly with a rounder hydrogel-ball treatment after reviewing a user-supplied material reference. A saturated rim, transparent centre, sharp offset highlights, lower refraction colour, and a soft contact shadow make the squeeze response read more clearly. The reference image itself is not included or copied into the program.
 - Added automated tests for pressure classification and breathing phase timing.
 
 ### AI collaboration record

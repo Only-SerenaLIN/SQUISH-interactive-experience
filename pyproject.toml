@@ -1,6 +1,6 @@
 [project]
 name = "squish-toy"
-version = "0.6.0"
+version = "0.6.1"
 description = "A webcam-controlled interactive digital stress toy"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"

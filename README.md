@@ -2,7 +2,7 @@
 
 Public repository: <https://github.com/Only-SerenaLIN/SQUISH-interactive-experience>
 
-**SQUISH!** is a webcam-controlled breathing and co-creation experience built around a translucent digital jelly. Follow a gentle breathing prompt, close your hand to build pressure, and open it to release a visual ripple and a generated musical chord. Each person's waves remain on the shared canvas long enough to meet the next participant's contribution.
+**SQUISH!** is a webcam-controlled breathing and co-creation experience built around a glossy, translucent digital hydrogel ball. Follow a gentle breathing prompt, close your hand to build pressure, and open it to release a visual ripple and a generated musical chord. Each person's waves remain on the shared canvas long enough to meet the next participant's contribution.
 
 The default **Ripple Jelly** mode is the focused Assignment 3 experience. Earlier Cyber Apple, Soft Blob, Crispy Peach, and Ramen Pack studies remain available as development experiments. If the camera is unavailable, the complete main interaction still works with the keyboard or mouse.
 
@@ -65,7 +65,7 @@ The enhanced supermarket interaction adds anticipation before the burst and a di
 - Live one-hand and two-hand tracking with OpenCV and MediaPipe
 - Hand-open / hand-closed estimation, normalised for hand size
 - Horizontal two-palm distance mapped to side pressure
-- A translucent **Ripple Jelly** with breathing expansion, pressure deformation, internal light, and spring rebound
+- A glossy translucent **Ripple Jelly** with a coloured rim, transmitted light, specular highlights, breathing expansion, pressure deformation, and spring rebound
 - A persistent eight-layer co-creation canvas for three sequential collaborators
 - Three pressure qualities mapped to distinct wave geometry and generated ambient chords
 - A 4-2-6 visual breathing guide that never treats timing variation as failure

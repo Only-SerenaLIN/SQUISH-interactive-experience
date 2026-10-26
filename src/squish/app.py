@@ -707,18 +707,32 @@ class SquishApp:
         else:
             breath_scale = 1.04 - progress * 0.08
 
-        width, height = self.deformed_size(285, 230, pressure, 0.48, 0.40, scale * breath_scale)
+        # Keep the resting form close to a water-gel sphere. Pressure turns that
+        # sphere into a convincing squish without losing its glossy silhouette.
+        width, height = self.deformed_size(252, 252, pressure, 0.43, 0.38, scale * breath_scale)
         if self.squeeze_axis == "vertical":
-            cy += pressure * 30 * scale
+            cy += pressure * 25 * scale
         cy += math.sin(pygame.time.get_ticks() * 0.0016) * 5 * scale
-        shadow = pygame.Rect(0, 0, width * 0.73, 24 * scale)
-        shadow.center = (cx, cy + height * 0.53)
-        pygame.draw.ellipse(surface, (207, 211, 231), shadow)
 
         layer = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        glow = pygame.Rect(0, 0, width + 95 * scale, height + 75 * scale)
-        glow.center = (cx, cy)
-        pygame.draw.ellipse(layer, (*RIPPLE_COLORS[self.collaborator], 24), glow)
+        tint = RIPPLE_COLORS[self.collaborator]
+        edge = tuple(max(0, int(channel * 0.67)) for channel in tint)
+        pale = tuple(min(255, int(channel + (255 - channel) * 0.45)) for channel in tint)
+        light = tuple(min(255, int(channel + (255 - channel) * 0.67)) for channel in tint)
+
+        # A layered contact shadow and a small coloured caustic sell the sense
+        # that the translucent ball is resting just above a surface.
+        for step in range(6, 0, -1):
+            shadow = pygame.Rect(0, 0, width * (0.55 + step * 0.045), (10 + step * 4) * scale)
+            shadow.center = (cx + width * 0.035, cy + height * 0.51)
+            pygame.draw.ellipse(layer, (66, 58, 92, 7 + step * 4), shadow)
+        caustic = pygame.Rect(0, 0, width * 0.48, height * 0.12)
+        caustic.center = (cx + width * 0.08, cy + height * 0.48)
+        pygame.draw.ellipse(layer, (*tint, 42), caustic)
+
+        glow = pygame.Rect(0, 0, width + 64 * scale, height + 58 * scale)
+        glow.center = (cx, cy + height * 0.03)
+        pygame.draw.ellipse(layer, (*tint, 18), glow)
 
         now = pygame.time.get_ticks() * 0.0018
         points = []
@@ -726,25 +740,66 @@ class SquishApp:
             angle = index / 96 * math.tau
             wobble = 1 + math.sin(angle * 6 + now) * (0.018 + pressure * 0.012)
             points.append((cx + math.cos(angle) * width * 0.5 * wobble, cy + math.sin(angle) * height * 0.5 * wobble))
-        pygame.draw.polygon(layer, (112, 204, 232, 72), points)
-        inner = [(cx + (x - cx) * 0.88, cy + (y - cy) * 0.88) for x, y in points]
-        pygame.draw.polygon(layer, (203, 177, 246, 63), inner)
-        pygame.draw.lines(layer, (255, 255, 255, 175), True, points, max(2, int(3 * scale)))
+        pygame.draw.polygon(layer, (*edge, 205), points)
 
-        for index in range(18):
-            angle = index * 2.399 + now * 0.22
-            distance = 0.20 + (index % 5) * 0.055
+        # Nested bodies act like a simple radial material: saturated at the rim,
+        # luminous and transparent through the middle.
+        body_layers = (
+            (0.94, (*tint, 202), 0.00, 0.00),
+            (0.83, (*pale, 190), -0.025, -0.025),
+            (0.68, (*light, 170), -0.055, -0.065),
+            (0.46, (*light, 150), -0.08, -0.09),
+        )
+        for factor, color, shift_x, shift_y in body_layers:
+            inner = [
+                (cx + (x - cx) * factor + width * shift_x, cy + (y - cy) * factor + height * shift_y)
+                for x, y in points
+            ]
+            pygame.draw.polygon(layer, color, inner)
+
+        lower_refraction = pygame.Rect(0, 0, width * 0.61, height * 0.22)
+        lower_refraction.center = (cx + width * 0.07, cy + height * 0.30)
+        pygame.draw.ellipse(layer, (*tint, 112), lower_refraction)
+        lower_light = pygame.Rect(0, 0, width * 0.35, height * 0.075)
+        lower_light.center = (cx - width * 0.09, cy + height * 0.34)
+        pygame.draw.ellipse(layer, (255, 255, 255, 105), lower_light)
+
+        # A darker lower rim and bright upper rim mimic refraction through a
+        # thick hydrogel skin while still allowing the ripples to show through.
+        rim_rect = pygame.Rect(0, 0, width * 0.96, height * 0.96)
+        rim_rect.center = (cx, cy)
+        pygame.draw.arc(layer, (*edge, 96), rim_rect, math.radians(12), math.radians(166), max(2, int(4 * scale)))
+        pygame.draw.arc(layer, (255, 255, 255, 210), rim_rect, math.radians(196), math.radians(330), max(2, int(4 * scale)))
+        pygame.draw.lines(layer, (*pale, 122), True, points, max(1, int(2 * scale)))
+
+        # A few barely visible inclusions add depth without turning the clean
+        # gel material back into the earlier dotted, misty blob.
+        for index in range(6):
+            angle = index * 2.399 + now * 0.12
+            distance = 0.12 + (index % 3) * 0.085
             px = cx + math.cos(angle) * width * distance
             py = cy + math.sin(angle) * height * distance * 0.72
-            radius = max(2, int((2 + index % 3) * scale))
-            color = (*RIPPLE_COLORS[index % 3], 90 + (index % 4) * 28)
-            pygame.draw.circle(layer, color, (int(px), int(py)), radius)
+            radius = max(2, int((2 + index % 2) * scale))
+            pygame.draw.circle(layer, (255, 255, 255, 52), (int(px), int(py)), radius)
 
-        core_radius = int((24 + pressure * 15) * scale)
-        pygame.draw.circle(layer, (255, 255, 255, 92), (int(cx), int(cy)), core_radius)
-        shine = pygame.Rect(0, 0, width * 0.32, height * 0.16)
-        shine.center = (cx - width * 0.19, cy - height * 0.25)
-        pygame.draw.ellipse(layer, (255, 255, 255, 150), shine)
+        # Crisp, offset specular highlights are the strongest material cue in
+        # the user's reference: one stretched reflection plus a small sparkle.
+        highlight_size = (max(12, int(width * 0.30)), max(8, int(height * 0.105)))
+        highlight = pygame.Surface(highlight_size, pygame.SRCALPHA)
+        pygame.draw.ellipse(highlight, (255, 255, 255, 244), highlight.get_rect())
+        highlight = pygame.transform.rotate(highlight, 24)
+        highlight_rect = highlight.get_rect(center=(cx - width * 0.20, cy - height * 0.27))
+        layer.blit(highlight, highlight_rect)
+        pygame.draw.ellipse(
+            layer,
+            (255, 255, 255, 235),
+            pygame.Rect(cx + width * 0.10, cy - height * 0.36, width * 0.095, height * 0.06),
+        )
+        pygame.draw.ellipse(
+            layer,
+            (*pale, 90),
+            pygame.Rect(cx - width * 0.23, cy + height * 0.30, width * 0.48, height * 0.095),
+        )
         surface.blit(layer, (0, 0))
 
     def draw_particles(self, surface: pygame.Surface) -> None:
