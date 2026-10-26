@@ -49,6 +49,7 @@ class HandCamera:
             capture = cv2.VideoCapture(self.camera_index)
             capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
             capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             if not capture.isOpened():
                 capture.release()
                 raise RuntimeError("No webcam could be opened")
@@ -58,7 +59,7 @@ class HandCamera:
                 max_num_hands=2,
                 model_complexity=0,
                 min_detection_confidence=0.55,
-                min_tracking_confidence=0.5,
+                min_tracking_confidence=0.45,
             )
             self.cv2 = cv2
             self.capture = capture
@@ -101,8 +102,8 @@ class HandCamera:
             palms = tuple(sorted((palm_centre(hand_a), palm_centre(hand_b)), key=lambda point: point[0]))
             raw_roll = two_hand_roll_motion(self._previous_palms, palms) if self._previous_palms is not None else 0.0
             self._previous_palms = palms
-            self._smoothed_horizontal += (raw - self._smoothed_horizontal) * 0.25
-            self._smoothed_roll += (raw_roll - self._smoothed_roll) * 0.32
+            self._smoothed_horizontal += (raw - self._smoothed_horizontal) * 0.42
+            self._smoothed_roll += (raw_roll - self._smoothed_roll) * 0.48
             self._last_seen = time.monotonic()
             message = "Two hands: rolling round" if self._smoothed_roll > 0.24 else "Two hands: flattening"
             return TrackingResult(
@@ -117,7 +118,7 @@ class HandCamera:
         self._previous_palms = None
         self._smoothed_roll *= 0.72
         raw = hand_openness(result.multi_hand_landmarks[0].landmark)
-        self._smoothed += (raw - self._smoothed) * 0.28
+        self._smoothed += (raw - self._smoothed) * 0.36
         self._last_seen = time.monotonic()
         centre = palm_centre(result.multi_hand_landmarks[0].landmark)
         return TrackingResult(self._smoothed, None, 1, "One hand detected", palm_centres=(centre,))

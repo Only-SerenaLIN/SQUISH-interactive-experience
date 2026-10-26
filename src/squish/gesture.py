@@ -79,7 +79,9 @@ def two_hand_squish(hand_a: Sequence[PointLike], hand_b: Sequence[PointLike]) ->
     centre_a = sum(hand_a[i].x for i in palm_ids) / len(palm_ids)
     centre_b = sum(hand_b[i].x for i in palm_ids) / len(palm_ids)
     gap = abs(centre_a - centre_b)
-    return 1.0 - remap_clamped(gap, 0.13, 0.58)
+    # A wider active range reaches useful pressure sooner while still leaving
+    # room for a clear release when the hands move apart.
+    return 1.0 - remap_clamped(gap, 0.18, 0.66)
 
 
 def palm_centre(landmarks: Sequence[PointLike]) -> tuple[float, float]:
@@ -114,7 +116,7 @@ def two_hand_roll_motion(
     # Horizontal opposition mostly means the palms are simply closing around
     # the ball. Vertical opposition is the distinctive rubbing/rolling cue.
     motion = opposing_vertical + opposing_horizontal * 0.08
-    return remap_clamped(motion, 0.006, 0.060)
+    return remap_clamped(motion, 0.004, 0.042)
 
 
 def is_pull_apart_tear(peak_pressure: float, current_pressure: float, target_pressure: float) -> bool:

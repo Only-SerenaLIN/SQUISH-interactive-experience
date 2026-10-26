@@ -175,6 +175,16 @@ Camera frames are mirrored and displayed live, then processed locally in memory 
 - Kept a camera-free background and the `Space`/`G` controls so denied permission or an unavailable camera does not block assessment.
 - No live frames or participant images are written to disk; generated documentation screenshots use only fallback mode.
 
+### Prototype 0.9 — responsive gesture and diamond splash
+
+- Widened the two-palm pressure range so useful deformation begins earlier and maximum pressure is reachable without overlapping the hands.
+- Increased camera signal, roll-signal, palm-position, and spring response rates to reduce the delayed feeling reported during hands-on use.
+- Requested a one-frame camera buffer where the OpenCV backend supports it, reducing the chance that an old frame is processed after the hands have moved.
+- Added a latched maximum-pressure event at 91%: the ball disappears into a deep ripple, generated chord, soft flash, water droplets, and thirty rotating faceted fragments.
+- Drew every diamond procedurally with four outer points, two coloured facets, a white edge, and a small cross-glint. No image asset was added.
+- Required pressure to return near zero before the ball reforms and the effect can trigger again, preventing an accidental continuous particle stream.
+- Added a test assertion that a practical close-palm pose now produces more than 90% pressure. The exact live-camera threshold still needs participant testing.
+
 ### AI collaboration record
 
 OpenAI Codex was used to scaffold the Python project, implement and test the camera/fallback loop, propose visual feedback, and draft documentation. A suggestion that was **kept** was separating the gesture maths from the Pygame drawing code, because it makes the input-to-response logic testable without a webcam. An early suggestion to add only simple colour choices was **changed** after the student supplied tactile references: later variants change rebound, fracture, ripple geometry, and sound rather than decoration alone. A first proposal to omit audio was later **rejected** after the student requested sound; the revised design generates sounds in memory and preserves a silent fallback. A points-based game direction was **rejected** in favour of equal-status pressure qualities and a shared generative canvas, because the student wanted a calmer co-creative experience.
@@ -185,6 +195,7 @@ The student must review this account, edit it into their own voice, and ensure i
 
 - Hand openness is heuristic and may vary with hand angle, lighting, and distance.
 - Two-hand distance is measured horizontally and rolling is estimated from frame-to-frame opposite vertical motion, so overlap, low frame rate, or strong camera angles can confuse it.
+- The 91% splash threshold is intentionally reachable, but perceived sensitivity will still vary with camera framing and palm angle.
 - Sound depends on the computer providing an output device; visual feedback remains complete without it.
 - Live camera contrast varies by room; translucent white panels preserve the controls, but very bright backlighting can still reduce hand-tracking quality.
 - Co-creation is sequential on one device, not networked or simultaneous.

@@ -18,6 +18,10 @@ The documentation screenshots use the camera-free fallback background so no pers
 
 ![3D jelly rolled back into a sphere](docs/3d-jelly-roll-round.png)
 
+At maximum pressure, the gel bursts into water droplets and rotating translucent diamond fragments. Releasing the gesture reforms the ball, so the effect cannot retrigger continuously.
+
+![Maximum-pressure diamond splash](docs/diamond-splash.png)
+
 This is a calming interactive artwork, not a medical or therapeutic product.
 
 ## Main interaction
@@ -74,6 +78,7 @@ The enhanced supermarket interaction adds anticipation before the burst and a di
 - Horizontal two-palm distance mapped to side pressure
 - Opposing two-palm motion detection that separates rolling from shared camera drift and horizontal squeezing
 - A software-rendered 3D **Ripple Jelly** with rotating projected surface lines, coloured rim, transmitted light, specular highlights, persistent flattening, and roll-to-round recovery
+- A one-shot maximum-pressure water splash with rotating faceted diamond fragments, flash, deep ripple, and reform-on-release feedback
 - A persistent eight-layer co-creation canvas for three sequential collaborators
 - Three pressure qualities mapped to distinct wave geometry and generated ambient chords
 - Four earlier tactile studies: **Cyber Apple**, **Soft Blob**, **Crispy Peach**, and **Ramen Pack**
@@ -145,6 +150,8 @@ Keyboard and mouse input temporarily take priority over the camera, so you can d
 **The camera status says “unavailable.”** The app is still usable. Try `C`, check macOS camera permission, close other camera apps, or run `uv run python run_squish.py --camera-index 1` if you have a second camera.
 
 **The hand signal feels jumpy.** Keep one hand visible, face the palm toward the camera, use even lighting, and keep your wrist and fingertips inside the frame. The prototype smooths the reading but intentionally stays responsive.
+
+**The ball does not reach the diamond splash.** Keep both palms facing the camera and bring their centres to roughly one hand-width apart. The wider v0.9 pressure range is intentionally more responsive, but very angled palms may still make the measured gap look larger.
 
 **The wrong gesture is detected.** For one-hand mode, start with a clearly open palm, then make a clear fist. To flatten, keep both palms visible and move them horizontally together. To roll round, hold the gap fairly steady while moving one palm up as the other moves down. Unusual angles, overlap, or a hand leaving the frame can confuse tracking. That limitation is documented honestly in `PROCESS.md`.
 

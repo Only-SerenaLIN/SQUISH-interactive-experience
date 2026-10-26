@@ -69,6 +69,7 @@ def test_two_hands_get_more_pressure_as_they_move_together() -> None:
     far_right = shifted_hand(0.25)
     near_right = shifted_hand(-0.05)
     assert two_hand_squish(left, near_right) > two_hand_squish(left, far_right)
+    assert two_hand_squish(left, near_right) > 0.9
 
 
 def test_opposing_palm_motion_reads_as_rolling() -> None:

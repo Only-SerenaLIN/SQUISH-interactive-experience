@@ -56,7 +56,7 @@ TOYS = (
     ToySpec("SOFT BLOB", "bouncy original friend", PURPLE, PINK, 28.0, 8.0),
     ToySpec("CRISPY PEACH", "crack the shell, find the soft core", (255, 210, 157), (255, 116, 145), 38.0, 10.0),
     ToySpec("RAMEN PACK", "crinkle the bag, then pop the noodles", (255, 91, 68), (255, 190, 61), 42.0, 11.0),
-    ToySpec("RIPPLE JELLY", "camera gel: flatten, roll, release", (166, 218, 238), (129, 108, 225), 22.0, 8.0),
+    ToySpec("RIPPLE JELLY", "camera gel: flatten, roll, release", (166, 218, 238), (129, 108, 225), 34.0, 9.0),
 )
 
 
@@ -70,6 +70,9 @@ class Particle:
     color: tuple[int, int, int]
     size: float
     shard: bool = False
+    jewel: bool = False
+    angle: float = 0.0
+    spin: float = 0.0
 
 
 @dataclass
@@ -132,6 +135,8 @@ class SquishApp:
         self.jelly_roll_strength = 0.0
         self.jelly_anchor = [0.5, 0.48]
         self.tracked_palms: tuple[tuple[float, float], ...] = ()
+        self.jelly_burst_latched = False
+        self.jelly_burst_timer = 0.0
         self.crinkle_sound = self.make_sound("crinkle")
         self.burst_sound = self.make_sound("burst")
         self.ripple_sounds = {
@@ -238,6 +243,8 @@ class SquishApp:
             self.jelly_rotation = 0.0
             self.jelly_roll_strength = 0.0
             self.jelly_anchor = [0.5, 0.48]
+            self.jelly_burst_latched = False
+            self.jelly_burst_timer = 0.0
 
     def release_ripple(self) -> None:
         pressure = clamp(self.jelly_peak)
@@ -329,11 +336,11 @@ class SquishApp:
         keys = pygame.key.get_pressed()
         mouse_pressed = pygame.mouse.get_pressed(num_buttons=3)[0]
         if self.toy_index == 4 and keys[pygame.K_g]:
-            self.manual_target = max(0.0, self.manual_target - dt * 4.8)
+            self.manual_target = max(0.0, self.manual_target - dt * 6.0)
             return self.manual_target, "rolling"
         axis = "horizontal" if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT] else "vertical"
         if keys[pygame.K_SPACE] or mouse_pressed:
-            self.manual_target = min(1.0, self.manual_target + dt * 3.8)
+            self.manual_target = min(1.0, self.manual_target + dt * 5.0)
             return self.manual_target, axis
         if keys[pygame.K_DOWN] or keys[pygame.K_RIGHT]:
             self.manual_target = min(1.0, self.manual_target + dt * 1.6)
@@ -352,6 +359,51 @@ class SquishApp:
             speed = random.uniform(100, 330 if ramen else 290 if crispy else 230)
             self.particles.append(Particle(cx, cy, math.cos(angle) * speed, math.sin(angle) * speed, random.uniform(0.55, 1.0), random.choice(palette), random.uniform(4, 11 if crispy or ramen else 8), crispy or ramen))
 
+    def spawn_diamond_splash(self) -> None:
+        """Burst the gel into water droplets and rotating faceted jewels."""
+        w, h = self.screen.get_size()
+        cx, cy = self.camera_point_to_screen(self.jelly_anchor[0], self.jelly_anchor[1], w, h)
+        jewel_palette = ((158, 239, 255), (204, 188, 255), (255, 191, 229), (236, 252, 255))
+        water_palette = ((112, 218, 246), (164, 236, 252), (216, 249, 255))
+        for _ in range(30):
+            angle = random.uniform(0, math.tau)
+            speed = random.uniform(220, 520)
+            self.particles.append(
+                Particle(
+                    cx,
+                    cy,
+                    math.cos(angle) * speed,
+                    math.sin(angle) * speed - random.uniform(25, 90),
+                    random.uniform(1.15, 1.95),
+                    random.choice(jewel_palette),
+                    random.uniform(6.5, 14.0),
+                    jewel=True,
+                    angle=random.uniform(0, math.tau),
+                    spin=random.uniform(-7.5, 7.5),
+                )
+            )
+        for _ in range(22):
+            angle = random.uniform(0, math.tau)
+            speed = random.uniform(170, 410)
+            self.particles.append(
+                Particle(
+                    cx,
+                    cy,
+                    math.cos(angle) * speed,
+                    math.sin(angle) * speed - random.uniform(20, 75),
+                    random.uniform(0.65, 1.25),
+                    random.choice(water_palette),
+                    random.uniform(2.5, 7.5),
+                )
+            )
+
+        self.ripples.append(Ripple(1.0, self.collaborator, 0.0, random.uniform(0, math.tau), self.jelly_anchor[0], self.jelly_anchor[1]))
+        self.ripples = self.ripples[-8:]
+        self.ripple_layers += 1
+        self.ripple_flash = 0.85
+        self.jelly_burst_timer = 1.15
+        self.play_sound(self.ripple_sounds["deep"])
+
     def update_particles(self, dt: float) -> None:
         alive = []
         for p in self.particles:
@@ -362,6 +414,7 @@ class SquishApp:
             p.y += p.vy * dt
             p.vy += 270 * dt
             p.vx *= 0.99
+            p.angle += p.spin * dt
             alive.append(p)
         self.particles = alive
 
@@ -371,7 +424,7 @@ class SquishApp:
         if len(self.tracked_palms) >= 2:
             target_x = clamp((self.tracked_palms[0][0] + self.tracked_palms[1][0]) * 0.5, 0.20, 0.80)
             target_y = clamp((self.tracked_palms[0][1] + self.tracked_palms[1][1]) * 0.5, 0.30, 0.68)
-            anchor_smoothing = min(1.0, dt * 8.0)
+            anchor_smoothing = min(1.0, dt * 13.0)
             self.jelly_anchor[0] += (target_x - self.jelly_anchor[0]) * anchor_smoothing
             self.jelly_anchor[1] += (target_y - self.jelly_anchor[1]) * anchor_smoothing
         manual = self.manual_input(dt)
@@ -408,8 +461,9 @@ class SquishApp:
         self.flash_timer = max(0.0, self.flash_timer - dt)
         self.restock_timer = max(0.0, self.restock_timer - dt)
         self.ripple_flash = max(0.0, self.ripple_flash - dt)
+        self.jelly_burst_timer = max(0.0, self.jelly_burst_timer - dt)
         if self.toy_index == 4:
-            self.jelly_roll_strength += (roll_input - self.jelly_roll_strength) * min(1.0, dt * 10.0)
+            self.jelly_roll_strength += (roll_input - self.jelly_roll_strength) * min(1.0, dt * 14.0)
             if roll_input > 0.12:
                 self.jelly_roundness = clamp(self.jelly_roundness + dt * (0.75 + roll_input * 1.65))
                 self.jelly_rotation = (self.jelly_rotation + dt * (1.6 + roll_input * 5.2)) % math.tau
@@ -421,11 +475,22 @@ class SquishApp:
                 # deliberate and clearly visible way to restore a sphere.
                 self.jelly_roundness = clamp(self.jelly_roundness + dt * 0.055, 0.36, 1.0)
                 self.jelly_rotation = (self.jelly_rotation + dt * 0.10) % math.tau
-            self.jelly_peak = max(self.jelly_peak, clamp(squish))
-            if self.jelly_peak > 0.16:
-                self.jelly_armed = True
-            if self.jelly_armed and squish < 0.10 and self.target < 0.08:
-                self.release_ripple()
+            if not self.jelly_burst_latched:
+                self.jelly_peak = max(self.jelly_peak, clamp(squish))
+                if self.jelly_peak > 0.16:
+                    self.jelly_armed = True
+                if squish >= 0.91:
+                    self.jelly_burst_latched = True
+                    self.jelly_armed = False
+                    self.jelly_peak = 0.0
+                    self.spawn_diamond_splash()
+                elif self.jelly_armed and squish < 0.10 and self.target < 0.08:
+                    self.release_ripple()
+            elif squish < 0.12 and self.target < 0.08:
+                self.jelly_burst_latched = False
+                self.jelly_peak = 0.0
+                self.jelly_armed = False
+                self.jelly_roundness = 1.0
             for ripple in self.ripples:
                 ripple.age += dt
             self.ripples = [ripple for ripple in self.ripples if ripple.age < 22.0]
@@ -474,7 +539,9 @@ class SquishApp:
         if self.toy_index == 3 and self.shell_broken:
             status = self.ramen_reward
         elif self.toy_index == 4:
-            if self.jelly_roll_strength > 0.20:
+            if self.jelly_burst_latched:
+                action = "DIAMOND SPLASH"
+            elif self.jelly_roll_strength > 0.20:
                 action = "ROLLING ROUND"
             elif squish > 0.12:
                 action = "FLATTENING"
@@ -870,12 +937,42 @@ class SquishApp:
         surface.blit(layer, (0, 0))
 
     def draw_particles(self, surface: pygame.Surface) -> None:
+        jewel_layer = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         for p in self.particles:
             size = max(1, int(p.size * clamp(p.life * 2)))
-            if p.shard:
+            if p.jewel:
+                cosine, sine = math.cos(p.angle), math.sin(p.angle)
+
+                def rotate(local_x: float, local_y: float) -> tuple[float, float]:
+                    return (
+                        p.x + local_x * cosine - local_y * sine,
+                        p.y + local_x * sine + local_y * cosine,
+                    )
+
+                points = (
+                    rotate(0, -size * 1.55),
+                    rotate(size, 0),
+                    rotate(0, size * 1.55),
+                    rotate(-size, 0),
+                )
+                alpha = int(225 * clamp(p.life / 0.65))
+                pygame.draw.polygon(jewel_layer, (*p.color, alpha), points)
+                pygame.draw.polygon(jewel_layer, (90, 106, 184, alpha), points, max(2, size // 4))
+                pygame.draw.polygon(jewel_layer, (255, 255, 255, min(245, alpha + 20)), points, 1)
+                centre = (p.x, p.y)
+                pygame.draw.polygon(jewel_layer, (255, 255, 255, alpha // 2), (points[0], points[1], centre))
+                pygame.draw.polygon(jewel_layer, (*RIPPLE_COLORS[self.collaborator], alpha // 2), (points[2], points[3], centre))
+                if size >= 5:
+                    pygame.draw.line(jewel_layer, (255, 255, 255, alpha), (p.x - size * 0.55, p.y), (p.x + size * 0.55, p.y), 1)
+                    pygame.draw.line(jewel_layer, (255, 255, 255, alpha), (p.x, p.y - size * 0.55), (p.x, p.y + size * 0.55), 1)
+            elif p.shard:
                 pygame.draw.polygon(surface, p.color, ((p.x, p.y - size), (p.x + size, p.y), (p.x, p.y + size), (p.x - size, p.y)))
             else:
-                pygame.draw.circle(surface, p.color, (int(p.x), int(p.y)), size)
+                alpha = int(195 * clamp(p.life / 0.45))
+                pygame.draw.circle(jewel_layer, (*p.color, alpha), (int(p.x), int(p.y)), size)
+                if size > 3:
+                    pygame.draw.circle(jewel_layer, (255, 255, 255, min(230, alpha + 25)), (int(p.x - size * 0.28), int(p.y - size * 0.28)), max(1, size // 3))
+        surface.blit(jewel_layer, (0, 0))
 
     def draw_selector(self, surface: pygame.Surface) -> None:
         x = 30
@@ -1011,7 +1108,8 @@ class SquishApp:
         elif self.toy_index == 3:
             self.draw_ramen(self.screen, cx, cy, scale)
         else:
-            self.draw_jelly(self.screen, cx, cy, scale)
+            if not self.jelly_burst_latched:
+                self.draw_jelly(self.screen, cx, cy, scale)
         self.draw_particles(self.screen)
         meter_w = min(300, int(w * 0.34))
         meter = pygame.Rect(w // 2 - meter_w // 2, int(h * 0.73), meter_w, 14)
@@ -1021,7 +1119,9 @@ class SquishApp:
         fill.width = int(meter.width * meter_value)
         pygame.draw.rect(self.screen, self.toy.accent, fill, border_radius=7)
         if self.toy_index == 4:
-            if self.jelly_roll_strength > 0.20:
+            if self.jelly_burst_latched:
+                label = "DIAMOND SPLASH!  |  release to reform"
+            elif self.jelly_roll_strength > 0.20:
                 label = f"ROLLING ROUND  |  form {round(self.jelly_roundness * 100):02d}%"
             elif clamp(self.spring.value) > 0.12:
                 level = pressure_band(clamp(self.spring.value)).upper()
@@ -1055,6 +1155,11 @@ class SquishApp:
         if self.ripple_flash > 0 and self.toy_index == 4:
             flash = pygame.Surface((w, h), pygame.SRCALPHA)
             flash.fill((*RIPPLE_COLORS[self.collaborator], int(32 * self.ripple_flash / 0.55)))
+            self.screen.blit(flash, (0, 0))
+        if self.jelly_burst_timer > 0.88 and self.toy_index == 4:
+            flash = pygame.Surface((w, h), pygame.SRCALPHA)
+            flash_alpha = int(125 * clamp((self.jelly_burst_timer - 0.88) / 0.27))
+            flash.fill((232, 250, 255, flash_alpha))
             self.screen.blit(flash, (0, 0))
         pygame.display.flip()
 
