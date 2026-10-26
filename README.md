@@ -16,11 +16,17 @@ The crispy variety has staged feedback: fine cracks appear under pressure, the s
 
 ![Crispy Peach after the shell breaks](docs/crispy-preview.png)
 
-The supermarket ramen pack adds an audio-visual payoff: light squeezes crinkle the wrapper, maximum pressure pops the seam with a short generated sound, and the noodle cake springs out. No downloaded sound file is needed.
+The supermarket ramen pack adds an audio-visual payoff: light squeezes crinkle the wrapper, then a strong two-hand squeeze arms the seam. Pulling the hands apart tears it open with a generated pop sound and a random surprise. Possible results include double noodles, a seasoning storm, an empty bag, a golden noodle, and a rare Cyber Apple cameo. No downloaded sound file is needed.
 
 ![Ramen pack under pressure](docs/ramen-preview.png)
 
 ![Ramen pack after it pops](docs/ramen-burst-preview.png)
+
+The enhanced supermarket interaction adds anticipation before the burst and a different result after it.
+
+![Ramen pack armed and waiting for a pull-apart gesture](docs/ramen-tear-preview.png)
+
+![Random double-noodle surprise](docs/ramen-surprise-preview.png)
 
 ## 中文三步启动
 
@@ -38,6 +44,7 @@ The supermarket ramen pack adds an audio-visual payoff: light squeezes crinkle t
 - Four tactile variations built around the same interaction: slow **Cyber Apple**, bouncy **Soft Blob**, breakable **Crispy Peach**, and noisy **Ramen Pack**
 - Per-toy spring deformation, staged cracking, wrapper crinkles, fragments, visible rebound, and automatic repair
 - Procedurally generated crinkle and pop sounds, with mute and audio-unavailable feedback
+- Squeeze-then-pull two-hand packet opening, pre-burst warning, screen shake, flash, random contents, changing flavours, and a session pop counter
 - A squish meter, tracking status, expressive faces, and celebratory particles
 - Automatic keyboard/mouse fallback
 - Resizable Pygame window
@@ -81,9 +88,9 @@ uv run python run_squish.py --no-camera
 |---|---|
 | Open hand | Release and rebound |
 | Closed fist | Squish |
-| Two hands moving together/apart | Horizontal squeeze/release |
+| Two hands moving together/apart | Horizontal squeeze/release; on Ramen Pack, squeeze until prompted and pull apart to tear |
 | Hold `Space` or left mouse | Manual squish |
-| Hold `Shift + Space` | Manual horizontal squeeze |
+| Hold, then release `Shift + Space` | Manual horizontal squeeze; tears an armed Ramen Pack |
 | Arrow keys | Gradually adjust squish |
 | `1`, `2`, `3`, `4` | Select Cyber Apple, Soft Blob, Crispy Peach, or Ramen Pack |
 | `Tab` | Move to the next toy |
@@ -113,7 +120,7 @@ Keyboard and mouse input temporarily take priority over the camera, so you can d
 uv run pytest
 ```
 
-These tests cover the one-hand gesture score, two-hand distance mapping, range mapping, invalid input, and spring movement without needing a webcam or display.
+These tests cover the one-hand gesture score, two-hand distance mapping, deliberate pull-apart detection, range mapping, invalid input, and spring movement without needing a webcam or display.
 
 ## Project map
 
@@ -133,7 +140,7 @@ SQUISH/
 
 | Criterion | Evidence in this repository |
 |---|---|
-| Interaction and design — 5 | One-hand closure controls vertical squish; two-hand distance controls horizontal compression. The meter, direction label, expression, cracks, particles, generated sound, and rebound make the result legible. |
+| Interaction and design — 5 | One-hand closure controls vertical squish; two-hand distance controls horizontal compression and a squeeze-then-pull gesture opens the ramen pack. The meter, prompts, expression, cracks, particles, generated sound, random reveal, and rebound make the result legible. |
 | Working implementation — 4 | Reproducible `uv` setup, pinned compatible camera libraries, camera-free fallback, automated logic tests, and documented limitations. |
 | Usability and iteration — 3 | Visible controls, camera status, reset/quit paths, denied-camera fallback, and a trial procedure in `PROCESS.md`. **The real user trial is still required.** |
 | Process and communication — 3 | README screenshots, process decisions, AI-use record, credits, and a multi-commit Git history. |

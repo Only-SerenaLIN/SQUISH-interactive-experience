@@ -64,6 +64,8 @@ With one hand, the program calculates an openness value from 0 to 1 and inverts 
 - [x] `Shift + Space` camera-free demonstration of two-hand mode
 - [x] Supermarket ramen pack with pressure wrinkles, burst state, and noodle debris
 - [x] Procedurally generated crinkle/pop audio, mute control, and silent fallback
+- [x] Squeeze-then-pull two-hand packet opening with a camera-free keyboard equivalent
+- [x] Pre-burst warning, shake/flash feedback, changing flavours, random contents, and pop counter
 
 ### Optional — not implemented
 
@@ -122,9 +124,18 @@ Camera frames are processed in memory and are not displayed, recorded, uploaded,
 - Generated all audio from code at launch instead of adding a downloaded recording.
 - Added `M` mute control and visible `sound unavailable` feedback so audio-device failure never blocks the experience.
 
+### Prototype 0.5 — anticipation and surprise
+
+- Changed the two-hand ramen interaction from an automatic pressure threshold into a short sequence: squeeze until the seam is armed, then pull both hands apart to tear it open.
+- Added explicit `PULL HANDS APART!` feedback and a `Shift + Space` equivalent so the sequence is demonstrable without a camera.
+- Added increasingly nervous expressions, screen shake, a flash, and a brief reward label to make the moment of rupture easier to anticipate and read.
+- Added rotating fictional supermarket flavours and weighted random contents: normal noodles remain common, while double noodles, seasoning, an empty packet, a golden noodle, and a Cyber Apple cameo are surprises.
+- Added a small `PACKS POPPED` counter and a replacement packet that slides onto the shelf after release. This encourages repetition without introducing scoring or a win/lose state.
+- Added an automated test for the pull-apart detector. Visual states were checked in camera-free mode; live participant testing is still outstanding.
+
 ### AI collaboration record
 
-OpenAI Codex was used to scaffold the Python project, implement and test the camera/fallback loop, propose visual feedback, and draft documentation. A suggestion that was **kept** was separating the gesture maths from the Pygame drawing code, because it makes the input-to-response logic testable without a webcam. An early suggestion to add only simple colour choices was **changed** after the student supplied a tactile reference: the final variants change rebound and fracture behaviour, not just decoration. A first proposal to omit audio was later **rejected** after the student requested a supermarket ramen pack with sound; the revised design generates short sounds in memory and preserves a silent fallback.
+OpenAI Codex was used to scaffold the Python project, implement and test the camera/fallback loop, propose visual feedback, and draft documentation. A suggestion that was **kept** was separating the gesture maths from the Pygame drawing code, because it makes the input-to-response logic testable without a webcam. An early suggestion to add only simple colour choices was **changed** after the student supplied a tactile reference: the final variants change rebound and fracture behaviour, not just decoration. A first proposal to omit audio was later **rejected** after the student requested a supermarket ramen pack with sound; the revised design generates short sounds in memory and preserves a silent fallback. A further suggestion to add levels and points was **simplified** into a session pop counter and random reveal, keeping the assignment focused on one interaction rather than turning it into a large game.
 
 The student must review this account, edit it into their own voice, and ensure it matches the final work before submission.
 
