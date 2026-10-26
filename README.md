@@ -2,9 +2,33 @@
 
 Public repository: <https://github.com/Only-SerenaLIN/SQUISH-interactive-experience>
 
-**SQUISH!** is a small interactive digital stress-toy collection. With one hand, close your fist to squash the selected toy and open it to release. With two hands, move your palms together to squeeze it from both sides and move them apart to rebound. If the camera is unavailable, the complete interaction still works with the keyboard or mouse.
+**SQUISH!** is a webcam-controlled breathing and co-creation experience built around a translucent digital jelly. Follow a gentle breathing prompt, close your hand to build pressure, and open it to release a visual ripple and a generated musical chord. Each person's waves remain on the shared canvas long enough to meet the next participant's contribution.
 
-This is a deliberately manageable Assignment 3 prototype: one clear interaction, immediate visual feedback, a strong visual identity, and enough technical depth to demonstrate webcam-based embodied input without turning the project into a large game.
+The default **Ripple Jelly** mode is the focused Assignment 3 experience. Earlier Cyber Apple, Soft Blob, Crispy Peach, and Ramen Pack studies remain available as development experiments. If the camera is unavailable, the complete main interaction still works with the keyboard or mouse.
+
+![Ripple Jelly during a guided squeeze](docs/ripple-jelly-squeeze.png)
+
+Three collaborators produce different coloured layers. Light, medium, and deep pressure create equal-status wave qualities rather than a score hierarchy.
+
+![Ripple Jelly after releasing a shared wave](docs/ripple-jelly-release.png)
+
+This is a calming interactive artwork, not a medical or therapeutic product.
+
+## Main interaction
+
+```text
+open hand / inhale → jelly expands → close hand / exhale → pressure builds
+        ↑                                                   ↓
+        └── release hand ← chord and shared ripple appear ──┘
+```
+
+- **Light pressure:** thin breathing waves and a bright, airy chord
+- **Medium pressure:** layered connecting waves and a warm chord
+- **Deep pressure:** broad slow waves and a low resonant chord
+- Press `N` to hand the experience to collaborator A, B, or C; recent waves overlap on one shared composition
+- The breathing guide uses a gentle 4-second inhale, comfortable 2-second hold, and 6-second exhale. A participant can release whenever they need to.
+
+## Earlier tactile studies
 
 ![SQUISH preview](docs/preview.png)
 
@@ -32,16 +56,20 @@ The enhanced supermarket interaction adds anticipation before the burst and a di
 
 1. 在 Codex 中选择 **Open Folder**，打开这个 `SQUISH` 文件夹，再打开内置终端。
 2. 第一次运行 `uv sync`，等待依赖安装完成。
-3. 运行 `uv run python run_squish.py`。看到摄像头权限提示时选择允许；张开手会让角色回弹，握拳会把它压扁。
+3. 运行 `uv run python run_squish.py`。看到摄像头权限提示时选择允许；跟随呼吸提示，握拳积累压力，张开手释放波纹和音乐。
 
-如果暂时不想开摄像头，运行 `uv run python run_squish.py --no-camera`，然后按住空格键或鼠标左键。按 `C` 可暂停或重试摄像头，按 `H` 隐藏说明，按 `Esc` 退出。遇到问题时直接看下面的 **Troubleshooting**，不会因为摄像头不可用而无法完成演示。
+如果暂时不想开摄像头，运行 `uv run python run_squish.py --no-camera`，然后按住空格键积累压力、松开生成波纹。按 `N` 交给下一位共创者，按 `C` 暂停或重试摄像头，按 `H` 隐藏说明，按 `Esc` 退出。遇到问题时直接看下面的 **Troubleshooting**，不会因为摄像头不可用而无法完成演示。
 
 ## What the prototype includes
 
 - Live one-hand and two-hand tracking with OpenCV and MediaPipe
 - Hand-open / hand-closed estimation, normalised for hand size
 - Horizontal two-palm distance mapped to side pressure
-- Four tactile variations built around the same interaction: slow **Cyber Apple**, bouncy **Soft Blob**, breakable **Crispy Peach**, and noisy **Ramen Pack**
+- A translucent **Ripple Jelly** with breathing expansion, pressure deformation, internal light, and spring rebound
+- A persistent eight-layer co-creation canvas for three sequential collaborators
+- Three pressure qualities mapped to distinct wave geometry and generated ambient chords
+- A 4-2-6 visual breathing guide that never treats timing variation as failure
+- Four earlier tactile studies: **Cyber Apple**, **Soft Blob**, **Crispy Peach**, and **Ramen Pack**
 - Per-toy spring deformation, staged cracking, wrapper crinkles, fragments, visible rebound, and automatic repair
 - Procedurally generated crinkle and pop sounds, with mute and audio-unavailable feedback
 - Squeeze-then-pull two-hand packet opening, pre-burst warning, screen shake, flash, random contents, changing flavours, and a session pop counter
@@ -86,18 +114,19 @@ uv run python run_squish.py --no-camera
 
 | Input | Result |
 |---|---|
-| Open hand | Release and rebound |
-| Closed fist | Squish |
+| Open hand | Release, rebound, and leave a wave in Ripple Jelly mode |
+| Closed fist | Build pressure while deforming the jelly |
 | Two hands moving together/apart | Horizontal squeeze/release; on Ramen Pack, squeeze until prompted and pull apart to tear |
 | Hold `Space` or left mouse | Manual squish |
 | Hold, then release `Shift + Space` | Manual horizontal squeeze; tears an armed Ramen Pack |
 | Arrow keys | Gradually adjust squish |
-| `1`, `2`, `3`, `4` | Select Cyber Apple, Soft Blob, Crispy Peach, or Ramen Pack |
+| `1`, `2`, `3`, `4`, `5` | Select Cyber Apple, Soft Blob, Crispy Peach, Ramen Pack, or Ripple Jelly |
 | `Tab` | Move to the next toy |
+| `N` | Pass Ripple Jelly to the next collaborator |
 | `M` | Mute/unmute sound |
 | `C` | Pause or restart camera |
 | `H` | Hide/show instructions |
-| `R` | Reset the current toy |
+| `R` | Reset the current toy; clears the shared Ripple Jelly canvas |
 | `Esc` or `Q` | Quit |
 
 Keyboard and mouse input temporarily take priority over the camera, so you can demonstrate both modes during one run.
@@ -120,7 +149,7 @@ Keyboard and mouse input temporarily take priority over the camera, so you can d
 uv run pytest
 ```
 
-These tests cover the one-hand gesture score, two-hand distance mapping, deliberate pull-apart detection, range mapping, invalid input, and spring movement without needing a webcam or display.
+These tests cover the one-hand gesture score, two-hand distance mapping, deliberate pull-apart detection, pressure bands, breathing phases, range mapping, invalid input, and spring movement without needing a webcam or display.
 
 ## Project map
 
@@ -140,7 +169,7 @@ SQUISH/
 
 | Criterion | Evidence in this repository |
 |---|---|
-| Interaction and design — 5 | One-hand closure controls vertical squish; two-hand distance controls horizontal compression and a squeeze-then-pull gesture opens the ramen pack. The meter, prompts, expression, cracks, particles, generated sound, random reveal, and rebound make the result legible. |
+| Interaction and design — 5 | Hand closure builds pressure in a translucent jelly; release generates visibly different persistent ripples and musical chords. Breathing prompts, deformation, pressure text, collaborator identity, wave count, sound, and rebound make the loop legible. |
 | Working implementation — 4 | Reproducible `uv` setup, pinned compatible camera libraries, camera-free fallback, automated logic tests, and documented limitations. |
 | Usability and iteration — 3 | Visible controls, camera status, reset/quit paths, denied-camera fallback, and a trial procedure in `PROCESS.md`. **The real user trial is still required.** |
 | Process and communication — 3 | README screenshots, process decisions, AI-use record, credits, and a multi-commit Git history. |
@@ -149,7 +178,7 @@ The work is due **Sunday 1 November 2026 at 23:59 Hong Kong time**. Before submi
 
 ## Sensible next steps
 
-Keep the submitted version focused. The four varieties change the tactile response but do not add separate scenes, scores, accounts, or menus. Prioritise the required user trial and tuning over adding more toys.
+Keep the submitted version focused on Ripple Jelly. The four earlier varieties document exploration but should not replace testing and refining the breathing, release threshold, sound balance, and collaborator handoff.
 
 ## Git checkpoint plan
 

@@ -4,11 +4,11 @@
 
 ## 1. Concept
 
-SQUISH! turns a familiar physical stress-relief action into a screen-based interaction. A person opens and closes one hand; a selected digital toy releases and compresses in response. The project aims to make computer vision feel playful and immediately understandable rather than technical.
+SQUISH! turns breathing and a familiar stress-toy gesture into a shared visual composition. A participant follows a gentle prompt, closes one hand to compress a translucent jelly, and opens it to release a pressure-shaped ripple and musical chord. The next participant adds another layer to the same canvas.
 
 ### One-sentence pitch
 
-Squeeze a cheerful digital blob with your hand, then watch it wobble back into shape.
+Breathe with a translucent jelly, squeeze it gently, and leave a ripple for the next person.
 
 ### Target audience
 
@@ -16,13 +16,13 @@ Squeeze a cheerful digital blob with your hand, then watch it wobble back into s
 - Exhibition visitors who should understand the interaction without a tutorial
 - People curious about playful, low-stakes camera interaction
 
-This is a creative prototype, not a medical or therapeutic product.
+This is a calming creative prototype, not a medical or therapeutic product.
 
 ## 2. Design goals
 
 1. **Immediate legibility:** the blob should visibly follow the user's hand within a fraction of a second.
 2. **Satisfying motion:** compression should feel elastic, with overshoot and rebound rather than a rigid resize.
-3. **Calm personality:** soft colours, rounded shapes, a reactive face, and gentle particles should communicate “toy,” not “tool.”
+3. **Calm personality:** translucency, slow breathing motion, persistent waves, and gentle chords should communicate an instrument rather than a game.
 4. **Graceful failure:** camera problems should never prevent someone from trying the core experience.
 5. **Manageable scope:** one polished interaction is more important than many unfinished features.
 
@@ -34,15 +34,15 @@ show hand(s) → system estimates openness or palm gap → toy deforms → statu
      └──────────── user changes hand after feedback ─────┘
 ```
 
-With one hand, the program calculates an openness value from 0 to 1 and inverts it into a squish target. With two hands, it maps the horizontal gap between palm centres to side pressure. A spring animation eases the toy toward either target. The deformation direction itself is feedback: one hand makes the toy wider/flatter, while two hands make it narrower/taller.
+With one hand, the program calculates an openness value from 0 to 1 and inverts it into a pressure target. A spring animation eases the jelly toward the target. The highest pressure in a squeeze determines the released wave's amplitude, ring count, line weight, and chord register. The wave persists and overlaps contributions from collaborators A, B, and C. Earlier modes also retain the two-hand horizontal-distance experiment.
 
 ## 4. Visual direction
 
-- Lavender background with mint and pink accent shapes
-- Thick dark outline, like a tactile sticker or vinyl toy
-- Face compresses with the body
-- Squish meter exposes the otherwise invisible gesture value
-- Small colour burst rewards a strong squeeze without becoming a game score
+- Pale atmospheric background with cyan, violet, and pink collaborator colours
+- Layered alpha surfaces create a translucent jelly body with internal light points
+- Breathing makes the body rise and expand before pressure deformation begins
+- A pressure meter exposes the otherwise invisible gesture value
+- Wavy elliptical contours persist and overlap instead of rewarding a high score
 
 ## 5. Implemented feature scope
 
@@ -66,6 +66,12 @@ With one hand, the program calculates an openness value from 0 to 1 and inverts 
 - [x] Procedurally generated crinkle/pop audio, mute control, and silent fallback
 - [x] Squeeze-then-pull two-hand packet opening with a camera-free keyboard equivalent
 - [x] Pre-burst warning, shake/flash feedback, changing flavours, random contents, and pop counter
+- [x] Default Ripple Jelly breathing and co-creation mode
+- [x] Translucent deforming jelly with internal glow and floating light points
+- [x] Light, medium, and deep pressure-to-wave mappings
+- [x] Three procedurally generated chord registers that can overlap
+- [x] 4-2-6 breathing guide with non-punitive wording
+- [x] Three-person sequential handoff and persistent eight-wave canvas
 
 ### Optional — not implemented
 
@@ -84,6 +90,8 @@ These remain optional so that testing and refinement can focus on the main gestu
 | Spring animation | Creates a soft rebound from a single number | Needs careful tuning to avoid excessive wobble |
 | Lazy camera imports/fallback | Keeps the artwork usable when camera access fails | Camera errors are shown as status text rather than a setup wizard |
 | Generated sound in memory | Adds tactile feedback without borrowed assets or missing files | It is deliberately short and synthetic rather than realistic |
+| Sequential co-creation | Works with one camera and keeps each contribution visible | Participants take turns rather than appearing simultaneously |
+| Three equal pressure qualities | Makes different gestures expressive without rewarding force | Thresholds may need tuning for different hands |
 
 ### Privacy note
 
@@ -133,9 +141,19 @@ Camera frames are processed in memory and are not displayed, recorded, uploaded,
 - Added a small `PACKS POPPED` counter and a replacement packet that slides onto the shelf after release. This encourages repetition without introducing scoring or a win/lose state.
 - Added an automated test for the pull-apart detector. Visual states were checked in camera-free mode; live participant testing is still outstanding.
 
+### Prototype 0.6 — Breathe & Ripple co-creation
+
+- Reframed the primary experience around a translucent jelly instrument rather than object destruction.
+- Added a repeating inhale, comfortable hold, and exhale prompt; timing variation never produces a failure state.
+- Mapped the strongest pressure in each squeeze to light, medium, or deep wave geometry and to a generated chord register.
+- Kept the eight most recent waves visible so three sequential collaborators can build one shared composition.
+- Added `N` handoff, collaborator colours, a shared-wave count, keyboard fallback, and a clear-canvas reset.
+- Retained the four earlier toys as visible development experiments while making Ripple Jelly the launch default.
+- Added automated tests for pressure classification and breathing phase timing.
+
 ### AI collaboration record
 
-OpenAI Codex was used to scaffold the Python project, implement and test the camera/fallback loop, propose visual feedback, and draft documentation. A suggestion that was **kept** was separating the gesture maths from the Pygame drawing code, because it makes the input-to-response logic testable without a webcam. An early suggestion to add only simple colour choices was **changed** after the student supplied a tactile reference: the final variants change rebound and fracture behaviour, not just decoration. A first proposal to omit audio was later **rejected** after the student requested a supermarket ramen pack with sound; the revised design generates short sounds in memory and preserves a silent fallback. A further suggestion to add levels and points was **simplified** into a session pop counter and random reveal, keeping the assignment focused on one interaction rather than turning it into a large game.
+OpenAI Codex was used to scaffold the Python project, implement and test the camera/fallback loop, propose visual feedback, and draft documentation. A suggestion that was **kept** was separating the gesture maths from the Pygame drawing code, because it makes the input-to-response logic testable without a webcam. An early suggestion to add only simple colour choices was **changed** after the student supplied tactile references: later variants change rebound, fracture, ripple geometry, and sound rather than decoration alone. A first proposal to omit audio was later **rejected** after the student requested sound; the revised design generates sounds in memory and preserves a silent fallback. A points-based game direction was **rejected** in favour of equal-status pressure qualities and a shared generative canvas, because the student wanted a calmer co-creative experience.
 
 The student must review this account, edit it into their own voice, and ensure it matches the final work before submission.
 
@@ -144,6 +162,8 @@ The student must review this account, edit it into their own voice, and ensure i
 - Hand openness is heuristic and may vary with hand angle, lighting, and distance.
 - Two-hand distance is measured horizontally, so overlapping hands or strong camera angles can confuse it.
 - Sound depends on the computer providing an output device; visual feedback remains complete without it.
+- The breathing prompt offers a visual rhythm but is not health guidance; participants can release at any time.
+- Co-creation is sequential on one device, not networked or simultaneous.
 - Camera access must be granted to the app that launches the Python process.
 - The visual design has been checked programmatically and by the developer, not evaluated by external users.
 - The brittle shell and ramen burst are playful simulations, not physically realistic.
