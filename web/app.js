@@ -891,20 +891,20 @@
     ctx.save();
     ctx.globalCompositeOperation = "screen";
     ctx.lineCap = "round";
+    const flowerY = size * 0.035;
     for (let vein = 0; vein < 20; vein += 1) {
       const angle = (vein / 20) * TAU;
       const endX = Math.cos(angle) * size * (0.72 + (vein % 3) * 0.05);
-      const endY = Math.sin(angle) * size * 0.48 - size * 0.13;
+      const endY = flowerY + Math.sin(angle) * size * 0.48;
       const bend = Math.sin(phase * 0.8 + vein * 1.7) * size * 0.055;
       ctx.beginPath();
-      ctx.moveTo(Math.cos(angle) * size * 0.24, Math.sin(angle) * size * 0.13 - size * 0.14);
+      ctx.moveTo(Math.cos(angle) * size * 0.24, flowerY + Math.sin(angle) * size * 0.13);
       ctx.quadraticCurveTo(endX * 0.58 + bend, endY * 0.56, endX, endY);
       ctx.strokeStyle = `rgba(232,251,255,${(0.11 + (vein % 4 === 0 ? 0.09 : 0)) * alpha})`;
       ctx.lineWidth = Math.max(0.45, size * 0.012);
       ctx.stroke();
     }
 
-    const flowerY = -size * 0.16;
     ctx.shadowBlur = size * 0.34;
     ctx.shadowColor = `rgba(255,220,247,${0.9 * alpha})`;
     for (let petal = 0; petal < 4; petal += 1) {
@@ -912,10 +912,7 @@
       ctx.translate(0, flowerY);
       ctx.rotate((petal / 4) * TAU);
       ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.bezierCurveTo(-size * 0.11, -size * 0.04, -size * 0.12, -size * 0.23, 0, -size * 0.27);
-      ctx.bezierCurveTo(size * 0.12, -size * 0.23, size * 0.11, -size * 0.04, 0, 0);
-      ctx.closePath();
+      ctx.ellipse(0, -size * 0.13, size * 0.09, size * 0.14, 0, 0, TAU);
       ctx.fillStyle = `rgba(255,231,250,${0.16 * alpha})`;
       ctx.fill();
       ctx.strokeStyle = `rgba(255,230,249,${0.82 * alpha})`;
@@ -1280,7 +1277,7 @@
     ctx.save();
     ctx.globalCompositeOperation = "screen";
     ctx.lineCap = "round";
-    const motherCoreY = state.center.y - radius * 0.34;
+    const motherCoreY = state.center.y - radius * 0.49;
     for (let vein = 0; vein < 24; vein += 1) {
       const angle = (vein / 24) * TAU;
       const startX = state.center.x + Math.cos(angle) * radius * 0.23;
@@ -1343,10 +1340,7 @@
       ctx.translate(state.center.x, motherCoreY);
       ctx.rotate((petal / 4) * TAU);
       ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.bezierCurveTo(-radius * 0.057, -radius * 0.02, -radius * 0.062, -radius * 0.115, 0, -radius * 0.135);
-      ctx.bezierCurveTo(radius * 0.062, -radius * 0.115, radius * 0.057, -radius * 0.02, 0, 0);
-      ctx.closePath();
+      ctx.ellipse(0, -radius * 0.068, radius * 0.048, radius * 0.074, 0, 0, TAU);
       ctx.fillStyle = "rgba(255,235,248,0.1)";
       ctx.fill();
       ctx.strokeStyle = "rgba(255,232,247,0.62)";
