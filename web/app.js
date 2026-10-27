@@ -80,6 +80,12 @@
     [201, 221, 212],
   ];
 
+  const vortexPalette = [
+    [183, 133, 190],
+    [111, 167, 199],
+    [133, 190, 171],
+  ];
+
   function resize() {
     const rect = canvas.getBoundingClientRect();
     state.dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -409,6 +415,78 @@
     ctx.restore();
   }
 
+  function drawFingerprintVortex() {
+    const radius = baseRadius();
+    const pressure = clamp(state.pressure, 0, 1);
+    const drag = clamp(state.dragDistance / radius, 0, 0.85);
+    const release = clamp(-state.pressureVelocity * 0.42, 0, 1);
+    const memoryComplexity = clamp(state.memories.length / 18, 0, 1);
+    const ringCount = 7 + Math.round(memoryComplexity * 3);
+    const phase = state.elapsed * (0.07 + pressure * 0.3) + drag * 0.34;
+    const energy = 0.28 + pressure * 0.72 + drag * 0.28 + release * 0.44;
+    const orbitStart = radius * 1.07;
+    const orbitLimit = Math.min(radius * 1.68, Math.min(state.width, state.height) * 0.455);
+    const orbitGap = Math.max(2.2, (orbitLimit - orbitStart) / Math.max(1, ringCount - 1));
+
+    ctx.save();
+    ctx.translate(state.center.x, state.center.y);
+    ctx.rotate(state.touchAngle);
+    ctx.scale(1 - pressure * 0.055 + release * 0.045, 1 + pressure * 0.075 + drag * 0.04);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    for (let ring = 0; ring < ringCount; ring += 1) {
+      const c = vortexPalette[(ring + state.count) % vortexPalette.length];
+      const base = orbitStart + ring * orbitGap + release * radius * 0.065;
+      const alpha = (0.16 + energy * 0.13) * (1 - ring / (ringCount * 1.8));
+      const ringPhase = phase * (ring % 2 === 0 ? 1 : -0.7) + ring * 0.47;
+
+      for (let segment = 0; segment < 3; segment += 1) {
+        const start = ringPhase * 0.18 + segment * 2.13 + ring * 0.08;
+        const length = 1.55 + Math.sin(ring * 1.7 + segment) * 0.19;
+        const steps = 32;
+        ctx.beginPath();
+        for (let step = 0; step <= steps; step += 1) {
+          const t = step / steps;
+          const angle = start + length * t;
+          const touchPull = Math.exp(-Math.pow(shortestAngle(angle, 0) / 0.54, 2));
+          const membrane = Math.sin(angle * 3 + ring * 0.72 + phase) * radius * 0.008;
+          const spiral = (t - 0.5) * radius * (0.025 + ring * 0.0028);
+          const localRadius =
+            base + membrane + spiral - pressure * radius * 0.075 * touchPull + drag * radius * 0.12 * touchPull;
+          const x = Math.cos(angle) * localRadius;
+          const y = Math.sin(angle) * localRadius * (0.93 + Math.sin(ring * 0.8) * 0.018);
+          if (step === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.shadowBlur = 7 + energy * 14;
+        ctx.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},${Math.min(0.62, alpha * 1.8)})`;
+        ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
+        ctx.lineWidth = 0.82 + energy * 0.64 - ring * 0.018;
+        ctx.stroke();
+      }
+    }
+
+    const sparks = 5 + Math.round(pressure * 4);
+    for (let i = 0; i < sparks; i += 1) {
+      const angle = phase * (1.2 + i * 0.06) + i * (TAU / sparks);
+      const orbit = radius * (1.24 + (i % 3) * 0.13) + release * radius * 0.07;
+      const x = Math.cos(angle) * orbit;
+      const y = Math.sin(angle) * orbit * 0.94;
+      const glowRadius = 2.1 + energy * 2.4;
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, glowRadius * 3.4);
+      const c = vortexPalette[i % vortexPalette.length];
+      glow.addColorStop(0, `rgba(255,255,255,${0.48 + energy * 0.18})`);
+      glow.addColorStop(0.28, `rgba(${c[0]},${c[1]},${c[2]},${0.34 + energy * 0.16})`);
+      glow.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(x, y, glowRadius * 3.4, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function drawCreature() {
     const radius = baseRadius();
     ctx.save();
@@ -482,17 +560,15 @@
       const x = state.center.x + Math.cos(memory.angle + drift) * distance;
       const y = state.center.y + Math.sin(memory.angle + drift) * distance * 0.88;
       const c = palette[memory.hue];
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(memory.angle * 0.34);
-      for (let ridge = 0; ridge < 4; ridge += 1) {
-        ctx.beginPath();
-        ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${0.58 - ridge * 0.085})`;
-        ctx.lineWidth = 0.75;
-        ctx.ellipse(0, 0, memory.size * (1.1 + ridge * 0.7), memory.size * (0.55 + ridge * 0.44), 0, -0.4, Math.PI * 1.35);
-        ctx.stroke();
-      }
-      ctx.restore();
+      const glowRadius = memory.size * 2.8;
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, glowRadius);
+      glow.addColorStop(0, `rgba(255,255,255,0.5)`);
+      glow.addColorStop(0.25, `rgba(${c[0]},${c[1]},${c[2]},0.3)`);
+      glow.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(x, y, glowRadius, 0, TAU);
+      ctx.fill();
     });
 
     const blinkCycle = state.elapsed % 8.2;
@@ -544,6 +620,7 @@
     drawBackground();
     drawMemoryLandscape();
     drawRipples();
+    drawFingerprintVortex();
     drawCreature();
     requestAnimationFrame(render);
   }
