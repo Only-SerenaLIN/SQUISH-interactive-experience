@@ -112,9 +112,11 @@
   }
 
   const palette = [
-    [126, 229, 220],
-    [139, 174, 255],
-    [230, 143, 211],
+    [103, 207, 255],
+    [174, 147, 255],
+    [255, 148, 204],
+    [111, 232, 216],
+    [255, 210, 164],
   ];
 
   const vortexPalette = [
@@ -860,57 +862,102 @@
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(rotation);
-    const pulse = 1 + Math.sin(phase * 2) * (reduceMotion ? 0.025 : 0.072);
+    const pulse = 1 + Math.sin(phase * 2) * (reduceMotion ? 0.018 : 0.058);
     ctx.scale(pulse, 1 / Math.sqrt(pulse));
     ctx.rotate(touchAngle);
-    ctx.scale(1 - squash * 0.26, 1 + squash * 0.18);
+    ctx.scale(1 - squash * 0.23, 1 + squash * 0.17);
     ctx.rotate(-touchAngle);
-    ctx.shadowBlur = size * (1.15 + squash * 1.6 + releaseGlow * 2.2);
-    ctx.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},${Math.min(0.9, (0.42 + squash * 0.28 + releaseGlow * 0.3) * alpha)})`;
-    const bell = ctx.createRadialGradient(-size * 0.22, -size * 0.34, 0, 0, 0, size * 1.05);
-    bell.addColorStop(0, `rgba(236,255,255,${0.78 * alpha})`);
-    bell.addColorStop(0.5, `rgba(${c[0]},${c[1]},${c[2]},${0.48 * alpha})`);
+    ctx.shadowBlur = size * (1.3 + squash * 1.6 + releaseGlow * 2.4);
+    ctx.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},${Math.min(0.92, (0.46 + squash * 0.24 + releaseGlow * 0.32) * alpha)})`;
+
+    const bell = ctx.createRadialGradient(-size * 0.28, -size * 0.42, size * 0.02, 0, 0, size * 1.08);
+    bell.addColorStop(0, `rgba(250,255,255,${0.9 * alpha})`);
+    bell.addColorStop(0.28, `rgba(${c[0]},${c[1]},${c[2]},${0.58 * alpha})`);
+    bell.addColorStop(0.72, `rgba(${c[0]},${c[1]},${c[2]},${0.28 * alpha})`);
     bell.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},${0.08 * alpha})`);
     ctx.beginPath();
-    ctx.moveTo(-size, 0);
-    ctx.bezierCurveTo(-size * 0.92, -size * 1.1, size * 0.92, -size * 1.1, size, 0);
-    ctx.quadraticCurveTo(size * 0.48, size * 0.18, 0, size * 0.04);
-    ctx.quadraticCurveTo(-size * 0.48, size * 0.18, -size, 0);
+    ctx.moveTo(-size, -size * 0.02);
+    ctx.bezierCurveTo(-size * 0.88, -size * 0.96, size * 0.88, -size * 0.96, size, -size * 0.02);
+    ctx.bezierCurveTo(size * 0.8, size * 0.35, size * 0.38, size * 0.43, 0, size * 0.37);
+    ctx.bezierCurveTo(-size * 0.38, size * 0.43, -size * 0.8, size * 0.35, -size, -size * 0.02);
     ctx.closePath();
     ctx.fillStyle = bell;
     ctx.fill();
-    ctx.strokeStyle = `rgba(205,252,250,${0.48 * alpha})`;
-    ctx.lineWidth = Math.max(0.7, size * 0.045);
+    ctx.strokeStyle = `rgba(229,253,255,${0.72 * alpha})`;
+    ctx.lineWidth = Math.max(0.8, size * 0.052);
     ctx.stroke();
+
     ctx.shadowBlur = 0;
-    ctx.fillStyle = `rgba(9,45,59,${0.66 * alpha})`;
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.lineCap = "round";
+    for (let vein = 0; vein < 20; vein += 1) {
+      const angle = (vein / 20) * TAU;
+      const endX = Math.cos(angle) * size * (0.72 + (vein % 3) * 0.05);
+      const endY = Math.sin(angle) * size * 0.48 - size * 0.13;
+      const bend = Math.sin(phase * 0.8 + vein * 1.7) * size * 0.055;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * size * 0.24, Math.sin(angle) * size * 0.13 - size * 0.14);
+      ctx.quadraticCurveTo(endX * 0.58 + bend, endY * 0.56, endX, endY);
+      ctx.strokeStyle = `rgba(232,251,255,${(0.11 + (vein % 4 === 0 ? 0.09 : 0)) * alpha})`;
+      ctx.lineWidth = Math.max(0.45, size * 0.012);
+      ctx.stroke();
+    }
+
+    const flowerY = -size * 0.16;
+    ctx.shadowBlur = size * 0.34;
+    ctx.shadowColor = `rgba(255,220,247,${0.9 * alpha})`;
+    for (let petal = 0; petal < 4; petal += 1) {
+      ctx.save();
+      ctx.translate(0, flowerY);
+      ctx.rotate((petal / 4) * TAU + Math.PI / 4);
+      ctx.beginPath();
+      ctx.ellipse(0, -size * 0.16, size * 0.105, size * 0.205, 0, 0, TAU);
+      ctx.fillStyle = `rgba(255,231,250,${0.16 * alpha})`;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(255,230,249,${0.82 * alpha})`;
+      ctx.lineWidth = Math.max(0.7, size * 0.036);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = `rgba(255,247,252,${0.74 * alpha})`;
     ctx.beginPath();
-    ctx.arc(-size * 0.24, -size * 0.22, Math.max(0.8, size * 0.055), 0, TAU);
-    ctx.arc(size * 0.24, -size * 0.22, Math.max(0.8, size * 0.055), 0, TAU);
+    ctx.arc(0, flowerY, size * 0.055, 0, TAU);
     ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    const highlight = ctx.createRadialGradient(-size * 0.35, -size * 0.48, 0, -size * 0.35, -size * 0.48, size * 0.42);
+    highlight.addColorStop(0, `rgba(255,255,255,${0.72 * alpha})`);
+    highlight.addColorStop(0.28, `rgba(255,255,255,${0.2 * alpha})`);
+    highlight.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = highlight;
     ctx.beginPath();
-    ctx.strokeStyle = `rgba(25,76,86,${0.5 * alpha})`;
-    ctx.lineWidth = Math.max(0.55, size * 0.035);
-    ctx.arc(0, -size * 0.08, size * 0.13, 0.14, Math.PI - 0.14);
-    ctx.stroke();
+    ctx.arc(-size * 0.35, -size * 0.48, size * 0.42, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+
     if (tentacleGrowth > 0.005) {
       const grown = easeOut(clamp(tentacleGrowth, 0, 1));
-      ctx.shadowBlur = size * 0.45;
-      for (let i = -1; i <= 1; i += 1) {
-        const rootX = i * size * 0.38;
-        const sway = Math.sin(phase + i * 1.2) * size * (reduceMotion ? 0.16 : 0.29) * grown;
+      ctx.shadowBlur = size * 0.36;
+      ctx.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},${0.35 * alpha})`;
+      for (let i = -2; i <= 2; i += 1) {
+        const rootX = i * size * 0.23;
+        const sway = Math.sin(phase + i * 1.15) * size * (reduceMotion ? 0.08 : 0.18) * grown;
         ctx.beginPath();
-        ctx.moveTo(rootX, size * 0.06);
+        ctx.moveTo(rootX, size * 0.27);
         ctx.bezierCurveTo(
-          mix(rootX, i * size * 0.32 + sway, grown),
-          size * (0.06 + 0.52 * grown),
-          mix(rootX, i * size * 0.18 - sway, grown),
-          size * (0.06 + 0.84 * grown),
-          mix(rootX, i * size * 0.28 + sway, grown),
-          size * (0.06 + 1.32 * grown),
+          rootX + sway,
+          size * (0.3 + 0.28 * grown),
+          rootX - sway * 0.7,
+          size * (0.3 + 0.55 * grown),
+          rootX + sway * 0.45,
+          size * (0.3 + (0.72 + (2 - Math.abs(i)) * 0.1) * grown),
         );
-        ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${(0.42 - Math.abs(i) * 0.07) * alpha * grown})`;
-        ctx.lineWidth = Math.max(0.65, size * 0.035);
+        ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${(0.38 - Math.abs(i) * 0.04) * alpha * grown})`;
+        ctx.lineWidth = Math.max(0.55, size * 0.026);
         ctx.stroke();
       }
     }
@@ -1100,43 +1147,84 @@
 
     ctx.save();
     const halo = ctx.createRadialGradient(state.center.x, state.center.y, radius * 0.28, state.center.x, state.center.y, radius * 1.72);
-    halo.addColorStop(0, "rgba(129,229,223,0.13)");
-    halo.addColorStop(0.52, "rgba(104,162,207,0.07)");
-    halo.addColorStop(1, "rgba(45,99,126,0)");
+    halo.addColorStop(0, "rgba(255,196,225,0.2)");
+    halo.addColorStop(0.5, "rgba(147,219,231,0.09)");
+    halo.addColorStop(1, "rgba(73,102,151,0)");
     ctx.fillStyle = halo;
     ctx.fillRect(state.center.x - radius * 1.8, state.center.y - radius * 1.8, radius * 3.6, radius * 3.6);
     ctx.restore();
 
     ctx.save();
     ctx.lineCap = "round";
-    for (let i = -3; i <= 3; i += 1) {
-      const rootX = state.center.x + i * radius * 0.18;
-      const rootY = state.center.y + radius * (0.58 + Math.abs(i) * 0.018);
-      const sway = Math.sin(state.elapsed * 0.62 + i * 0.78) * radius * (0.12 + Math.abs(i) * 0.012);
-      const length = radius * (0.72 + (3 - Math.abs(i)) * 0.095);
+    for (let i = -6; i <= 6; i += 1) {
+      const rootX = state.center.x + i * radius * 0.105;
+      const rootY = state.center.y + radius * (0.5 + Math.abs(i) * 0.009);
+      const sway = Math.sin(state.elapsed * 0.58 + i * 0.7) * radius * (0.08 + Math.abs(i) * 0.006);
+      const length = radius * (0.62 + (6 - Math.abs(i)) * 0.045);
       ctx.beginPath();
       ctx.moveTo(rootX, rootY);
       ctx.bezierCurveTo(
         rootX + sway,
-        rootY + length * 0.3,
-        rootX - sway * 0.72,
-        rootY + length * 0.68,
-        rootX + sway * 0.45,
+        rootY + length * 0.28,
+        rootX - sway * 0.8,
+        rootY + length * 0.7,
+        rootX + sway * 0.55,
         rootY + length,
       );
-      const c = palette[(i + 6) % palette.length];
-      ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${0.22 + (3 - Math.abs(i)) * 0.035})`;
-      ctx.lineWidth = radius * (0.014 + (3 - Math.abs(i)) * 0.0025);
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},0.28)`;
+      ctx.strokeStyle = `rgba(255,153,203,${0.18 + (6 - Math.abs(i)) * 0.012})`;
+      ctx.lineWidth = Math.max(0.75, radius * 0.009);
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = "rgba(255,145,199,0.3)";
       ctx.stroke();
     }
     ctx.restore();
 
     ctx.save();
-    ctx.filter = `blur(${Math.round(radius * 0.055)}px)`;
-    traceBlob(radius + 4);
-    ctx.fillStyle = "rgba(112,220,218,0.16)";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    for (let arm = -2; arm <= 2; arm += 1) {
+      const rootX = state.center.x + arm * radius * 0.17;
+      const rootY = state.center.y + radius * 0.46;
+      const length = radius * (0.72 + (2 - Math.abs(arm)) * 0.13);
+      const sway = Math.sin(state.elapsed * 0.48 + arm * 1.4) * radius * 0.11;
+      ctx.beginPath();
+      ctx.moveTo(rootX, rootY);
+      ctx.bezierCurveTo(
+        rootX + sway * 0.3,
+        rootY + length * 0.3,
+        rootX - sway,
+        rootY + length * 0.62,
+        rootX + sway * 0.55,
+        rootY + length,
+      );
+      ctx.strokeStyle = `rgba(250,232,248,${0.3 + (2 - Math.abs(arm)) * 0.055})`;
+      ctx.lineWidth = radius * (0.09 + (2 - Math.abs(arm)) * 0.012);
+      ctx.shadowBlur = radius * 0.09;
+      ctx.shadowColor = "rgba(255,205,235,0.42)";
+      ctx.stroke();
+
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      const segments = 36;
+      for (let segment = 0; segment <= segments; segment += 1) {
+        const t = segment / segments;
+        const y = rootY + length * t;
+        const centerLine = rootX + Math.sin(t * Math.PI * 1.35 + state.elapsed * 0.48 + arm) * sway;
+        const ruffle = Math.sin(t * Math.PI * 7 + arm) * radius * (0.024 + t * 0.008);
+        const px = centerLine + ruffle;
+        if (segment === 0) ctx.moveTo(px, y);
+        else ctx.lineTo(px, y);
+      }
+      ctx.strokeStyle = "rgba(255,248,253,0.38)";
+      ctx.lineWidth = radius * 0.018;
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.filter = `blur(${Math.round(radius * 0.065)}px)`;
+    traceBlob(radius + 5);
+    ctx.fillStyle = "rgba(255,145,201,0.23)";
     ctx.fill();
     ctx.restore();
 
@@ -1149,10 +1237,11 @@
       state.center.y + radius * 0.12,
       radius * 1.16,
     );
-    body.addColorStop(0, "rgba(232,255,253,0.9)");
-    body.addColorStop(0.32, "rgba(151,226,224,0.68)");
-    body.addColorStop(0.7, "rgba(91,148,190,0.48)");
-    body.addColorStop(1, "rgba(91,73,158,0.36)");
+    body.addColorStop(0, "rgba(255,252,253,0.96)");
+    body.addColorStop(0.2, "rgba(255,214,233,0.88)");
+    body.addColorStop(0.52, "rgba(247,145,194,0.7)");
+    body.addColorStop(0.8, "rgba(221,103,169,0.54)");
+    body.addColorStop(1, "rgba(145,72,145,0.4)");
     ctx.fillStyle = body;
     ctx.fill();
 
@@ -1161,41 +1250,45 @@
     ctx.clip();
 
     const wash = ctx.createLinearGradient(state.center.x - radius, state.center.y - radius, state.center.x + radius, state.center.y + radius);
-    wash.addColorStop(0, "rgba(163,247,237,0.24)");
-    wash.addColorStop(0.45, "rgba(255,255,255,0.04)");
-    wash.addColorStop(0.73, "rgba(119,182,231,0.22)");
-    wash.addColorStop(1, "rgba(188,116,211,0.22)");
+    wash.addColorStop(0, "rgba(255,245,249,0.36)");
+    wash.addColorStop(0.42, "rgba(255,255,255,0.06)");
+    wash.addColorStop(0.73, "rgba(255,179,214,0.24)");
+    wash.addColorStop(1, "rgba(156,183,225,0.18)");
     traceBlob(radius - 4);
     ctx.fillStyle = wash;
     ctx.fill();
 
-    for (let i = 0; i < 5; i += 1) {
-      const phase = state.elapsed * (0.09 + i * 0.007) + i * 1.47;
-      const sweep = radius * (0.3 + i * 0.075);
-      const x = state.center.x + Math.cos(phase) * radius * 0.09;
-      const y = state.center.y + Math.sin(phase * 0.7) * radius * 0.11;
-      const c = palette[i % palette.length];
-      ctx.beginPath();
-      ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${0.12 + i * 0.012})`;
-      ctx.lineWidth = radius * (0.025 + i * 0.002);
-      ctx.lineCap = "round";
-      ctx.arc(x, y, sweep, phase + 0.2, phase + 1.42);
-      ctx.stroke();
-    }
+    const innerGlow = ctx.createRadialGradient(
+      state.center.x,
+      state.center.y + radius * 0.08,
+      radius * 0.02,
+      state.center.x,
+      state.center.y + radius * 0.08,
+      radius * 0.43,
+    );
+    innerGlow.addColorStop(0, "rgba(255,244,250,0.34)");
+    innerGlow.addColorStop(0.46, "rgba(255,181,218,0.18)");
+    innerGlow.addColorStop(1, "rgba(255,181,218,0)");
+    ctx.fillStyle = innerGlow;
+    ctx.beginPath();
+    ctx.arc(state.center.x, state.center.y + radius * 0.08, radius * 0.43, 0, TAU);
+    ctx.fill();
 
     ctx.save();
     ctx.globalCompositeOperation = "screen";
-    for (let rib = -3; rib <= 3; rib += 1) {
+    for (let rib = -6; rib <= 6; rib += 1) {
       ctx.beginPath();
-      ctx.moveTo(state.center.x + rib * radius * 0.045, state.center.y - radius * 0.7);
-      ctx.quadraticCurveTo(
-        state.center.x + rib * radius * 0.14,
-        state.center.y - radius * 0.05,
-        state.center.x + rib * radius * 0.2,
-        state.center.y + radius * 0.55,
+      ctx.moveTo(state.center.x + rib * radius * 0.018, state.center.y - radius * 0.62);
+      ctx.bezierCurveTo(
+        state.center.x + rib * radius * 0.055,
+        state.center.y - radius * 0.34,
+        state.center.x + rib * radius * 0.105,
+        state.center.y + radius * 0.12,
+        state.center.x + rib * radius * 0.128,
+        state.center.y + radius * 0.47,
       );
-      ctx.strokeStyle = `rgba(176,241,236,${0.1 + (3 - Math.abs(rib)) * 0.018})`;
-      ctx.lineWidth = 0.8;
+      ctx.strokeStyle = `rgba(255,226,241,${0.1 + (6 - Math.abs(rib)) * 0.012})`;
+      ctx.lineWidth = Math.max(0.65, radius * 0.0055);
       ctx.stroke();
     }
     ctx.restore();
@@ -1220,15 +1313,15 @@
     ctx.beginPath();
     const skirtY = state.center.y + radius * 0.48;
     ctx.moveTo(state.center.x - radius * 0.68, skirtY);
-    for (let i = -3; i < 4; i += 1) {
-      const x1 = state.center.x + (i + 0.5) * radius * 0.19;
-      const x2 = state.center.x + (i + 1) * radius * 0.19;
-      ctx.quadraticCurveTo(x1, skirtY + (i % 2 === 0 ? radius * 0.045 : -radius * 0.02), x2, skirtY);
+    for (let i = -6; i < 7; i += 1) {
+      const x1 = state.center.x + (i + 0.5) * radius * 0.105;
+      const x2 = state.center.x + (i + 1) * radius * 0.105;
+      ctx.quadraticCurveTo(x1, skirtY + radius * (i % 2 === 0 ? 0.05 : 0.025), x2, skirtY);
     }
-    ctx.strokeStyle = "rgba(169,244,237,0.34)";
-    ctx.lineWidth = 1.15;
-    ctx.shadowBlur = 7;
-    ctx.shadowColor = "rgba(112,231,222,0.36)";
+    ctx.strokeStyle = "rgba(255,207,231,0.68)";
+    ctx.lineWidth = Math.max(1.15, radius * 0.009);
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "rgba(255,128,188,0.48)";
     ctx.stroke();
     ctx.shadowBlur = 0;
 
@@ -1238,7 +1331,7 @@
     [-1, 1].forEach((side) => {
       const x = state.center.x + side * radius * 0.112;
       ctx.beginPath();
-      ctx.fillStyle = "rgba(8,48,62,0.62)";
+      ctx.fillStyle = "rgba(91,36,77,0.66)";
       ctx.ellipse(x, eyeY, radius * 0.018, Math.max(0.7, radius * 0.031 * blink), 0, 0, TAU);
       ctx.fill();
       ctx.beginPath();
@@ -1247,7 +1340,7 @@
       ctx.fill();
     });
     ctx.beginPath();
-    ctx.strokeStyle = "rgba(18,70,80,0.5)";
+    ctx.strokeStyle = "rgba(101,42,83,0.55)";
     ctx.lineWidth = 1.4;
     ctx.lineCap = "round";
     ctx.arc(state.center.x, eyeY + radius * 0.045, radius * 0.055, 0.16, Math.PI - 0.16);
@@ -1261,8 +1354,8 @@
         eyeY + radius * 0.055,
         radius * 0.055,
       );
-      blush.addColorStop(0, "rgba(239,143,206,0.3)");
-      blush.addColorStop(1, "rgba(239,143,206,0)");
+      blush.addColorStop(0, "rgba(255,119,181,0.42)");
+      blush.addColorStop(1, "rgba(255,119,181,0)");
       ctx.fillStyle = blush;
       ctx.beginPath();
       ctx.arc(state.center.x + side * radius * 0.22, eyeY + radius * 0.055, radius * 0.055, 0, TAU);
@@ -1272,10 +1365,10 @@
 
     ctx.save();
     traceBlob(radius);
-    ctx.strokeStyle = "rgba(141,230,224,0.38)";
+    ctx.strokeStyle = "rgba(255,183,218,0.62)";
     ctx.lineWidth = 2.2;
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = "rgba(113,232,223,0.44)";
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = "rgba(255,116,185,0.5)";
     ctx.stroke();
     ctx.restore();
 
@@ -1283,13 +1376,13 @@
     traceBlob(radius - 8);
     ctx.clip();
     ctx.beginPath();
-    ctx.strokeStyle = "rgba(255,255,255,0.62)";
-    ctx.lineWidth = radius * 0.035;
+    ctx.strokeStyle = "rgba(255,255,255,0.76)";
+    ctx.lineWidth = radius * 0.042;
     ctx.lineCap = "round";
     ctx.arc(state.center.x - radius * 0.25, state.center.y - radius * 0.28, radius * 0.48, 3.62, 4.88);
     ctx.stroke();
     ctx.beginPath();
-    ctx.strokeStyle = "rgba(255,255,255,0.28)";
+    ctx.strokeStyle = "rgba(255,238,248,0.38)";
     ctx.lineWidth = radius * 0.014;
     ctx.arc(state.center.x - radius * 0.04, state.center.y - radius * 0.04, radius * 0.73, 2.05, 2.72);
     ctx.stroke();
