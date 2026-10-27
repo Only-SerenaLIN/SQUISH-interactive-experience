@@ -58,6 +58,8 @@
       size: 2.5 + (i % 4) * 0.75,
       hue: i % 3,
       phase: i * 0.83,
+      landX: 0.08 + ((i * 0.618033 + memorySeed * 0.071) % 0.84),
+      landPeak: 0.08 + ((i * 29 + memorySeed * 7) % 10) / 100,
     });
   }
 
@@ -210,6 +212,8 @@
       size: 3 + strength * 3.8,
       hue,
       phase: Math.random() * TAU,
+      landX: 0.08 + ((state.count * 0.618033) % 0.84),
+      landPeak: 0.08 + strength * 0.11,
     });
     if (state.memories.length > 24) state.memories.shift();
     state.ripples.push({
@@ -350,6 +354,61 @@
     });
   }
 
+  function drawMemoryLandscape() {
+    if (state.memories.length === 0) return;
+    const memories = state.memories.slice(-18);
+    const w = state.width;
+    const h = state.height;
+    const baseline = h * 0.88;
+    const samples = Math.max(70, Math.floor(w / 12));
+    const ridges = 8;
+
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    for (let ridge = 0; ridge < ridges; ridge += 1) {
+      ctx.beginPath();
+      for (let sample = 0; sample <= samples; sample += 1) {
+        const x = (sample / samples) * w;
+        const nx = x / w;
+        let lift = 0;
+        memories.forEach((memory, index) => {
+          const spread = 0.07 + (index % 4) * 0.012 + ridge * 0.006;
+          const distance = (nx - memory.landX) / spread;
+          const peak = Math.exp(-distance * distance * 0.78) * memory.landPeak * h;
+          lift = Math.max(lift, peak);
+        });
+        const contour = lift * (1 - ridge * 0.072);
+        const fingerprintWave = Math.sin(nx * 24 + ridge * 0.82) * (1.4 + ridge * 0.16);
+        const y = baseline + ridge * 8.2 - contour + fingerprintWave;
+        if (sample === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      const alpha = 0.08 + (ridges - ridge) * 0.012;
+      ctx.strokeStyle = `rgba(88,75,104,${alpha})`;
+      ctx.lineWidth = ridge === 0 ? 1.25 : 0.8;
+      ctx.stroke();
+    }
+
+    memories.slice(-10).forEach((memory, index) => {
+      const x = memory.landX * w;
+      const peakY = baseline - memory.landPeak * h;
+      const width = clamp(w * 0.018 + memory.size * 1.7, 13, 31);
+      ctx.save();
+      ctx.translate(x, peakY + 7);
+      ctx.rotate((memory.phase % 0.5) - 0.25);
+      for (let ring = 0; ring < 4; ring += 1) {
+        ctx.beginPath();
+        ctx.ellipse(0, 0, width + ring * 4.2, width * 0.46 + ring * 3.1, 0, Math.PI * 1.08, Math.PI * 1.94);
+        ctx.strokeStyle = `rgba(88,75,104,${0.13 - ring * 0.017})`;
+        ctx.lineWidth = 0.75;
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
+    ctx.restore();
+  }
+
   function drawCreature() {
     const radius = baseRadius();
     ctx.save();
@@ -368,9 +427,9 @@
     ctx.restore();
 
     ctx.save();
-    ctx.filter = `blur(${Math.round(radius * 0.12)}px)`;
-    traceBlob(radius + 16);
-    ctx.fillStyle = "rgba(250,242,245,0.28)";
+    ctx.filter = `blur(${Math.round(radius * 0.055)}px)`;
+    traceBlob(radius + 4);
+    ctx.fillStyle = "rgba(236,225,236,0.2)";
     ctx.fill();
     ctx.restore();
 
@@ -399,23 +458,22 @@
     wash.addColorStop(0.45, "rgba(255,255,255,0.04)");
     wash.addColorStop(0.73, "rgba(183,216,216,0.24)");
     wash.addColorStop(1, "rgba(171,151,197,0.27)");
+    traceBlob(radius - 4);
     ctx.fillStyle = wash;
-    ctx.fillRect(state.center.x - radius, state.center.y - radius, radius * 2, radius * 2);
+    ctx.fill();
 
-    for (let i = 0; i < 6; i += 1) {
-      const phase = state.elapsed * (0.11 + i * 0.008) + i * 1.7;
-      const x = state.center.x + Math.cos(phase) * radius * (0.23 + i * 0.055);
-      const y = state.center.y + Math.sin(phase * 0.77) * radius * (0.34 + (i % 2) * 0.08);
-      const glowRadius = radius * (0.1 + (i % 3) * 0.022);
-      const glow = ctx.createRadialGradient(x, y, 0, x, y, glowRadius);
+    for (let i = 0; i < 5; i += 1) {
+      const phase = state.elapsed * (0.09 + i * 0.007) + i * 1.47;
+      const sweep = radius * (0.3 + i * 0.075);
+      const x = state.center.x + Math.cos(phase) * radius * 0.09;
+      const y = state.center.y + Math.sin(phase * 0.7) * radius * 0.11;
       const c = palette[i % palette.length];
-      glow.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},0.28)`);
-      glow.addColorStop(0.42, `rgba(${c[0]},${c[1]},${c[2]},0.13)`);
-      glow.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
       ctx.beginPath();
-      ctx.fillStyle = glow;
-      ctx.arc(x, y, glowRadius, 0, TAU);
-      ctx.fill();
+      ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${0.12 + i * 0.012})`;
+      ctx.lineWidth = radius * (0.025 + i * 0.002);
+      ctx.lineCap = "round";
+      ctx.arc(x, y, sweep, phase + 0.2, phase + 1.42);
+      ctx.stroke();
     }
 
     state.memories.forEach((memory) => {
@@ -424,15 +482,17 @@
       const x = state.center.x + Math.cos(memory.angle + drift) * distance;
       const y = state.center.y + Math.sin(memory.angle + drift) * distance * 0.88;
       const c = palette[memory.hue];
-      ctx.beginPath();
-      ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},0.68)`;
-      ctx.arc(x, y, memory.size, 0, TAU);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.strokeStyle = "rgba(255,255,255,0.52)";
-      ctx.lineWidth = 0.7;
-      ctx.arc(x, y, memory.size * 2.2, -0.7, 1.25);
-      ctx.stroke();
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(memory.angle * 0.34);
+      for (let ridge = 0; ridge < 4; ridge += 1) {
+        ctx.beginPath();
+        ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${0.58 - ridge * 0.085})`;
+        ctx.lineWidth = 0.75;
+        ctx.ellipse(0, 0, memory.size * (1.1 + ridge * 0.7), memory.size * (0.55 + ridge * 0.44), 0, -0.4, Math.PI * 1.35);
+        ctx.stroke();
+      }
+      ctx.restore();
     });
 
     const blinkCycle = state.elapsed % 8.2;
@@ -447,10 +507,14 @@
     });
     ctx.restore();
 
-    traceBlob(radius - 2);
-    ctx.strokeStyle = "rgba(255,255,255,0.58)";
-    ctx.lineWidth = 1.2;
+    ctx.save();
+    traceBlob(radius);
+    ctx.strokeStyle = "rgba(194,181,210,0.26)";
+    ctx.lineWidth = 2.2;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "rgba(246,236,246,0.38)";
     ctx.stroke();
+    ctx.restore();
 
     ctx.save();
     traceBlob(radius - 8);
@@ -478,6 +542,7 @@
     ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
     ctx.clearRect(0, 0, state.width, state.height);
     drawBackground();
+    drawMemoryLandscape();
     drawRipples();
     drawCreature();
     requestAnimationFrame(render);
