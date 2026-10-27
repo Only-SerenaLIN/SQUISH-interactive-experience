@@ -284,13 +284,24 @@
     hint.textContent = "它正从母体慢慢分离";
     window.setTimeout(() => {
       if (!state.pointer.down) hint.textContent = "再捏出一只，或只是看它们漂游";
-    }, 2200);
+    }, 3200);
   }
 
   function spawnBaby(strength, hue) {
     const radius = baseRadius();
     const surface = bodySurfacePoint(state.touchAngle);
-    const size = 16 + strength * 10;
+    const pullRatio = clamp(state.dragDistance / (radius * 0.7), 0, 1);
+    const size = 14 + Math.pow(pullRatio, 0.8) * 20;
+    const directionX = Math.cos(state.touchAngle);
+    const directionY = Math.sin(state.touchAngle);
+    const margin = size * 1.22;
+    const edgeLimits = [];
+    if (directionX > 0.001) edgeLimits.push((state.width - margin - surface.x) / directionX);
+    if (directionX < -0.001) edgeLimits.push((margin - surface.x) / directionX);
+    if (directionY > 0.001) edgeLimits.push((state.height - margin - surface.y) / directionY);
+    if (directionY < -0.001) edgeLimits.push((margin - surface.y) / directionY);
+    const edgeLimit = edgeLimits.length ? Math.max(size * 0.82, Math.min(...edgeLimits)) : radius * 0.48;
+    const desiredTravel = clamp(state.dragDistance * 0.54, size * 1.05, radius * 0.48);
     state.babies.push({
       x: surface.x,
       y: surface.y,
@@ -302,8 +313,8 @@
       phase: state.count * 0.91 + Math.random() * 0.5,
       age: 0,
       birthAngle: state.touchAngle,
-      birthDuration: 1.05 + strength * 0.28,
-      birthTravel: clamp(state.dragDistance * 0.62, size * 1.9, radius * 0.56),
+      birthDuration: 1.55 + strength * 0.45,
+      birthTravel: Math.min(desiredTravel, edgeLimit / 1.08),
       detached: false,
       birthSquash: 0,
       squash: 0,
@@ -416,8 +427,9 @@
         const popT = clamp((t - 0.82) / 0.18, 0, 1);
         const travel = easeOut(stretchT) * baby.birthTravel * 0.78 + easeOut(popT) * baby.birthTravel * 0.3;
         const anchor = bodySurfacePoint(baby.birthAngle);
-        baby.x = anchor.x + Math.cos(baby.birthAngle) * travel;
-        baby.y = anchor.y + Math.sin(baby.birthAngle) * travel - Math.sin(t * Math.PI) * baby.size * 0.12;
+        const curve = Math.sin(t * Math.PI) * baby.size * 0.12;
+        baby.x = anchor.x + Math.cos(baby.birthAngle) * travel - Math.sin(baby.birthAngle) * curve;
+        baby.y = anchor.y + Math.sin(baby.birthAngle) * travel + Math.cos(baby.birthAngle) * curve;
         const gather = easeOut(clamp((t - 0.46) / 0.38, 0, 1));
         baby.birthSquash = gather * (1 - easeOut(popT)) * 0.38 - Math.sin(popT * Math.PI) * 0.11;
       } else {
@@ -439,7 +451,7 @@
             radius: baby.size,
           });
           popTone(baby.strength, baby.birthAngle);
-          hint.textContent = "啵——它正慢慢翻过身";
+          hint.textContent = "啵——它翻过身了";
         }
         baby.vx *= Math.pow(0.72, dt);
         baby.vy = mix(baby.vy, -2.2 - baby.strength * 1.5, 1 - Math.pow(0.3, dt));
@@ -625,11 +637,18 @@
   function drawBabyJellyfish() {
     state.babies.forEach((baby) => {
       const separatedAge = Math.max(0, baby.age - baby.birthDuration);
-      const turnT = clamp(separatedAge / 0.9, 0, 1);
+      const turnT = clamp(separatedAge / 0.46, 0, 1);
+      const birthRotation = Math.atan2(
+        Math.sin(baby.birthAngle - Math.PI / 2),
+        Math.cos(baby.birthAngle - Math.PI / 2),
+      );
       const rotation = baby.age < baby.birthDuration
-        ? Math.PI
-        : Math.PI * (1 - easeOut(turnT)) + Math.sin(turnT * Math.PI) * 0.14;
-      const tentacleGrowth = easeOut(clamp((separatedAge - 0.12) / 0.82, 0, 1));
+        ? birthRotation
+        : birthRotation * (1 - easeOut(turnT)) + Math.sin(turnT * Math.PI) * 0.1;
+      const squashAngle = baby.age < baby.birthDuration
+        ? baby.birthAngle - birthRotation
+        : baby.touchAngle;
+      const tentacleGrowth = easeOut(clamp((separatedAge - 0.08) / 0.62, 0, 1));
       drawJellyfishBody(
         baby.x,
         baby.y,
@@ -638,7 +657,7 @@
         baby.hue,
         clamp(baby.age / 0.8, 0.12, 1),
         baby.squash + baby.birthSquash,
-        baby.age < baby.birthDuration ? baby.birthAngle : baby.touchAngle,
+        squashAngle,
         baby.releaseGlow,
         rotation,
         tentacleGrowth,
