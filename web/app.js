@@ -74,6 +74,12 @@
       cursorAlpha: 0,
       suspendedUntil: 0,
       requestToken: 0,
+      rearm: true,
+      gestureOriginX: 0,
+      gestureOriginY: 0,
+      pointerOriginX: 0,
+      pointerOriginY: 0,
+      outsideSince: 0,
     },
   };
 
@@ -247,6 +253,8 @@
       presenceFrames: 0,
       absentFrames: 0,
       cursorAlpha: 0,
+      rearm: true,
+      outsideSince: 0,
     });
     updateCameraButton();
     if (message) hint.textContent = message;
@@ -305,6 +313,8 @@
         presenceFrames: 0,
         absentFrames: 0,
         cursorAlpha: 0,
+        rearm: true,
+        outsideSince: 0,
       });
       updateCameraButton("校准中");
       hint.textContent = "请暂时保持画面不动，正在记住背景";
@@ -390,24 +400,55 @@
     }
     camera.cursorAlpha = mix(camera.cursorAlpha, present ? 1 : 0, present ? 0.3 : 0.16);
 
+    if (!present && !camera.active && camera.absentFrames >= 4) camera.rearm = true;
+
     const canControl = now >= camera.suspendedUntil && (!state.pointer.down || state.pointer.id === "camera");
     if (present && canControl) {
       if (!camera.active) {
         const distance = Math.hypot(camera.x - state.center.x, camera.y - state.center.y);
-        if (camera.presenceFrames >= 3 && distance <= baseRadius() * 1.16) {
+        if (camera.rearm && camera.presenceFrames >= 3 && distance <= baseRadius() * 1.32) {
           camera.active = true;
+          camera.rearm = false;
+          camera.gestureOriginX = camera.x;
+          camera.gestureOriginY = camera.y;
+          camera.pointerOriginX = camera.x;
+          camera.pointerOriginY = camera.y;
+          camera.outsideSince = 0;
           state.pointer = { x: camera.x, y: camera.y, down: true, id: "camera", startedAt: now };
           state.touchAngle = Math.atan2(camera.y - state.center.y, camera.x - state.center.x);
           canvas.classList.add("is-touching");
-          hint.textContent = "手势正在触碰它，移开手就会松开";
+          hint.textContent = "抓住了，向外移动手掌";
         }
       } else {
-        state.pointer.x = camera.x;
-        state.pointer.y = camera.y;
-        state.touchAngle = Math.atan2(camera.y - state.center.y, camera.x - state.center.x);
+        const amplification = 1.72;
+        state.pointer.x = clamp(
+          camera.pointerOriginX + (camera.x - camera.gestureOriginX) * amplification,
+          -baseRadius() * 0.4,
+          state.width + baseRadius() * 0.4,
+        );
+        state.pointer.y = clamp(
+          camera.pointerOriginY + (camera.y - camera.gestureOriginY) * amplification,
+          -baseRadius() * 0.4,
+          state.height + baseRadius() * 0.4,
+        );
+        state.touchAngle = Math.atan2(state.pointer.y - state.center.y, state.pointer.x - state.center.x);
+        const distance = Math.hypot(state.pointer.x - state.center.x, state.pointer.y - state.center.y);
+        if (distance > baseRadius() * 1.02) {
+          if (!camera.outsideSince) camera.outsideSince = now;
+          hint.textContent = "保持一下，它就会松开";
+          if (now - camera.outsideSince > 520) {
+            camera.active = false;
+            camera.suspendedUntil = now + 800;
+            camera.outsideSince = 0;
+            releasePointer();
+          }
+        } else {
+          camera.outsideSince = 0;
+        }
       }
     } else if (camera.active && camera.absentFrames >= 5) {
       camera.active = false;
+      camera.outsideSince = 0;
       releasePointer();
     }
   }
@@ -936,20 +977,22 @@
     const camera = state.camera;
     if (!camera.enabled || !camera.ready || camera.cursorAlpha < 0.01) return;
     const alpha = camera.cursorAlpha;
+    const cursorX = camera.active && state.pointer.id === "camera" ? state.pointer.x : camera.x;
+    const cursorY = camera.active && state.pointer.id === "camera" ? state.pointer.y : camera.y;
     const radius = 18 + camera.presence * 22 + (camera.active ? Math.sin(state.elapsed * 4.2) * 2 : 0);
     ctx.save();
     ctx.globalCompositeOperation = "screen";
-    const glow = ctx.createRadialGradient(camera.x, camera.y, 0, camera.x, camera.y, radius * 2.2);
+    const glow = ctx.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, radius * 2.2);
     glow.addColorStop(0, `rgba(225,255,250,${0.28 * alpha})`);
     glow.addColorStop(0.32, `rgba(126,229,220,${0.17 * alpha})`);
     glow.addColorStop(1, "rgba(126,229,220,0)");
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.arc(camera.x, camera.y, radius * 2.2, 0, TAU);
+    ctx.arc(cursorX, cursorY, radius * 2.2, 0, TAU);
     ctx.fill();
     ctx.fillStyle = `rgba(225,255,250,${0.52 * alpha})`;
     ctx.beginPath();
-    ctx.arc(camera.x, camera.y, 2.1 + camera.presence * 1.6, 0, TAU);
+    ctx.arc(cursorX, cursorY, 2.1 + camera.presence * 1.6, 0, TAU);
     ctx.fill();
     ctx.restore();
   }
