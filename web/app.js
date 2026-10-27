@@ -153,6 +153,35 @@
     });
   }
 
+  function popTone(strength, angle) {
+    if (!state.soundOn) return;
+    const audio = initAudio();
+    if (!audio) return;
+    if (audio.state === "suspended") audio.resume();
+    const now = audio.currentTime;
+    const gain = audio.createGain();
+    const osc = audio.createOscillator();
+    const overtone = audio.createOscillator();
+    const overtoneGain = audio.createGain();
+    const pitch = 340 + strength * 95 + (Math.cos(angle) + 1) * 18;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.036, now + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(pitch * 1.18, now);
+    osc.frequency.exponentialRampToValueAtTime(pitch * 0.72, now + 0.28);
+    overtone.type = "sine";
+    overtone.frequency.setValueAtTime(pitch * 1.9, now);
+    overtone.frequency.exponentialRampToValueAtTime(pitch * 1.12, now + 0.18);
+    overtoneGain.gain.value = 0.11;
+    osc.connect(gain).connect(audio.destination);
+    overtone.connect(overtoneGain).connect(gain);
+    osc.start(now);
+    overtone.start(now);
+    osc.stop(now + 0.32);
+    overtone.stop(now + 0.22);
+  }
+
   function updateSoundButton() {
     soundButton.setAttribute("aria-pressed", String(state.soundOn));
     soundButton.setAttribute("aria-label", state.soundOn ? "关闭声音" : "开启声音");
@@ -276,6 +305,7 @@
       birthDuration: 1.05 + strength * 0.28,
       birthTravel: clamp(state.dragDistance * 0.62, size * 1.9, radius * 0.56),
       detached: false,
+      birthSquash: 0,
       squash: 0,
       squashVelocity: 0,
       touchAngle: 0,
@@ -368,7 +398,7 @@
     });
 
     state.ripples.forEach((ripple) => { ripple.age += dt; });
-    state.ripples = state.ripples.filter((ripple) => ripple.age < 3.4);
+    state.ripples = state.ripples.filter((ripple) => ripple.age < (ripple.duration || 3.4));
 
     state.babies.forEach((baby) => {
       baby.age += dt;
@@ -382,16 +412,34 @@
       const birthing = baby.age < baby.birthDuration;
       if (birthing) {
         const t = clamp(baby.age / baby.birthDuration, 0, 1);
-        const travel = easeOut(t) * baby.birthTravel;
+        const stretchT = clamp(t / 0.82, 0, 1);
+        const popT = clamp((t - 0.82) / 0.18, 0, 1);
+        const travel = easeOut(stretchT) * baby.birthTravel * 0.78 + easeOut(popT) * baby.birthTravel * 0.3;
         const anchor = bodySurfacePoint(baby.birthAngle);
         baby.x = anchor.x + Math.cos(baby.birthAngle) * travel;
         baby.y = anchor.y + Math.sin(baby.birthAngle) * travel - Math.sin(t * Math.PI) * baby.size * 0.12;
+        const gather = easeOut(clamp((t - 0.46) / 0.38, 0, 1));
+        baby.birthSquash = gather * (1 - easeOut(popT)) * 0.38 - Math.sin(popT * Math.PI) * 0.11;
       } else {
         if (!baby.detached) {
           baby.detached = true;
-          baby.releaseGlow = 0.9;
-          baby.squashVelocity = -0.08;
-          state.ripples.push({ x: baby.x, y: baby.y, age: 0, strength: 0.12, hue: baby.hue });
+          baby.birthSquash = 0;
+          baby.releaseGlow = 1.15;
+          baby.squashVelocity = -0.15;
+          baby.vx += Math.cos(baby.birthAngle) * (8 + baby.strength * 5);
+          baby.vy += Math.sin(baby.birthAngle) * (8 + baby.strength * 5) - 3;
+          state.ripples.push({
+            x: baby.x,
+            y: baby.y,
+            age: 0,
+            strength: 0.18,
+            hue: baby.hue,
+            duration: 0.72,
+            pop: true,
+            radius: baby.size,
+          });
+          popTone(baby.strength, baby.birthAngle);
+          hint.textContent = "啵——它学会自己游了";
         }
         baby.vx *= Math.pow(0.72, dt);
         baby.vy = mix(baby.vy, -2.2 - baby.strength * 1.5, 1 - Math.pow(0.3, dt));
@@ -554,7 +602,8 @@
     state.babies.forEach((baby) => {
       if (baby.age >= baby.birthDuration) return;
       const t = clamp(baby.age / baby.birthDuration, 0, 1);
-      const fade = clamp((1 - t) / 0.22, 0, 1);
+      const popT = clamp((t - 0.82) / 0.18, 0, 1);
+      const fade = 1 - easeOut(popT);
       const anchor = bodySurfacePoint(baby.birthAngle);
       const c = palette[baby.hue % palette.length];
       const bend = Math.sin(t * Math.PI) * baby.size * 0.32;
@@ -569,7 +618,7 @@
       ctx.moveTo(anchor.x, anchor.y);
       ctx.quadraticCurveTo(midX, midY, baby.x, baby.y);
       ctx.strokeStyle = bridge;
-      ctx.lineWidth = Math.max(1, baby.size * (0.38 * (1 - t) + 0.07));
+      ctx.lineWidth = Math.max(0.8, baby.size * (0.34 * (1 - easeOut(t)) + 0.055) * (1 - popT * 0.7));
       ctx.lineCap = "round";
       ctx.shadowBlur = baby.size * 0.8;
       ctx.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},${0.35 * fade})`;
@@ -587,8 +636,8 @@
         baby.phase,
         baby.hue,
         clamp(baby.age / 0.8, 0.12, 1),
-        baby.squash,
-        baby.touchAngle,
+        baby.squash + baby.birthSquash,
+        baby.age < baby.birthDuration ? baby.birthAngle : baby.touchAngle,
         baby.releaseGlow,
       );
     });
@@ -596,15 +645,22 @@
 
   function drawRipples() {
     state.ripples.forEach((ripple) => {
-      const t = ripple.age / 3.4;
+      const duration = ripple.duration || 3.4;
+      const t = ripple.age / duration;
       const color = palette[ripple.hue];
       ctx.save();
       ctx.translate(ripple.x, ripple.y);
-      ctx.scale(1, 0.62);
+      ctx.scale(1, ripple.pop ? 0.82 : 0.62);
       ctx.beginPath();
-      ctx.arc(0, 0, 28 + easeOut(t) * 210 * ripple.strength, 0, TAU);
-      ctx.strokeStyle = `rgba(${color[0]},${color[1]},${color[2]},${(1 - t) * 0.42})`;
-      ctx.lineWidth = 1.2;
+      const startRadius = ripple.pop ? ripple.radius * 0.56 : 28;
+      const travel = ripple.pop ? ripple.radius * 1.9 : 210 * ripple.strength;
+      ctx.arc(0, 0, startRadius + easeOut(t) * travel, 0, TAU);
+      ctx.strokeStyle = `rgba(${color[0]},${color[1]},${color[2]},${(1 - t) * (ripple.pop ? 0.7 : 0.42)})`;
+      ctx.lineWidth = ripple.pop ? 1.45 - t * 0.55 : 1.2;
+      if (ripple.pop) {
+        ctx.shadowBlur = ripple.radius * (1 - t);
+        ctx.shadowColor = `rgba(${color[0]},${color[1]},${color[2]},${0.55 * (1 - t)})`;
+      }
       ctx.stroke();
       ctx.restore();
     });
