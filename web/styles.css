@@ -22,6 +22,12 @@ body {
   font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
 }
 
+.handsfree-video,
+.handsfree-canvas,
+.handsfree-debugger {
+  display: none !important;
+}
+
 button,
 a {
   color: inherit;

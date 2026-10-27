@@ -22,10 +22,6 @@
   const mix = (a, b, t) => a + (b - a) * t;
   const easeOut = (t) => 1 - Math.pow(1 - t, 3);
   const shortestAngle = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
-  const HAND_TRACKER_VERSION = "0.10.21";
-  const HAND_TRACKER_MODULE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${HAND_TRACKER_VERSION}/+esm`;
-  const HAND_TRACKER_WASM = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${HAND_TRACKER_VERSION}/wasm`;
-  const HAND_TRACKER_MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 
   const state = {
     width: 0,
@@ -63,8 +59,9 @@
       ready: false,
       starting: false,
       active: false,
-      stream: null,
-      video: null,
+      handsfree: null,
+      hands: null,
+      startupTimer: null,
       lastFrameAt: 0,
       x: 0,
       y: 0,
@@ -75,8 +72,6 @@
       suspendedUntil: 0,
       requestToken: 0,
       rearm: true,
-      handLandmarker: null,
-      lastVideoTime: -1,
       fingerAX: 0,
       fingerAY: 0,
       fingerBX: 0,
@@ -224,8 +219,9 @@
   }
 
   function updateCameraButton(label = "手势") {
-    cameraButton.setAttribute("aria-pressed", String(state.camera.enabled));
-    cameraButton.setAttribute("aria-label", state.camera.enabled ? "关闭摄像头手势" : "开启摄像头手势");
+    const engaged = state.camera.enabled || state.camera.starting;
+    cameraButton.setAttribute("aria-pressed", String(engaged));
+    cameraButton.setAttribute("aria-label", engaged ? "关闭摄像头手势" : "开启摄像头手势");
     cameraButton.querySelector(".camera-copy").textContent = label;
     cameraButton.classList.toggle("is-calibrating", state.camera.starting || (state.camera.enabled && !state.camera.ready));
   }
@@ -240,42 +236,40 @@
     }
   }
 
-  async function createHandLandmarker() {
-    const { FilesetResolver, HandLandmarker } = await import(HAND_TRACKER_MODULE);
-    const vision = await FilesetResolver.forVisionTasks(HAND_TRACKER_WASM);
-    return HandLandmarker.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath: HAND_TRACKER_MODEL,
-      },
-      runningMode: "VIDEO",
-      numHands: 1,
-      minHandDetectionConfidence: 0.55,
-      minHandPresenceConfidence: 0.5,
-      minTrackingConfidence: 0.5,
-    });
+  function shutdownHandsfree(handsfree) {
+    if (!handsfree) return;
+    try {
+      handsfree.pause();
+      const stream = handsfree.debug?.stream || handsfree.debug?.$video?.srcObject;
+      stream?.getTracks?.().forEach((track) => track.stop());
+      if (handsfree.debug?.$video) {
+        handsfree.debug.$video.pause();
+        handsfree.debug.$video.srcObject = null;
+      }
+      if (handsfree.debug) handsfree.debug.stream = null;
+    } catch (error) {
+      // The library can be interrupted before its video element exists.
+    }
+    document.body.classList.remove("handsfree-started", "handsfree-loading");
   }
 
   function stopCamera(message = "摄像头手势已关闭") {
     state.camera.requestToken += 1;
     cancelCameraGesture();
-    if (state.camera.stream) {
-      state.camera.stream.getTracks().forEach((track) => track.stop());
-    }
-    if (state.camera.video) state.camera.video.srcObject = null;
-    if (state.camera.handLandmarker) state.camera.handLandmarker.close();
+    if (state.camera.startupTimer) window.clearTimeout(state.camera.startupTimer);
+    shutdownHandsfree(state.camera.handsfree);
     Object.assign(state.camera, {
       enabled: false,
       ready: false,
       starting: false,
-      stream: null,
-      video: null,
+      handsfree: null,
+      hands: null,
+      startupTimer: null,
       presence: 0,
       presenceFrames: 0,
       absentFrames: 0,
       cursorAlpha: 0,
       rearm: true,
-      handLandmarker: null,
-      lastVideoTime: -1,
       pinchRatio: 2,
       pinchFrames: 0,
       openFrames: 0,
@@ -284,54 +278,34 @@
     if (message) hint.textContent = message;
   }
 
-  async function startCamera() {
+  function startCamera() {
     if (state.camera.starting || state.camera.enabled) return;
-    if (!navigator.mediaDevices?.getUserMedia) {
-      hint.textContent = "这个浏览器暂时无法使用摄像头手势";
+    if (!window.Handsfree || !navigator.mediaDevices?.getUserMedia) {
+      hint.textContent = "Handsfree.js 尚未载入，仍可用鼠标或触屏";
       return;
     }
     if (!state.entered) enter();
     const requestToken = ++state.camera.requestToken;
     state.camera.starting = true;
-    updateCameraButton("连接中");
-    hint.textContent = "正在请求摄像头权限";
-    let requestedStream = null;
+    updateCameraButton("加载 Handsfree");
+    hint.textContent = "正在准备双指捏合模型，首次打开会稍慢";
     try {
-      requestedStream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: {
-          facingMode: "user",
-          width: { ideal: 320 },
-          height: { ideal: 240 },
-          frameRate: { ideal: 20, max: 30 },
+      const handsfree = new window.Handsfree({
+        showDebug: false,
+        assetsPath: "https://unpkg.com/handsfree@8.5.1/build/lib/assets",
+        hands: {
+          enabled: true,
+          maxNumHands: 1,
+          minDetectionConfidence: 0.55,
+          minTrackingConfidence: 0.5,
+        },
+        plugin: {
+          pinchers: { enabled: true },
         },
       });
-      if (state.camera.requestToken !== requestToken) {
-        requestedStream.getTracks().forEach((track) => track.stop());
-        return;
-      }
-      const video = document.createElement("video");
-      video.autoplay = true;
-      video.muted = true;
-      video.playsInline = true;
-      video.srcObject = requestedStream;
-      await video.play();
-      updateCameraButton("加载双指识别");
-      hint.textContent = "正在准备双指捏合识别";
-      const handLandmarker = await createHandLandmarker();
-      if (state.camera.requestToken !== requestToken) {
-        handLandmarker.close();
-        requestedStream.getTracks().forEach((track) => track.stop());
-        return;
-      }
       Object.assign(state.camera, {
-        enabled: true,
-        ready: true,
-        starting: false,
-        stream: requestedStream,
-        video,
-        handLandmarker,
-        lastVideoTime: -1,
+        handsfree,
+        hands: null,
         lastFrameAt: 0,
         x: state.center.x,
         y: state.center.y,
@@ -344,15 +318,37 @@
         pinchFrames: 0,
         openFrames: 0,
       });
-      updateCameraButton("双指已开");
-      hint.textContent = "用拇指和食指捏合水母，再保持夹住向外拉";
+      handsfree.use("squishBridge", ({ hands }) => {
+        if (state.camera.requestToken === requestToken) state.camera.hands = hands || null;
+      });
+      state.camera.startupTimer = window.setTimeout(() => {
+        if (state.camera.requestToken !== requestToken || !state.camera.starting) return;
+        stopCamera("Handsfree.js 加载超时，请检查网络后重试");
+      }, 45000);
+      handsfree.start(() => {
+        if (state.camera.requestToken !== requestToken) {
+          shutdownHandsfree(handsfree);
+          return;
+        }
+        if (state.camera.startupTimer) window.clearTimeout(state.camera.startupTimer);
+        handsfree.hideDebugger();
+        Object.assign(state.camera, {
+          enabled: true,
+          ready: true,
+          starting: false,
+          startupTimer: null,
+        });
+        updateCameraButton("Handsfree 已开");
+        hint.textContent = "把两枚光点移到水母上，再用拇指和食指捏合";
+      });
     } catch (error) {
-      if (requestedStream) requestedStream.getTracks().forEach((track) => track.stop());
       if (state.camera.requestToken !== requestToken) return;
+      shutdownHandsfree(state.camera.handsfree);
       state.camera.starting = false;
+      state.camera.handsfree = null;
       updateCameraButton();
       const blocked = error?.name === "NotAllowedError" || error?.name === "SecurityError";
-      hint.textContent = blocked ? "没有获得摄像头权限，仍可用鼠标或触屏" : "双指识别加载失败，仍可用鼠标或触屏";
+      hint.textContent = blocked ? "没有获得摄像头权限，仍可用鼠标或触屏" : "Handsfree.js 启动失败，仍可用鼠标或触屏";
     }
   }
 
@@ -363,23 +359,21 @@
 
   function processCameraGesture(now) {
     const camera = state.camera;
-    if (!camera.enabled || !camera.handLandmarker || !camera.video || camera.video.readyState < 2 || now - camera.lastFrameAt < 46) return;
-    if (camera.video.currentTime === camera.lastVideoTime) return;
+    if (!camera.enabled || !camera.handsfree || now - camera.lastFrameAt < 46) return;
     camera.lastFrameAt = now;
-    camera.lastVideoTime = camera.video.currentTime;
-    let result;
-    try {
-      result = camera.handLandmarker.detectForVideo(camera.video, Math.round(now));
-    } catch (error) {
-      return;
-    }
-    const landmarks = result?.landmarks?.[0];
+    const hands = camera.hands || camera.handsfree.data?.hands;
+    const landmarks = hands?.multiHandLandmarks?.[0];
     const present = Boolean(landmarks && landmarks.length >= 21);
+    let pinching = false;
     if (present) {
       const thumb = landmarks[4];
       const index = landmarks[8];
       const palmA = landmarks[5];
       const palmB = landmarks[17];
+      const handedness = hands.multiHandedness?.[0]?.label;
+      const handSlot = handedness === "Right" ? 0 : 1;
+      const pinchState = hands.pinchState?.[handSlot]?.[0] || "";
+      pinching = pinchState === "start" || pinchState === "held";
       const targetAX = (1 - thumb.x) * state.width;
       const targetAY = thumb.y * state.height;
       const targetBX = (1 - index.x) * state.width;
@@ -400,15 +394,12 @@
       camera.presence = mix(camera.presence, clamp((0.76 - camera.pinchRatio) / 0.56, 0, 1), 0.38);
       camera.presenceFrames += 1;
       camera.absentFrames = 0;
-      if (camera.pinchRatio < 0.48) {
+      if (pinching) {
         camera.pinchFrames += 1;
         camera.openFrames = 0;
-      } else if (camera.pinchRatio > 0.72) {
+      } else {
         camera.openFrames += 1;
         camera.pinchFrames = 0;
-      } else {
-        camera.pinchFrames = Math.max(0, camera.pinchFrames - 1);
-        camera.openFrames = Math.max(0, camera.openFrames - 1);
       }
     } else {
       camera.presence *= 0.82;
@@ -419,13 +410,13 @@
     }
     camera.cursorAlpha = mix(camera.cursorAlpha, present ? 1 : 0, present ? 0.3 : 0.16);
 
-    if (!camera.active && camera.openFrames >= 3) camera.rearm = true;
+    if (present && !pinching && !camera.active && camera.openFrames >= 4) camera.rearm = true;
 
     const canControl = now >= camera.suspendedUntil && (!state.pointer.down || state.pointer.id === "camera");
     if (present && canControl) {
       if (!camera.active) {
         const distance = Math.hypot(camera.x - state.center.x, camera.y - state.center.y);
-        if (camera.rearm && camera.pinchFrames >= 2 && distance <= baseRadius() * 1.34) {
+        if (camera.rearm && camera.pinchFrames === 3 && distance <= baseRadius() * 1.34) {
           camera.active = true;
           camera.rearm = false;
           camera.gestureOriginX = camera.x;
@@ -438,7 +429,7 @@
           hint.textContent = "夹住了——保持双指合拢，向外拉";
         } else if (camera.openFrames >= 2) {
           hint.textContent = "把两枚光点移到水母上，再合拢双指";
-        } else if (camera.pinchFrames >= 2 && distance > baseRadius() * 1.34) {
+        } else if (pinching && distance > baseRadius() * 1.34) {
           hint.textContent = "已经捏合；先移到水母上再夹取";
         }
       } else {
@@ -454,7 +445,7 @@
           state.height + baseRadius() * 0.4,
         );
         state.touchAngle = Math.atan2(state.pointer.y - state.center.y, state.pointer.x - state.center.x);
-        if (camera.openFrames >= 2) {
+        if (!pinching && camera.openFrames >= 3) {
           camera.active = false;
           camera.suspendedUntil = now + 260;
           releasePointer();

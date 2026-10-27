@@ -18,6 +18,7 @@ Do not use this wording if it does not accurately describe the final process.
 - [Pygame](https://www.pygame.org/) — window, drawing, and input; GNU LGPL v2.1.
 - [OpenCV](https://opencv.org/) — webcam capture and image conversion; Apache 2.0 License.
 - [MediaPipe](https://ai.google.dev/edge/mediapipe/solutions/guide) — hand landmark tracking; Apache 2.0 License.
+- [Handsfree.js 8.5.1](https://handsfreejs.netlify.app/) — browser hand-tracking wrapper and pinch-state events; Apache 2.0 License.
 - [uv](https://docs.astral.sh/uv/) — Python project and dependency manager; Apache 2.0 / MIT License.
 - [pytest](https://pytest.org/) — development tests; MIT License.
 
@@ -25,7 +26,7 @@ Library versions used for a particular submission are recorded in `uv.lock` afte
 
 ## Visual and media assets
 
-All shapes, character graphics, projected 3D jelly geometry, directional physical deformation curves, translucent material layers, pressure waves, faceted diamond fragments, water droplets, hand-tracking guides, supermarket elements, particles, interface elements, and short sound effects are generated procedurally by the Python code. There are no downloaded images, fonts, sounds, prerecorded camera clips, or third-party visual assets in prototype version 0.11.0.
+All artwork shapes, character graphics, projected 3D jelly geometry, directional physical deformation curves, translucent material layers, pressure waves, faceted diamond fragments, water droplets, hand-tracking guides, supermarket elements, particles, interface elements, and short sound effects are generated procedurally by the project code. There are no downloaded images, fonts, sounds, prerecorded camera clips, or third-party visual artwork; Handsfree.js and its model/runtime assets are loaded only to provide optional browser hand tracking.
 
 ## Interaction references
 
