@@ -231,10 +231,7 @@
   function cancelCameraGesture() {
     state.camera.active = false;
     if (state.pointer.id === "camera") {
-      state.pointer.down = false;
-      state.pointer.id = null;
-      state.activeBaby = null;
-      canvas.classList.remove("is-touching");
+      releasePointer();
     }
   }
 
@@ -341,7 +338,7 @@
           startupTimer: null,
         });
         updateCameraButton("Handsfree 已开");
-        hint.textContent = "把两枚光点移到水母上，再用拇指和食指捏合";
+        hint.textContent = "指尖可以轻碰小水母；双指捏合可以夹住它";
       });
     } catch (error) {
       if (state.camera.requestToken !== requestToken) return;
@@ -412,13 +409,41 @@
     }
     camera.cursorAlpha = mix(camera.cursorAlpha, present ? 1 : 0, present ? 0.3 : 0.16);
 
+    let cameraTouchBaby = null;
+    if (present && !camera.active && !pinching && now >= camera.suspendedUntil) {
+      const touchA = findTouchableBaby(camera.fingerAX, camera.fingerAY, 1.08);
+      const touchB = findTouchableBaby(camera.fingerBX, camera.fingerBY, 1.08);
+      const touchedBaby = touchA || touchB;
+      if (touchedBaby) {
+        cameraTouchBaby = touchedBaby;
+        const fingerX = touchA ? camera.fingerAX : camera.fingerBX;
+        const fingerY = touchA ? camera.fingerAY : camera.fingerBY;
+        const previousX = camera.touchX ?? fingerX;
+        const previousY = camera.touchY ?? fingerY;
+        const pushX = clamp(fingerX - previousX, -18, 18);
+        const pushY = clamp(fingerY - previousY, -18, 18);
+        touchedBaby.cameraTouch = 1;
+        touchedBaby.touchAngle = Math.atan2(fingerY - touchedBaby.y, fingerX - touchedBaby.x);
+        touchedBaby.vx += pushX * 0.055;
+        touchedBaby.vy += pushY * 0.055;
+        touchedBaby.releaseGlow = Math.max(touchedBaby.releaseGlow, 0.16);
+        camera.touchX = fingerX;
+        camera.touchY = fingerY;
+        hint.textContent = "指尖碰到了它——它软软地让开了";
+      } else {
+        camera.touchX = null;
+        camera.touchY = null;
+      }
+    }
+
     if (present && !pinching && !camera.active && camera.openFrames >= 4) camera.rearm = true;
 
     const canControl = now >= camera.suspendedUntil && (!state.pointer.down || state.pointer.id === "camera");
     if (present && canControl) {
       if (!camera.active) {
         const distance = Math.hypot(camera.x - state.center.x, camera.y - state.center.y);
-        if (camera.rearm && camera.pinchFrames === 3 && distance <= baseRadius() * 1.34) {
+        const baby = findTouchableBaby(camera.x, camera.y, 1.18);
+        if (camera.rearm && camera.pinchFrames === 3 && (baby || distance <= baseRadius() * 1.34)) {
           camera.active = true;
           camera.rearm = false;
           camera.gestureOriginX = camera.x;
@@ -426,12 +451,19 @@
           camera.pointerOriginX = camera.x;
           camera.pointerOriginY = camera.y;
           state.pointer = { x: camera.x, y: camera.y, down: true, id: "camera", startedAt: now };
-          state.touchAngle = Math.atan2(camera.y - state.center.y, camera.x - state.center.x);
+          state.activeBaby = baby || null;
+          if (baby) {
+            baby.touchAngle = Math.atan2(camera.y - baby.y, camera.x - baby.x);
+          } else {
+            state.touchAngle = Math.atan2(camera.y - state.center.y, camera.x - state.center.x);
+          }
           canvas.classList.add("is-touching");
-          hint.textContent = "夹住了——保持双指合拢，向外拉";
+          hint.textContent = baby ? "夹住小水母了——轻轻移动，张开双指放开" : "夹住了——保持双指合拢，向外拉";
         } else if (camera.openFrames >= 2) {
-          hint.textContent = "把两枚光点移到水母上，再合拢双指";
-        } else if (pinching && distance > baseRadius() * 1.34) {
+          hint.textContent = cameraTouchBaby
+            ? "指尖碰到了它——它软软地让开了"
+            : "用指尖碰小水母，或移到水母上合拢双指";
+        } else if (pinching && !baby && distance > baseRadius() * 1.34) {
           hint.textContent = "已经捏合；先移到水母上再夹取";
         }
       } else {
@@ -446,14 +478,22 @@
           -baseRadius() * 0.4,
           state.height + baseRadius() * 0.4,
         );
-        state.touchAngle = Math.atan2(state.pointer.y - state.center.y, state.pointer.x - state.center.x);
+        if (state.activeBaby) {
+          state.activeBaby.touchAngle = Math.atan2(
+            state.pointer.y - state.activeBaby.y,
+            state.pointer.x - state.activeBaby.x,
+          );
+        } else {
+          state.touchAngle = Math.atan2(state.pointer.y - state.center.y, state.pointer.x - state.center.x);
+        }
         if (!pinching && camera.openFrames >= 3) {
+          const releasedBaby = state.activeBaby;
           camera.active = false;
           camera.suspendedUntil = now + 260;
           releasePointer();
-          hint.textContent = "张开手指——啵，它松开了";
+          hint.textContent = releasedBaby ? "张开手指——它弹了一下，游开了" : "张开手指——啵，它松开了";
         } else {
-          hint.textContent = "保持夹住向外拉；张开双指就松手";
+          hint.textContent = state.activeBaby ? "轻轻带它游动；张开双指就放开" : "保持夹住向外拉；张开双指就松手";
         }
       }
     } else if (camera.active && camera.absentFrames >= 5) {
@@ -484,24 +524,31 @@
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   }
 
+  function findTouchableBaby(x, y, reach = 1) {
+    for (let i = state.babies.length - 1; i >= 0; i -= 1) {
+      const baby = state.babies[i];
+      if (baby.age < baby.birthDuration) continue;
+      const hitRadius = Math.max(26, baby.size * 2.15) * reach;
+      if (Math.hypot(x - baby.x, y - baby.y) <= hitRadius) return baby;
+    }
+    return null;
+  }
+
   function pointerDown(event) {
     if (!state.entered || aboutPanel.classList.contains("is-open")) return;
     if (state.camera.active) cancelCameraGesture();
     state.camera.suspendedUntil = performance.now() + 1400;
     const point = pointerPosition(event);
-    for (let i = state.babies.length - 1; i >= 0; i -= 1) {
-      const baby = state.babies[i];
-      if (baby.age < baby.birthDuration) continue;
-      if (Math.hypot(point.x - baby.x, point.y - baby.y) <= Math.max(30, baby.size * 2.35)) {
-        state.activeBaby = baby;
-        baby.touchAngle = Math.atan2(point.y - baby.y, point.x - baby.x);
-        state.pointer = { x: point.x, y: point.y, down: true, id: event.pointerId, startedAt: performance.now() };
-        canvas.setPointerCapture(event.pointerId);
-        canvas.classList.add("is-touching");
-        hint.textContent = "它软软地凹下去了";
-        initAudio();
-        return;
-      }
+    const baby = findTouchableBaby(point.x, point.y, 1.1);
+    if (baby) {
+      state.activeBaby = baby;
+      baby.touchAngle = Math.atan2(point.y - baby.y, point.x - baby.x);
+      state.pointer = { x: point.x, y: point.y, down: true, id: event.pointerId, startedAt: performance.now() };
+      canvas.setPointerCapture(event.pointerId);
+      canvas.classList.add("is-touching");
+      hint.textContent = "它软软地凹下去了";
+      initAudio();
+      return;
     }
     const radius = baseRadius();
     const distance = Math.hypot(point.x - state.center.x, point.y - state.center.y);
@@ -600,6 +647,7 @@
       squashVelocity: 0,
       touchAngle: 0,
       releaseGlow: 0,
+      cameraTouch: 0,
     });
     if (state.babies.length > 18) state.babies.shift();
   }
@@ -700,7 +748,9 @@
       baby.age += dt;
       baby.phase += dt * (0.42 + baby.strength * 0.16);
       baby.releaseGlow *= Math.pow(0.055, dt);
-      const babyTarget = state.pointer.down && state.activeBaby === baby ? clamp(0.48 + holdTime * 0.34, 0, 0.88) : 0;
+      baby.cameraTouch = (baby.cameraTouch || 0) * Math.pow(0.008, dt);
+      const heldTarget = state.pointer.down && state.activeBaby === baby ? clamp(0.48 + holdTime * 0.34, 0, 0.88) : 0;
+      const babyTarget = Math.max(heldTarget, baby.cameraTouch * 0.34);
       baby.squashVelocity += (babyTarget - baby.squash) * 32 * dt;
       baby.squashVelocity *= Math.pow(0.006, dt);
       baby.squash += baby.squashVelocity * dt * 6.4;
