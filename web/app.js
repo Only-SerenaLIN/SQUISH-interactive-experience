@@ -38,6 +38,7 @@
     contourAngle: -Math.PI / 2,
     contourRelease: 0,
     activeBaby: null,
+    tentaclePlay: { amount: 0, x: 0, y: 0, direction: 0 },
     entered: false,
     soundOn: true,
     lastTime: performance.now(),
@@ -338,7 +339,7 @@
           startupTimer: null,
         });
         updateCameraButton("Handsfree 已开");
-        hint.textContent = "指尖可以轻碰小水母；双指捏合可以夹住它";
+        hint.textContent = "一根食指可以逗小水母、拨触须；双指捏母体会出生";
       });
     } catch (error) {
       if (state.camera.requestToken !== requestToken) return;
@@ -410,14 +411,13 @@
     camera.cursorAlpha = mix(camera.cursorAlpha, present ? 1 : 0, present ? 0.3 : 0.16);
 
     let cameraTouchBaby = null;
+    let playingTentacles = false;
     if (present && !camera.active && !pinching && now >= camera.suspendedUntil) {
-      const touchA = findTouchableBaby(camera.fingerAX, camera.fingerAY, 1.08);
-      const touchB = findTouchableBaby(camera.fingerBX, camera.fingerBY, 1.08);
-      const touchedBaby = touchA || touchB;
+      const fingerX = camera.fingerBX;
+      const fingerY = camera.fingerBY;
+      const touchedBaby = findTouchableBaby(fingerX, fingerY, 1.08);
       if (touchedBaby) {
         cameraTouchBaby = touchedBaby;
-        const fingerX = touchA ? camera.fingerAX : camera.fingerBX;
-        const fingerY = touchA ? camera.fingerAY : camera.fingerBY;
         const previousX = camera.touchX ?? fingerX;
         const previousY = camera.touchY ?? fingerY;
         const pushX = clamp(fingerX - previousX, -18, 18);
@@ -433,7 +433,34 @@
       } else {
         camera.touchX = null;
         camera.touchY = null;
+        const radius = baseRadius();
+        const inTentacles =
+          Math.abs(fingerX - state.center.x) <= radius * 0.82 &&
+          fingerY >= state.center.y + radius * 0.38 &&
+          fingerY <= state.center.y + radius * 1.45;
+        if (inTentacles) {
+          const previousX = camera.playX ?? fingerX;
+          const previousY = camera.playY ?? fingerY;
+          const deltaX = clamp(fingerX - previousX, -22, 22);
+          const deltaY = clamp(fingerY - previousY, -22, 22);
+          const speed = Math.hypot(deltaX, deltaY);
+          state.tentaclePlay.x = fingerX;
+          state.tentaclePlay.y = fingerY;
+          state.tentaclePlay.direction = mix(
+            state.tentaclePlay.direction,
+            clamp(deltaX / 12, -1, 1),
+            0.55,
+          );
+          state.tentaclePlay.amount = Math.max(state.tentaclePlay.amount, clamp(0.22 + speed / 15, 0.22, 1));
+          playingTentacles = true;
+          hint.textContent = "食指拨过触须——它们顺着水流摆开了";
+        }
+        camera.playX = fingerX;
+        camera.playY = fingerY;
       }
+    } else if (!present || pinching) {
+      camera.playX = null;
+      camera.playY = null;
     }
 
     if (present && !pinching && !camera.active && camera.openFrames >= 4) camera.rearm = true;
@@ -442,8 +469,7 @@
     if (present && canControl) {
       if (!camera.active) {
         const distance = Math.hypot(camera.x - state.center.x, camera.y - state.center.y);
-        const baby = findTouchableBaby(camera.x, camera.y, 1.18);
-        if (camera.rearm && camera.pinchFrames === 3 && (baby || distance <= baseRadius() * 1.34)) {
+        if (camera.rearm && camera.pinchFrames === 3 && distance <= baseRadius() * 1.34) {
           camera.active = true;
           camera.rearm = false;
           camera.gestureOriginX = camera.x;
@@ -451,20 +477,18 @@
           camera.pointerOriginX = camera.x;
           camera.pointerOriginY = camera.y;
           state.pointer = { x: camera.x, y: camera.y, down: true, id: "camera", startedAt: now };
-          state.activeBaby = baby || null;
-          if (baby) {
-            baby.touchAngle = Math.atan2(camera.y - baby.y, camera.x - baby.x);
-          } else {
-            state.touchAngle = Math.atan2(camera.y - state.center.y, camera.x - state.center.x);
-          }
+          state.activeBaby = null;
+          state.touchAngle = Math.atan2(camera.y - state.center.y, camera.x - state.center.x);
           canvas.classList.add("is-touching");
-          hint.textContent = baby ? "夹住小水母了——轻轻移动，张开双指放开" : "夹住了——保持双指合拢，向外拉";
+          hint.textContent = "夹住母体了——保持双指合拢，向外拉";
         } else if (camera.openFrames >= 2) {
           hint.textContent = cameraTouchBaby
             ? "指尖碰到了它——它软软地让开了"
-            : "用指尖碰小水母，或移到水母上合拢双指";
-        } else if (pinching && !baby && distance > baseRadius() * 1.34) {
-          hint.textContent = "已经捏合；先移到水母上再夹取";
+            : playingTentacles
+              ? "食指拨过触须——它们顺着水流摆开了"
+              : "食指逗小水母或拨触须；双指移到母体再捏合";
+        } else if (pinching && distance > baseRadius() * 1.34) {
+          hint.textContent = "双指捏合只会抓住母体；一根食指可以逗小水母";
         }
       } else {
         const amplification = 1.55;
@@ -478,22 +502,14 @@
           -baseRadius() * 0.4,
           state.height + baseRadius() * 0.4,
         );
-        if (state.activeBaby) {
-          state.activeBaby.touchAngle = Math.atan2(
-            state.pointer.y - state.activeBaby.y,
-            state.pointer.x - state.activeBaby.x,
-          );
-        } else {
-          state.touchAngle = Math.atan2(state.pointer.y - state.center.y, state.pointer.x - state.center.x);
-        }
+        state.touchAngle = Math.atan2(state.pointer.y - state.center.y, state.pointer.x - state.center.x);
         if (!pinching && camera.openFrames >= 3) {
-          const releasedBaby = state.activeBaby;
           camera.active = false;
           camera.suspendedUntil = now + 260;
           releasePointer();
-          hint.textContent = releasedBaby ? "张开手指——它弹了一下，游开了" : "张开手指——啵，它松开了";
+          hint.textContent = "张开手指——啵，它松开了";
         } else {
-          hint.textContent = state.activeBaby ? "轻轻带它游动；张开双指就放开" : "保持夹住向外拉；张开双指就松手";
+          hint.textContent = "保持夹住向外拉；张开双指就松手";
         }
       }
     } else if (camera.active && camera.absentFrames >= 5) {
@@ -690,6 +706,8 @@
 
   function update(dt) {
     state.elapsed += dt;
+    state.tentaclePlay.amount *= Math.pow(0.018, dt);
+    state.tentaclePlay.direction *= Math.pow(0.08, dt);
     const radius = baseRadius();
     const dx = state.pointer.x - state.center.x;
     const dy = state.pointer.y - state.center.y;
@@ -1245,7 +1263,9 @@
     for (let i = -6; i <= 6; i += 1) {
       const rootX = state.center.x + i * radius * 0.105;
       const rootY = state.center.y + radius * (0.5 + Math.abs(i) * 0.009);
-      const sway = Math.sin(state.elapsed * 0.58 + i * 0.7) * radius * (0.08 + Math.abs(i) * 0.006);
+      const playProximity = Math.exp(-Math.pow((rootX - state.tentaclePlay.x) / (radius * 0.52), 2));
+      const playSway = state.tentaclePlay.direction * state.tentaclePlay.amount * playProximity * radius * 0.24;
+      const sway = Math.sin(state.elapsed * 0.58 + i * 0.7) * radius * (0.08 + Math.abs(i) * 0.006) + playSway;
       const length = radius * (0.62 + (6 - Math.abs(i)) * 0.045);
       ctx.beginPath();
       ctx.moveTo(rootX, rootY);
@@ -1272,7 +1292,9 @@
       const rootX = state.center.x + arm * radius * 0.17;
       const rootY = state.center.y + radius * 0.46;
       const length = radius * (0.72 + (2 - Math.abs(arm)) * 0.13);
-      const sway = Math.sin(state.elapsed * 0.48 + arm * 1.4) * radius * 0.11;
+      const playProximity = Math.exp(-Math.pow((rootX - state.tentaclePlay.x) / (radius * 0.48), 2));
+      const playSway = state.tentaclePlay.direction * state.tentaclePlay.amount * playProximity * radius * 0.2;
+      const sway = Math.sin(state.elapsed * 0.48 + arm * 1.4) * radius * 0.11 + playSway;
       ctx.beginPath();
       ctx.moveTo(rootX, rootY);
       ctx.bezierCurveTo(
