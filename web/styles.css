@@ -54,9 +54,43 @@ canvas:focus-visible {
 }
 
 #world {
+  z-index: 2;
   display: block;
   touch-action: none;
   cursor: grab;
+}
+
+.camera-backdrop,
+.camera-backdrop__shade {
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 900ms var(--ease);
+}
+
+.camera-backdrop {
+  object-fit: cover;
+  transform: scaleX(-1) scale(1.025);
+  filter: saturate(0.82) contrast(0.92) brightness(0.78) hue-rotate(5deg);
+}
+
+.camera-backdrop__shade {
+  z-index: 1;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(22, 75, 88, 0.05), rgba(1, 10, 20, 0.44) 78%),
+    linear-gradient(180deg, rgba(4, 42, 56, 0.24), rgba(2, 11, 22, 0.48));
+}
+
+body.camera-background .camera-backdrop {
+  opacity: 1;
+}
+
+body.camera-background .camera-backdrop__shade {
+  opacity: 1;
 }
 
 #world.is-touching {
@@ -177,6 +211,12 @@ canvas:focus-visible {
   opacity: 0.88;
   visibility: visible;
   transform: translateY(0) scale(1);
+}
+
+body.camera-background .camera-preview {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px) scale(0.94);
 }
 
 .camera-preview::after {
@@ -469,6 +509,19 @@ canvas:focus-visible {
 
   .camera-copy {
     font-size: 12px;
+  }
+
+  .background-copy {
+    font-size: 0;
+  }
+
+  .background-copy::after {
+    content: "海";
+    font-size: 12px;
+  }
+
+  .background-button[aria-pressed="true"] .background-copy::after {
+    content: "镜";
   }
 
   .camera-preview {

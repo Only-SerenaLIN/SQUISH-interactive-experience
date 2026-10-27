@@ -7,8 +7,11 @@
   const enterButton = document.querySelector("#enterButton");
   const soundButton = document.querySelector("#soundButton");
   const cameraButton = document.querySelector("#cameraButton");
+  const backgroundButton = document.querySelector("#backgroundButton");
+  const backgroundCopy = backgroundButton.querySelector(".background-copy");
   const cameraPreviewShell = document.querySelector("#cameraPreviewShell");
   const cameraPreview = document.querySelector("#cameraPreview");
+  const cameraBackdrop = document.querySelector("#cameraBackdrop");
   const aboutButton = document.querySelector("#aboutButton");
   const aboutPanel = document.querySelector("#aboutPanel");
   const closeAbout = document.querySelector("#closeAbout");
@@ -66,6 +69,8 @@
       hands: null,
       startupTimer: null,
       previewTimer: null,
+      backgroundMode: false,
+      backgroundRequested: false,
       lastFrameAt: 0,
       x: 0,
       y: 0,
@@ -235,6 +240,39 @@
     cameraButton.classList.toggle("is-calibrating", state.camera.starting || (state.camera.enabled && !state.camera.ready));
   }
 
+  function updateBackgroundButton() {
+    const active = state.camera.backgroundMode || state.camera.backgroundRequested;
+    backgroundButton.setAttribute("aria-pressed", String(active));
+    backgroundButton.setAttribute("aria-label", active ? "切换为深海背景" : "切换为摄像头背景");
+    backgroundCopy.textContent = active ? "背景·镜头" : "背景·深海";
+  }
+
+  function applyBackgroundMode(active) {
+    state.camera.backgroundMode = Boolean(active && state.camera.enabled);
+    state.camera.backgroundRequested = false;
+    document.body.classList.toggle("camera-background", state.camera.backgroundMode);
+    cameraPreviewShell.classList.toggle("is-visible", state.camera.enabled && !state.camera.backgroundMode && cameraPreview.readyState >= 2);
+    cameraPreviewShell.setAttribute("aria-hidden", String(!state.camera.enabled || state.camera.backgroundMode));
+    updateBackgroundButton();
+  }
+
+  function toggleBackgroundMode() {
+    if (state.camera.backgroundMode || state.camera.backgroundRequested) {
+      applyBackgroundMode(false);
+      hint.textContent = "深海重新漫回来了";
+      return;
+    }
+    if (state.camera.enabled) {
+      applyBackgroundMode(true);
+      hint.textContent = "镜头成为了这片海的背景";
+      return;
+    }
+    state.camera.backgroundRequested = true;
+    updateBackgroundButton();
+    hint.textContent = "正在打开镜头背景";
+    startCamera();
+  }
+
   function cancelCameraGesture() {
     state.camera.active = false;
     if (state.pointer.id === "camera") {
@@ -266,6 +304,9 @@
     cameraPreviewShell.setAttribute("aria-hidden", "true");
     cameraPreview.pause();
     cameraPreview.srcObject = null;
+    cameraBackdrop.pause();
+    cameraBackdrop.srcObject = null;
+    document.body.classList.remove("camera-background");
   }
 
   function showCameraPreview(handsfree, attempt = 0) {
@@ -280,9 +321,11 @@
     }
     state.camera.previewTimer = null;
     cameraPreview.srcObject = stream;
+    cameraBackdrop.srcObject = stream;
     cameraPreview.play().catch(() => {});
-    cameraPreviewShell.classList.add("is-visible");
-    cameraPreviewShell.setAttribute("aria-hidden", "false");
+    cameraBackdrop.play().catch(() => {});
+    if (state.camera.backgroundRequested) applyBackgroundMode(true);
+    else applyBackgroundMode(state.camera.backgroundMode);
   }
 
   function stopCamera(message = "摄像头手势已关闭") {
@@ -299,6 +342,8 @@
       hands: null,
       startupTimer: null,
       previewTimer: null,
+      backgroundMode: false,
+      backgroundRequested: false,
       presence: 0,
       presenceFrames: 0,
       absentFrames: 0,
@@ -312,12 +357,15 @@
       touchBaby: null,
     });
     updateCameraButton();
+    updateBackgroundButton();
     if (message) hint.textContent = message;
   }
 
   function startCamera() {
     if (state.camera.starting || state.camera.enabled) return;
     if (!window.Handsfree || !navigator.mediaDevices?.getUserMedia) {
+      state.camera.backgroundRequested = false;
+      updateBackgroundButton();
       hint.textContent = "Handsfree.js 尚未载入，仍可用鼠标或触屏";
       return;
     }
@@ -374,7 +422,7 @@
           ready: true,
           starting: false,
           startupTimer: null,
-        previewTimer: null,
+          previewTimer: null,
         });
         updateCameraButton("Handsfree 已开");
         showCameraPreview(handsfree);
@@ -386,6 +434,8 @@
       state.camera.starting = false;
       state.camera.handsfree = null;
       updateCameraButton();
+      state.camera.backgroundRequested = false;
+      updateBackgroundButton();
       const blocked = error?.name === "NotAllowedError" || error?.name === "SecurityError";
       hint.textContent = blocked ? "没有获得摄像头权限，仍可用鼠标或触屏" : "Handsfree.js 启动失败，仍可用鼠标或触屏";
     }
@@ -921,9 +971,15 @@
     const h = state.height;
     const time = state.elapsed * (reduceMotion ? 0.03 : 0.12);
     const gradient = ctx.createLinearGradient(0, 0, 0, h);
-    gradient.addColorStop(0, "#0a3144");
-    gradient.addColorStop(0.42, "#082638");
-    gradient.addColorStop(1, "#020b16");
+    if (state.camera.backgroundMode) {
+      gradient.addColorStop(0, "rgba(5,41,54,0.26)");
+      gradient.addColorStop(0.42, "rgba(3,27,42,0.34)");
+      gradient.addColorStop(1, "rgba(1,8,18,0.58)");
+    } else {
+      gradient.addColorStop(0, "#0a3144");
+      gradient.addColorStop(0.42, "#082638");
+      gradient.addColorStop(1, "#020b16");
+    }
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, w, h);
 
@@ -1611,6 +1667,7 @@
     updateSoundButton();
   });
   cameraButton.addEventListener("click", toggleCamera);
+  backgroundButton.addEventListener("click", toggleBackgroundMode);
   aboutButton.addEventListener("click", () => showAbout(true));
   closeAbout.addEventListener("click", () => showAbout(false));
   veil.addEventListener("click", () => showAbout(false));
@@ -1627,6 +1684,7 @@
       updateSoundButton();
     }
     if (event.key.toLowerCase() === "c" && !event.repeat) toggleCamera();
+    if (event.key.toLowerCase() === "b" && !event.repeat) toggleBackgroundMode();
     if (event.key.toLowerCase() === "r") resetMemories();
     if (event.code === "Space" && !event.repeat && state.entered) {
       event.preventDefault();
@@ -1655,6 +1713,7 @@
   memoryCount.textContent = String(state.count).padStart(2, "0");
   updateSoundButton();
   updateCameraButton();
+  updateBackgroundButton();
   resize();
   requestAnimationFrame(render);
 })();

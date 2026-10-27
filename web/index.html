@@ -7,10 +7,12 @@
     <meta name="description" content="《不可触摸的柔软》——一件会呼吸、回弹，并记住每次触碰的浏览器交互艺术作品。" />
     <title>不可触摸的柔软 — Softness Without Touch</title>
     <link rel="stylesheet" href="https://unpkg.com/handsfree@8.5.1/build/lib/assets/handsfree.css" />
-    <link rel="stylesheet" href="styles.css?v=live-camera-1" />
+    <link rel="stylesheet" href="styles.css?v=camera-scene-1" />
   </head>
   <body>
     <main class="artwork" aria-label="《不可触摸的柔软》交互艺术作品">
+      <video class="camera-backdrop" id="cameraBackdrop" autoplay muted playsinline aria-hidden="true"></video>
+      <div class="camera-backdrop__shade" aria-hidden="true"></div>
       <canvas id="world" aria-label="可按压和拉伸的柔软生命体" tabindex="0"></canvas>
 
       <header class="topbar">
@@ -26,6 +28,16 @@
           <button id="cameraButton" class="text-button camera-button" type="button" aria-pressed="false">
             <span class="status-dot" aria-hidden="true"></span>
             <span class="camera-copy">手势</span>
+          </button>
+          <button
+            id="backgroundButton"
+            class="text-button background-button"
+            type="button"
+            aria-pressed="false"
+            aria-label="切换为摄像头背景"
+          >
+            <span class="status-dot" aria-hidden="true"></span>
+            <span class="background-copy">背景·深海</span>
           </button>
           <button id="aboutButton" class="text-button" type="button" aria-expanded="false" aria-controls="aboutPanel">
             关于作品
@@ -73,7 +85,7 @@
           <p>这是一只生活在屏幕深海中的柔软母水母。你无法真正触摸它，却可以让它凹陷、延展、呼吸和回弹。</p>
           <p>每一次捏取都会从它身上分离出一只小水母，在水流中继续漂游。没有分数，也没有正确的方法；你只是在创造一群新的柔软生命。</p>
           <div class="about__divider"></div>
-          <p class="about__small">鼠标 / 单指拖动 · 摄像头拇指食指捏合<br />Space 按压 · C 摄像头 · M 静音 · R 清除记忆</p>
+          <p class="about__small">鼠标 / 单指拖动 · 摄像头拇指食指捏合<br />Space 按压 · C 摄像头 · B 背景 · M 静音 · R 清除记忆</p>
           <p class="camera-privacy">摄像头画面只在当前浏览器内分析，不录制、不保存，也不会上传。</p>
           <button id="resetButton" class="reset-button" type="button">重新成为陌生人</button>
           <p class="disclaimer">本作品用于艺术体验，不是医疗或治疗工具。</p>
@@ -83,6 +95,6 @@
       <div class="veil" id="veil" aria-hidden="true"></div>
     </main>
     <script src="https://unpkg.com/handsfree@8.5.1/build/lib/handsfree.js"></script>
-    <script src="app.js?v=live-camera-1"></script>
+    <script src="app.js?v=camera-scene-1"></script>
   </body>
 </html>
