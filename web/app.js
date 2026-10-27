@@ -36,6 +36,7 @@
     contourDrag: 0,
     contourAngle: -Math.PI / 2,
     contourRelease: 0,
+    activeBaby: null,
     entered: false,
     soundOn: true,
     lastTime: performance.now(),
@@ -180,6 +181,19 @@
   function pointerDown(event) {
     if (!state.entered || aboutPanel.classList.contains("is-open")) return;
     const point = pointerPosition(event);
+    for (let i = state.babies.length - 1; i >= 0; i -= 1) {
+      const baby = state.babies[i];
+      if (Math.hypot(point.x - baby.x, point.y - baby.y) <= Math.max(30, baby.size * 2.35)) {
+        state.activeBaby = baby;
+        baby.touchAngle = Math.atan2(point.y - baby.y, point.x - baby.x);
+        state.pointer = { x: point.x, y: point.y, down: true, id: event.pointerId, startedAt: performance.now() };
+        canvas.setPointerCapture(event.pointerId);
+        canvas.classList.add("is-touching");
+        hint.textContent = "它软软地凹下去了";
+        initAudio();
+        return;
+      }
+    }
     const radius = baseRadius();
     const distance = Math.hypot(point.x - state.center.x, point.y - state.center.y);
     if (distance > radius * 1.28) return;
@@ -196,11 +210,28 @@
     const point = pointerPosition(event);
     state.pointer.x = point.x;
     state.pointer.y = point.y;
+    if (state.activeBaby) {
+      state.activeBaby.touchAngle = Math.atan2(point.y - state.activeBaby.y, point.x - state.activeBaby.x);
+      return;
+    }
     state.touchAngle = Math.atan2(point.y - state.center.y, point.x - state.center.x);
   }
 
   function releasePointer() {
     if (!state.pointer.down) return;
+    if (state.activeBaby) {
+      const baby = state.activeBaby;
+      state.pointer.down = false;
+      state.pointer.id = null;
+      state.activeBaby = null;
+      canvas.classList.remove("is-touching");
+      tone(0.22 + baby.squash * 0.35, baby.touchAngle);
+      hint.textContent = "它轻轻弹回去了";
+      window.setTimeout(() => {
+        if (!state.pointer.down) hint.textContent = "小水母也可以被轻轻触碰";
+      }, 1800);
+      return;
+    }
     const strength = clamp(state.pressure * 0.72 + state.dragDistance / (baseRadius() * 2.8), 0.15, 1);
     state.pointer.down = false;
     state.pointer.id = null;
@@ -220,17 +251,20 @@
     const surfaceY = state.center.y + Math.sin(state.touchAngle) * radius * 0.84;
     const originX = pulledOut ? mix(surfaceX, state.pointer.x, 0.58) : surfaceX;
     const originY = pulledOut ? mix(surfaceY, state.pointer.y, 0.58) : surfaceY;
-    const size = 10 + strength * 8;
+    const size = 16 + strength * 10;
     state.babies.push({
       x: originX,
       y: originY,
       vx: Math.cos(state.touchAngle) * (5 + strength * 7),
-      vy: -7 - strength * 7,
+      vy: -4 - strength * 4,
       size,
       strength,
       hue,
       phase: state.count * 0.91 + Math.random() * 0.5,
       age: 0,
+      squash: 0,
+      squashVelocity: 0,
+      touchAngle: 0,
     });
     if (state.babies.length > 18) state.babies.shift();
   }
@@ -278,23 +312,24 @@
     const dy = state.pointer.y - state.center.y;
     const pointerDistance = Math.hypot(dx, dy);
     const holdTime = state.pointer.down ? (performance.now() - state.pointer.startedAt) / 1000 : 0;
-    const targetPressure = state.pointer.down ? clamp(0.28 + holdTime * 0.36, 0, 1) : 0;
+    const mainActive = state.pointer.down && !state.activeBaby;
+    const targetPressure = mainActive ? clamp(0.28 + holdTime * 0.36, 0, 1) : 0;
     state.pressureVelocity += (targetPressure - state.pressure) * 16 * dt;
     state.pressureVelocity *= Math.pow(0.035, dt);
     state.pressure += state.pressureVelocity * dt * 7;
     state.pressure = clamp(state.pressure, -0.12, 1.08);
-    state.dragDistance = state.pointer.down ? Math.max(0, pointerDistance - radius * 0.72) : mix(state.dragDistance, 0, 1 - Math.pow(0.02, dt));
+    state.dragDistance = mainActive ? Math.max(0, pointerDistance - radius * 0.72) : mix(state.dragDistance, 0, 1 - Math.pow(0.02, dt));
 
     const contourEase = 1 - Math.pow(0.16, dt);
     state.contourPressure = mix(state.contourPressure, clamp(state.pressure, 0, 1), contourEase);
     state.contourDrag = mix(state.contourDrag, clamp(state.dragDistance / radius, 0, 0.85), contourEase);
     state.contourRelease = mix(state.contourRelease, clamp(-state.pressureVelocity * 0.34, 0, 1), contourEase * 0.72);
-    if (state.pointer.down) {
+    if (mainActive) {
       state.contourAngle += shortestAngle(state.touchAngle, state.contourAngle) * contourEase * 0.58;
     }
 
-    const centerTargetX = state.width * 0.5 + (state.pointer.down ? dx * 0.075 : 0);
-    const centerTargetY = state.height * 0.51 + (state.pointer.down ? dy * 0.075 : 0);
+    const centerTargetX = state.width * 0.5 + (mainActive ? dx * 0.075 : 0);
+    const centerTargetY = state.height * 0.51 + (mainActive ? dy * 0.075 : 0);
     state.center.vx += (centerTargetX - state.center.x) * 8.5 * dt;
     state.center.vy += (centerTargetY - state.center.y) * 8.5 * dt;
     state.center.vx *= Math.pow(0.018, dt);
@@ -306,9 +341,9 @@
       const proximity = Math.exp(-Math.pow(shortestAngle(node.angle, state.touchAngle) / 0.58, 2));
       const opposite = Math.exp(-Math.pow(shortestAngle(node.angle, state.touchAngle + Math.PI) / 0.9, 2));
       const inside = pointerDistance < radius;
-      const indentation = state.pointer.down && inside ? -state.pressure * 0.24 * proximity : 0;
-      const pull = state.pointer.down && !inside ? clamp((pointerDistance - radius) / radius, 0, 0.72) * 0.66 * proximity : 0;
-      const volume = state.pointer.down ? state.pressure * 0.075 * (1 - proximity) - state.pressure * 0.025 * opposite : 0;
+      const indentation = mainActive && inside ? -state.pressure * 0.24 * proximity : 0;
+      const pull = mainActive && !inside ? clamp((pointerDistance - radius) / radius, 0, 0.72) * 0.66 * proximity : 0;
+      const volume = mainActive ? state.pressure * 0.075 * (1 - proximity) - state.pressure * 0.025 * opposite : 0;
       const breath = (reduceMotion ? 0.006 : 0.021) * Math.sin(state.elapsed * 0.92 + node.phase * 0.22);
       const membrane = (reduceMotion ? 0.002 : 0.007) * Math.sin(state.elapsed * 0.55 + node.angle * 3 + node.phase);
       const target = indentation + pull + volume + breath + membrane;
@@ -323,10 +358,17 @@
     state.babies.forEach((baby) => {
       baby.age += dt;
       baby.phase += dt * (0.42 + baby.strength * 0.16);
+      const babyTarget = state.pointer.down && state.activeBaby === baby ? clamp(0.48 + holdTime * 0.34, 0, 0.88) : 0;
+      baby.squashVelocity += (babyTarget - baby.squash) * 32 * dt;
+      baby.squashVelocity *= Math.pow(0.006, dt);
+      baby.squash += baby.squashVelocity * dt * 6.4;
+      baby.squash = clamp(baby.squash, -0.12, 0.94);
       baby.vx *= Math.pow(0.72, dt);
-      baby.vy = mix(baby.vy, -4.2 - baby.strength * 2.2, 1 - Math.pow(0.3, dt));
-      baby.x += (baby.vx + Math.sin(baby.phase * 0.8) * 3.2) * dt;
-      baby.y += baby.vy * dt;
+      baby.vy = mix(baby.vy, -2.2 - baby.strength * 1.5, 1 - Math.pow(0.3, dt));
+      if (state.activeBaby !== baby) {
+        baby.x += (baby.vx + Math.sin(baby.phase * 0.8) * 2.2) * dt;
+        baby.y += baby.vy * dt;
+      }
       if (baby.y < -baby.size * 4) baby.y = state.height + baby.size * 3;
       if (baby.x < -baby.size * 3) baby.x = state.width + baby.size * 2;
       if (baby.x > state.width + baby.size * 3) baby.x = -baby.size * 2;
@@ -336,9 +378,13 @@
   function blobPoint(node, radius, offset = 0) {
     const value = node.value * (1 - offset * 0.18);
     const localRadius = radius * (1 + value) - offset;
+    const sine = Math.sin(node.angle);
+    const lower = Math.max(0, sine);
+    const xScale = 1 - lower * 0.09;
+    const yScale = lower > 0 ? 0.56 + (1 - lower) * 0.14 : 1;
     return {
-      x: state.center.x + Math.cos(node.angle) * localRadius,
-      y: state.center.y + Math.sin(node.angle) * localRadius,
+      x: state.center.x + Math.cos(node.angle) * localRadius * xScale,
+      y: state.center.y + sine * localRadius * yScale,
     };
   }
 
@@ -417,14 +463,17 @@
     });
   }
 
-  function drawJellyfishBody(x, y, size, phase, hue, alpha = 1) {
+  function drawJellyfishBody(x, y, size, phase, hue, alpha = 1, squash = 0, touchAngle = 0) {
     const c = palette[hue % palette.length];
     ctx.save();
     ctx.translate(x, y);
     const pulse = 1 + Math.sin(phase * 2) * 0.055;
     ctx.scale(pulse, 1 / Math.sqrt(pulse));
-    ctx.shadowBlur = size * 1.15;
-    ctx.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},${0.42 * alpha})`;
+    ctx.rotate(touchAngle);
+    ctx.scale(1 - squash * 0.26, 1 + squash * 0.18);
+    ctx.rotate(-touchAngle);
+    ctx.shadowBlur = size * (1.15 + squash * 1.6);
+    ctx.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},${(0.42 + squash * 0.28) * alpha})`;
     const bell = ctx.createRadialGradient(-size * 0.22, -size * 0.34, 0, 0, 0, size * 1.05);
     bell.addColorStop(0, `rgba(236,255,255,${0.78 * alpha})`);
     bell.addColorStop(0.5, `rgba(${c[0]},${c[1]},${c[2]},${0.48 * alpha})`);
@@ -439,6 +488,17 @@
     ctx.fill();
     ctx.strokeStyle = `rgba(205,252,250,${0.48 * alpha})`;
     ctx.lineWidth = Math.max(0.7, size * 0.045);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = `rgba(9,45,59,${0.66 * alpha})`;
+    ctx.beginPath();
+    ctx.arc(-size * 0.24, -size * 0.22, Math.max(0.8, size * 0.055), 0, TAU);
+    ctx.arc(size * 0.24, -size * 0.22, Math.max(0.8, size * 0.055), 0, TAU);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.strokeStyle = `rgba(25,76,86,${0.5 * alpha})`;
+    ctx.lineWidth = Math.max(0.55, size * 0.035);
+    ctx.arc(0, -size * 0.08, size * 0.13, 0.14, Math.PI - 0.14);
     ctx.stroke();
     ctx.shadowBlur = size * 0.45;
     for (let i = -1; i <= 1; i += 1) {
@@ -455,7 +515,16 @@
 
   function drawBabyJellyfish() {
     state.babies.forEach((baby) => {
-      drawJellyfishBody(baby.x, baby.y, baby.size, baby.phase, baby.hue, clamp(baby.age / 0.8, 0.12, 1));
+      drawJellyfishBody(
+        baby.x,
+        baby.y,
+        baby.size,
+        baby.phase,
+        baby.hue,
+        clamp(baby.age / 0.8, 0.12, 1),
+        baby.squash,
+        baby.touchAngle,
+      );
     });
   }
 
@@ -658,14 +727,55 @@
       ctx.fill();
     });
 
+    ctx.beginPath();
+    const skirtY = state.center.y + radius * 0.48;
+    ctx.moveTo(state.center.x - radius * 0.68, skirtY);
+    for (let i = -3; i < 4; i += 1) {
+      const x1 = state.center.x + (i + 0.5) * radius * 0.19;
+      const x2 = state.center.x + (i + 1) * radius * 0.19;
+      ctx.quadraticCurveTo(x1, skirtY + (i % 2 === 0 ? radius * 0.045 : -radius * 0.02), x2, skirtY);
+    }
+    ctx.strokeStyle = "rgba(169,244,237,0.34)";
+    ctx.lineWidth = 1.15;
+    ctx.shadowBlur = 7;
+    ctx.shadowColor = "rgba(112,231,222,0.36)";
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
     const blinkCycle = state.elapsed % 8.2;
     const blink = blinkCycle > 7.72 ? Math.abs(blinkCycle - 7.96) / 0.24 : 1;
-    const eyeY = state.center.y + radius * 0.08;
+    const eyeY = state.center.y + radius * 0.02;
     [-1, 1].forEach((side) => {
       const x = state.center.x + side * radius * 0.112;
       ctx.beginPath();
-      ctx.fillStyle = "rgba(68,60,78,0.36)";
-      ctx.ellipse(x, eyeY, radius * 0.011, Math.max(0.5, radius * 0.024 * blink), 0, 0, TAU);
+      ctx.fillStyle = "rgba(8,48,62,0.62)";
+      ctx.ellipse(x, eyeY, radius * 0.018, Math.max(0.7, radius * 0.031 * blink), 0, 0, TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.arc(x - radius * 0.005, eyeY - radius * 0.009, radius * 0.0045, 0, TAU);
+      ctx.fill();
+    });
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(18,70,80,0.5)";
+    ctx.lineWidth = 1.4;
+    ctx.lineCap = "round";
+    ctx.arc(state.center.x, eyeY + radius * 0.045, radius * 0.055, 0.16, Math.PI - 0.16);
+    ctx.stroke();
+    [-1, 1].forEach((side) => {
+      const blush = ctx.createRadialGradient(
+        state.center.x + side * radius * 0.22,
+        eyeY + radius * 0.055,
+        0,
+        state.center.x + side * radius * 0.22,
+        eyeY + radius * 0.055,
+        radius * 0.055,
+      );
+      blush.addColorStop(0, "rgba(239,143,206,0.3)");
+      blush.addColorStop(1, "rgba(239,143,206,0)");
+      ctx.fillStyle = blush;
+      ctx.beginPath();
+      ctx.arc(state.center.x + side * radius * 0.22, eyeY + radius * 0.055, radius * 0.055, 0, TAU);
       ctx.fill();
     });
     ctx.restore();
