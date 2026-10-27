@@ -22,6 +22,10 @@
   const mix = (a, b, t) => a + (b - a) * t;
   const easeOut = (t) => 1 - Math.pow(1 - t, 3);
   const shortestAngle = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+  const HAND_TRACKER_VERSION = "0.10.21";
+  const HAND_TRACKER_MODULE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${HAND_TRACKER_VERSION}/+esm`;
+  const HAND_TRACKER_WASM = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${HAND_TRACKER_VERSION}/wasm`;
+  const HAND_TRACKER_MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 
   const state = {
     width: 0,
@@ -61,10 +65,6 @@
       active: false,
       stream: null,
       video: null,
-      frameCanvas: null,
-      frameContext: null,
-      background: null,
-      warmupFrames: 0,
       lastFrameAt: 0,
       x: 0,
       y: 0,
@@ -75,11 +75,19 @@
       suspendedUntil: 0,
       requestToken: 0,
       rearm: true,
+      handLandmarker: null,
+      lastVideoTime: -1,
+      fingerAX: 0,
+      fingerAY: 0,
+      fingerBX: 0,
+      fingerBY: 0,
+      pinchRatio: 2,
+      pinchFrames: 0,
+      openFrames: 0,
       gestureOriginX: 0,
       gestureOriginY: 0,
       pointerOriginX: 0,
       pointerOriginY: 0,
-      outsideSince: 0,
     },
   };
 
@@ -232,6 +240,21 @@
     }
   }
 
+  async function createHandLandmarker() {
+    const { FilesetResolver, HandLandmarker } = await import(HAND_TRACKER_MODULE);
+    const vision = await FilesetResolver.forVisionTasks(HAND_TRACKER_WASM);
+    return HandLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: HAND_TRACKER_MODEL,
+      },
+      runningMode: "VIDEO",
+      numHands: 1,
+      minHandDetectionConfidence: 0.55,
+      minHandPresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+    });
+  }
+
   function stopCamera(message = "摄像头手势已关闭") {
     state.camera.requestToken += 1;
     cancelCameraGesture();
@@ -239,22 +262,23 @@
       state.camera.stream.getTracks().forEach((track) => track.stop());
     }
     if (state.camera.video) state.camera.video.srcObject = null;
+    if (state.camera.handLandmarker) state.camera.handLandmarker.close();
     Object.assign(state.camera, {
       enabled: false,
       ready: false,
       starting: false,
       stream: null,
       video: null,
-      frameCanvas: null,
-      frameContext: null,
-      background: null,
-      warmupFrames: 0,
       presence: 0,
       presenceFrames: 0,
       absentFrames: 0,
       cursorAlpha: 0,
       rearm: true,
-      outsideSince: 0,
+      handLandmarker: null,
+      lastVideoTime: -1,
+      pinchRatio: 2,
+      pinchFrames: 0,
+      openFrames: 0,
     });
     updateCameraButton();
     if (message) hint.textContent = message;
@@ -292,20 +316,22 @@
       video.playsInline = true;
       video.srcObject = requestedStream;
       await video.play();
-      const frameCanvas = document.createElement("canvas");
-      frameCanvas.width = 96;
-      frameCanvas.height = 72;
-      const frameContext = frameCanvas.getContext("2d", { willReadFrequently: true });
+      updateCameraButton("加载双指识别");
+      hint.textContent = "正在准备双指捏合识别";
+      const handLandmarker = await createHandLandmarker();
+      if (state.camera.requestToken !== requestToken) {
+        handLandmarker.close();
+        requestedStream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       Object.assign(state.camera, {
         enabled: true,
-        ready: false,
+        ready: true,
         starting: false,
         stream: requestedStream,
         video,
-        frameCanvas,
-        frameContext,
-        background: new Float32Array(96 * 72 * 3),
-        warmupFrames: 0,
+        handLandmarker,
+        lastVideoTime: -1,
         lastFrameAt: 0,
         x: state.center.x,
         y: state.center.y,
@@ -314,17 +340,19 @@
         absentFrames: 0,
         cursorAlpha: 0,
         rearm: true,
-        outsideSince: 0,
+        pinchRatio: 2,
+        pinchFrames: 0,
+        openFrames: 0,
       });
-      updateCameraButton("校准中");
-      hint.textContent = "请暂时保持画面不动，正在记住背景";
+      updateCameraButton("双指已开");
+      hint.textContent = "用拇指和食指捏合水母，再保持夹住向外拉";
     } catch (error) {
       if (requestedStream) requestedStream.getTracks().forEach((track) => track.stop());
       if (state.camera.requestToken !== requestToken) return;
       state.camera.starting = false;
       updateCameraButton();
       const blocked = error?.name === "NotAllowedError" || error?.name === "SecurityError";
-      hint.textContent = blocked ? "没有获得摄像头权限，仍可用鼠标或触屏" : "摄像头暂时不可用，仍可继续触碰";
+      hint.textContent = blocked ? "没有获得摄像头权限，仍可用鼠标或触屏" : "双指识别加载失败，仍可用鼠标或触屏";
     }
   }
 
@@ -335,92 +363,86 @@
 
   function processCameraGesture(now) {
     const camera = state.camera;
-    if (!camera.enabled || !camera.video || camera.video.readyState < 2 || now - camera.lastFrameAt < 78) return;
+    if (!camera.enabled || !camera.handLandmarker || !camera.video || camera.video.readyState < 2 || now - camera.lastFrameAt < 46) return;
+    if (camera.video.currentTime === camera.lastVideoTime) return;
     camera.lastFrameAt = now;
-    const width = camera.frameCanvas.width;
-    const height = camera.frameCanvas.height;
-    camera.frameContext.drawImage(camera.video, 0, 0, width, height);
-    const pixels = camera.frameContext.getImageData(0, 0, width, height).data;
-
-    if (camera.warmupFrames < 28) {
-      const blend = camera.warmupFrames === 0 ? 1 : 1 / (camera.warmupFrames + 1);
-      for (let pixel = 0, sample = 0; pixel < pixels.length; pixel += 4, sample += 3) {
-        camera.background[sample] = mix(camera.background[sample], pixels[pixel], blend);
-        camera.background[sample + 1] = mix(camera.background[sample + 1], pixels[pixel + 1], blend);
-        camera.background[sample + 2] = mix(camera.background[sample + 2], pixels[pixel + 2], blend);
-      }
-      camera.warmupFrames += 1;
-      if (camera.warmupFrames === 28) {
-        camera.ready = true;
-        updateCameraButton("手势已开");
-        hint.textContent = "把一只手慢慢伸进镜头，移动它触碰水母";
-      }
+    camera.lastVideoTime = camera.video.currentTime;
+    let result;
+    try {
+      result = camera.handLandmarker.detectForVideo(camera.video, Math.round(now));
+    } catch (error) {
       return;
     }
-
-    let foreground = 0;
-    let totalWeight = 0;
-    let weightedX = 0;
-    let weightedY = 0;
-    for (let y = 0, pixel = 0, sample = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1, pixel += 4, sample += 3) {
-        const difference = (
-          Math.abs(pixels[pixel] - camera.background[sample]) +
-          Math.abs(pixels[pixel + 1] - camera.background[sample + 1]) +
-          Math.abs(pixels[pixel + 2] - camera.background[sample + 2])
-        ) / 3;
-        const backgroundBlend = difference < 34 ? 0.025 : 0.0007;
-        camera.background[sample] = mix(camera.background[sample], pixels[pixel], backgroundBlend);
-        camera.background[sample + 1] = mix(camera.background[sample + 1], pixels[pixel + 1], backgroundBlend);
-        camera.background[sample + 2] = mix(camera.background[sample + 2], pixels[pixel + 2], backgroundBlend);
-        if (difference > 42) {
-          const weight = Math.min(100, difference - 34);
-          foreground += 1;
-          totalWeight += weight;
-          weightedX += x * weight;
-          weightedY += y * weight;
-        }
-      }
-    }
-
-    const area = foreground / (width * height);
-    const present = totalWeight > 0 && area > 0.022 && area < 0.62;
+    const landmarks = result?.landmarks?.[0];
+    const present = Boolean(landmarks && landmarks.length >= 21);
     if (present) {
-      const targetX = (1 - weightedX / totalWeight / width) * state.width;
-      const targetY = (weightedY / totalWeight / height) * state.height;
-      camera.x = mix(camera.x || targetX, targetX, 0.32);
-      camera.y = mix(camera.y || targetY, targetY, 0.32);
-      camera.presence = mix(camera.presence, clamp((area - 0.022) / 0.18, 0, 1), 0.28);
+      const thumb = landmarks[4];
+      const index = landmarks[8];
+      const palmA = landmarks[5];
+      const palmB = landmarks[17];
+      const targetAX = (1 - thumb.x) * state.width;
+      const targetAY = thumb.y * state.height;
+      const targetBX = (1 - index.x) * state.width;
+      const targetBY = index.y * state.height;
+      const targetX = (targetAX + targetBX) * 0.5;
+      const targetY = (targetAY + targetBY) * 0.5;
+      const fingerGap = Math.hypot(thumb.x - index.x, thumb.y - index.y);
+      const palmWidth = Math.max(0.035, Math.hypot(palmA.x - palmB.x, palmA.y - palmB.y));
+      const targetPinchRatio = fingerGap / palmWidth;
+      const smoothing = camera.presenceFrames ? 0.42 : 1;
+      camera.fingerAX = mix(camera.fingerAX || targetAX, targetAX, smoothing);
+      camera.fingerAY = mix(camera.fingerAY || targetAY, targetAY, smoothing);
+      camera.fingerBX = mix(camera.fingerBX || targetBX, targetBX, smoothing);
+      camera.fingerBY = mix(camera.fingerBY || targetBY, targetBY, smoothing);
+      camera.x = mix(camera.x || targetX, targetX, smoothing);
+      camera.y = mix(camera.y || targetY, targetY, smoothing);
+      camera.pinchRatio = mix(camera.pinchRatio, targetPinchRatio, 0.44);
+      camera.presence = mix(camera.presence, clamp((0.76 - camera.pinchRatio) / 0.56, 0, 1), 0.38);
       camera.presenceFrames += 1;
       camera.absentFrames = 0;
+      if (camera.pinchRatio < 0.48) {
+        camera.pinchFrames += 1;
+        camera.openFrames = 0;
+      } else if (camera.pinchRatio > 0.72) {
+        camera.openFrames += 1;
+        camera.pinchFrames = 0;
+      } else {
+        camera.pinchFrames = Math.max(0, camera.pinchFrames - 1);
+        camera.openFrames = Math.max(0, camera.openFrames - 1);
+      }
     } else {
       camera.presence *= 0.82;
       camera.presenceFrames = 0;
       camera.absentFrames += 1;
+      camera.pinchFrames = 0;
+      camera.openFrames += 1;
     }
     camera.cursorAlpha = mix(camera.cursorAlpha, present ? 1 : 0, present ? 0.3 : 0.16);
 
-    if (!present && !camera.active && camera.absentFrames >= 4) camera.rearm = true;
+    if (!camera.active && camera.openFrames >= 3) camera.rearm = true;
 
     const canControl = now >= camera.suspendedUntil && (!state.pointer.down || state.pointer.id === "camera");
     if (present && canControl) {
       if (!camera.active) {
         const distance = Math.hypot(camera.x - state.center.x, camera.y - state.center.y);
-        if (camera.rearm && camera.presenceFrames >= 3 && distance <= baseRadius() * 1.32) {
+        if (camera.rearm && camera.pinchFrames >= 2 && distance <= baseRadius() * 1.34) {
           camera.active = true;
           camera.rearm = false;
           camera.gestureOriginX = camera.x;
           camera.gestureOriginY = camera.y;
           camera.pointerOriginX = camera.x;
           camera.pointerOriginY = camera.y;
-          camera.outsideSince = 0;
           state.pointer = { x: camera.x, y: camera.y, down: true, id: "camera", startedAt: now };
           state.touchAngle = Math.atan2(camera.y - state.center.y, camera.x - state.center.x);
           canvas.classList.add("is-touching");
-          hint.textContent = "抓住了，向外移动手掌";
+          hint.textContent = "夹住了——保持双指合拢，向外拉";
+        } else if (camera.openFrames >= 2) {
+          hint.textContent = "把两枚光点移到水母上，再合拢双指";
+        } else if (camera.pinchFrames >= 2 && distance > baseRadius() * 1.34) {
+          hint.textContent = "已经捏合；先移到水母上再夹取";
         }
       } else {
-        const amplification = 1.72;
+        const amplification = 1.55;
         state.pointer.x = clamp(
           camera.pointerOriginX + (camera.x - camera.gestureOriginX) * amplification,
           -baseRadius() * 0.4,
@@ -432,24 +454,20 @@
           state.height + baseRadius() * 0.4,
         );
         state.touchAngle = Math.atan2(state.pointer.y - state.center.y, state.pointer.x - state.center.x);
-        const distance = Math.hypot(state.pointer.x - state.center.x, state.pointer.y - state.center.y);
-        if (distance > baseRadius() * 1.02) {
-          if (!camera.outsideSince) camera.outsideSince = now;
-          hint.textContent = "保持一下，它就会松开";
-          if (now - camera.outsideSince > 520) {
-            camera.active = false;
-            camera.suspendedUntil = now + 800;
-            camera.outsideSince = 0;
-            releasePointer();
-          }
+        if (camera.openFrames >= 2) {
+          camera.active = false;
+          camera.suspendedUntil = now + 260;
+          releasePointer();
+          hint.textContent = "张开手指——啵，它松开了";
         } else {
-          camera.outsideSince = 0;
+          hint.textContent = "保持夹住向外拉；张开双指就松手";
         }
       }
     } else if (camera.active && camera.absentFrames >= 5) {
       camera.active = false;
-      camera.outsideSince = 0;
       releasePointer();
+    } else if (!present && camera.absentFrames >= 6) {
+      hint.textContent = "把拇指和食指伸进镜头";
     }
   }
 
@@ -979,21 +997,49 @@
     const alpha = camera.cursorAlpha;
     const cursorX = camera.active && state.pointer.id === "camera" ? state.pointer.x : camera.x;
     const cursorY = camera.active && state.pointer.id === "camera" ? state.pointer.y : camera.y;
-    const radius = 18 + camera.presence * 22 + (camera.active ? Math.sin(state.elapsed * 4.2) * 2 : 0);
+    const shiftX = cursorX - camera.x;
+    const shiftY = cursorY - camera.y;
+    const fingerA = { x: camera.fingerAX + shiftX, y: camera.fingerAY + shiftY };
+    const fingerB = { x: camera.fingerBX + shiftX, y: camera.fingerBY + shiftY };
+    const radius = 12 + camera.presence * 8 + (camera.active ? Math.sin(state.elapsed * 4.2) * 1.5 : 0);
+    const pinch = clamp((0.78 - camera.pinchRatio) / 0.58, 0, 1);
     ctx.save();
     ctx.globalCompositeOperation = "screen";
-    const glow = ctx.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, radius * 2.2);
-    glow.addColorStop(0, `rgba(225,255,250,${0.28 * alpha})`);
-    glow.addColorStop(0.32, `rgba(126,229,220,${0.17 * alpha})`);
-    glow.addColorStop(1, "rgba(126,229,220,0)");
-    ctx.fillStyle = glow;
+    ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.arc(cursorX, cursorY, radius * 2.2, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = `rgba(225,255,250,${0.52 * alpha})`;
-    ctx.beginPath();
-    ctx.arc(cursorX, cursorY, 2.1 + camera.presence * 1.6, 0, TAU);
-    ctx.fill();
+    ctx.moveTo(fingerA.x, fingerA.y);
+    ctx.quadraticCurveTo(cursorX, cursorY, fingerB.x, fingerB.y);
+    ctx.strokeStyle = `rgba(178,246,239,${(0.1 + pinch * 0.3) * alpha})`;
+    ctx.lineWidth = 1 + pinch * 1.6;
+    ctx.shadowBlur = 10 + pinch * 12;
+    ctx.shadowColor = `rgba(126,229,220,${0.34 * alpha})`;
+    ctx.stroke();
+
+    [fingerA, fingerB].forEach((finger) => {
+      const glow = ctx.createRadialGradient(finger.x, finger.y, 0, finger.x, finger.y, radius * 2.25);
+      glow.addColorStop(0, `rgba(234,255,252,${0.34 * alpha})`);
+      glow.addColorStop(0.32, `rgba(126,229,220,${0.2 * alpha})`);
+      glow.addColorStop(1, "rgba(126,229,220,0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(finger.x, finger.y, radius * 2.25, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = `rgba(233,255,252,${(0.42 + pinch * 0.34) * alpha})`;
+      ctx.beginPath();
+      ctx.arc(finger.x, finger.y, 2.2 + pinch * 1.5, 0, TAU);
+      ctx.fill();
+    });
+
+    if (camera.active) {
+      const core = ctx.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, 24);
+      core.addColorStop(0, `rgba(239,255,253,${0.34 * alpha})`);
+      core.addColorStop(0.4, `rgba(126,229,220,${0.12 * alpha})`);
+      core.addColorStop(1, "rgba(126,229,220,0)");
+      ctx.fillStyle = core;
+      ctx.beginPath();
+      ctx.arc(cursorX, cursorY, 24, 0, TAU);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
