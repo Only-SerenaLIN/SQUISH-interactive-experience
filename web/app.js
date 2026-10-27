@@ -7,6 +7,8 @@
   const enterButton = document.querySelector("#enterButton");
   const soundButton = document.querySelector("#soundButton");
   const cameraButton = document.querySelector("#cameraButton");
+  const cameraPreviewShell = document.querySelector("#cameraPreviewShell");
+  const cameraPreview = document.querySelector("#cameraPreview");
   const aboutButton = document.querySelector("#aboutButton");
   const aboutPanel = document.querySelector("#aboutPanel");
   const closeAbout = document.querySelector("#closeAbout");
@@ -63,6 +65,7 @@
       handsfree: null,
       hands: null,
       startupTimer: null,
+      previewTimer: null,
       lastFrameAt: 0,
       x: 0,
       y: 0,
@@ -256,10 +259,37 @@
     document.body.classList.remove("handsfree-started", "handsfree-loading");
   }
 
+  function hideCameraPreview() {
+    if (state.camera.previewTimer) window.clearTimeout(state.camera.previewTimer);
+    state.camera.previewTimer = null;
+    cameraPreviewShell.classList.remove("is-visible");
+    cameraPreviewShell.setAttribute("aria-hidden", "true");
+    cameraPreview.pause();
+    cameraPreview.srcObject = null;
+  }
+
+  function showCameraPreview(handsfree, attempt = 0) {
+    if (!state.camera.enabled || state.camera.handsfree !== handsfree) return;
+    const stream = handsfree.debug?.stream || handsfree.debug?.$video?.srcObject;
+    const hasLiveVideo = Boolean(stream?.getVideoTracks?.().some((track) => track.readyState === "live"));
+    if (!hasLiveVideo) {
+      if (attempt < 16) {
+        state.camera.previewTimer = window.setTimeout(() => showCameraPreview(handsfree, attempt + 1), 120);
+      }
+      return;
+    }
+    state.camera.previewTimer = null;
+    cameraPreview.srcObject = stream;
+    cameraPreview.play().catch(() => {});
+    cameraPreviewShell.classList.add("is-visible");
+    cameraPreviewShell.setAttribute("aria-hidden", "false");
+  }
+
   function stopCamera(message = "摄像头手势已关闭") {
     state.camera.requestToken += 1;
     cancelCameraGesture();
     if (state.camera.startupTimer) window.clearTimeout(state.camera.startupTimer);
+    hideCameraPreview();
     shutdownHandsfree(state.camera.handsfree);
     Object.assign(state.camera, {
       enabled: false,
@@ -268,6 +298,7 @@
       handsfree: null,
       hands: null,
       startupTimer: null,
+      previewTimer: null,
       presence: 0,
       presenceFrames: 0,
       absentFrames: 0,
@@ -343,8 +374,10 @@
           ready: true,
           starting: false,
           startupTimer: null,
+        previewTimer: null,
         });
         updateCameraButton("Handsfree 已开");
+        showCameraPreview(handsfree);
         hint.textContent = "一根食指可以逗小水母、拨触须；双指捏母体会出生";
       });
     } catch (error) {

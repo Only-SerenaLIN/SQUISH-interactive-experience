@@ -7,7 +7,7 @@
     <meta name="description" content="《不可触摸的柔软》——一件会呼吸、回弹，并记住每次触碰的浏览器交互艺术作品。" />
     <title>不可触摸的柔软 — Softness Without Touch</title>
     <link rel="stylesheet" href="https://unpkg.com/handsfree@8.5.1/build/lib/assets/handsfree.css" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=live-camera-1" />
   </head>
   <body>
     <main class="artwork" aria-label="《不可触摸的柔软》交互艺术作品">
@@ -32,6 +32,21 @@
           </button>
         </nav>
       </header>
+
+      <figure class="camera-preview" id="cameraPreviewShell" aria-hidden="true">
+        <video
+          class="camera-preview__video"
+          id="cameraPreview"
+          autoplay
+          muted
+          playsinline
+          aria-label="实时摄像头镜像预览"
+        ></video>
+        <figcaption class="camera-preview__label">
+          <span class="camera-preview__live" aria-hidden="true"></span>
+          镜中手势 · LIVE
+        </figcaption>
+      </figure>
 
       <section class="invitation" id="invitation" aria-labelledby="invitationTitle">
         <div class="invitation__copy">
@@ -68,6 +83,6 @@
       <div class="veil" id="veil" aria-hidden="true"></div>
     </main>
     <script src="https://unpkg.com/handsfree@8.5.1/build/lib/handsfree.js"></script>
-    <script src="app.js?v=open-hand-play-2"></script>
+    <script src="app.js?v=live-camera-1"></script>
   </body>
 </html>
