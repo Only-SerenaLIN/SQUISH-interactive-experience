@@ -891,40 +891,76 @@
     ctx.save();
     ctx.globalCompositeOperation = "screen";
     ctx.lineCap = "round";
-    const flowerY = size * 0.035;
+    const veinY = -size * 0.11;
     for (let vein = 0; vein < 20; vein += 1) {
       const angle = (vein / 20) * TAU;
       const endX = Math.cos(angle) * size * (0.72 + (vein % 3) * 0.05);
-      const endY = flowerY + Math.sin(angle) * size * 0.48;
+      const endY = veinY + Math.sin(angle) * size * 0.48;
       const bend = Math.sin(phase * 0.8 + vein * 1.7) * size * 0.055;
       ctx.beginPath();
-      ctx.moveTo(Math.cos(angle) * size * 0.24, flowerY + Math.sin(angle) * size * 0.13);
+      ctx.moveTo(Math.cos(angle) * size * 0.24, veinY + Math.sin(angle) * size * 0.13);
       ctx.quadraticCurveTo(endX * 0.58 + bend, endY * 0.56, endX, endY);
       ctx.strokeStyle = `rgba(232,251,255,${(0.11 + (vein % 4 === 0 ? 0.09 : 0)) * alpha})`;
       ctx.lineWidth = Math.max(0.45, size * 0.012);
       ctx.stroke();
     }
 
-    ctx.shadowBlur = size * 0.34;
-    ctx.shadowColor = `rgba(255,220,247,${0.9 * alpha})`;
-    for (let petal = 0; petal < 4; petal += 1) {
-      ctx.save();
-      ctx.translate(0, flowerY);
-      ctx.rotate((petal / 4) * TAU);
+    ctx.restore();
+
+    const expression = hue % 5;
+    const faceY = -size * 0.045;
+    const eyeX = size * 0.21;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = `rgba(42,55,96,${0.7 * alpha})`;
+    ctx.fillStyle = `rgba(42,55,96,${0.72 * alpha})`;
+    ctx.lineWidth = Math.max(0.75, size * 0.035);
+    const dotEye = (side) => {
       ctx.beginPath();
-      ctx.ellipse(0, -size * 0.13, size * 0.09, size * 0.14, 0, 0, TAU);
-      ctx.fillStyle = `rgba(255,231,250,${0.16 * alpha})`;
+      ctx.arc(side * eyeX, faceY, size * 0.042, 0, TAU);
       ctx.fill();
-      ctx.strokeStyle = `rgba(255,230,249,${0.82 * alpha})`;
-      ctx.lineWidth = Math.max(0.7, size * 0.036);
+    };
+    const closedEye = (side) => {
+      ctx.beginPath();
+      ctx.moveTo(side * eyeX - size * 0.065, faceY);
+      ctx.quadraticCurveTo(side * eyeX, faceY + size * 0.055, side * eyeX + size * 0.065, faceY);
       ctx.stroke();
-      ctx.restore();
+    };
+    if (expression === 0) {
+      dotEye(-1);
+      dotEye(1);
+      ctx.beginPath();
+      ctx.arc(0, faceY + size * 0.055, size * 0.13, 0.18, Math.PI - 0.18);
+      ctx.stroke();
+    } else if (expression === 1) {
+      closedEye(-1);
+      dotEye(1);
+      ctx.beginPath();
+      ctx.arc(0, faceY + size * 0.06, size * 0.12, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+    } else if (expression === 2) {
+      closedEye(-1);
+      closedEye(1);
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.07, faceY + size * 0.13);
+      ctx.quadraticCurveTo(0, faceY + size * 0.17, size * 0.07, faceY + size * 0.13);
+      ctx.stroke();
+    } else if (expression === 3) {
+      dotEye(-1);
+      dotEye(1);
+      ctx.beginPath();
+      ctx.arc(0, faceY + size * 0.13, size * 0.055, 0, TAU);
+      ctx.stroke();
+    } else {
+      closedEye(-1);
+      closedEye(1);
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.12, faceY + size * 0.09);
+      ctx.quadraticCurveTo(-size * 0.055, faceY + size * 0.17, 0, faceY + size * 0.105);
+      ctx.quadraticCurveTo(size * 0.055, faceY + size * 0.17, size * 0.12, faceY + size * 0.09);
+      ctx.stroke();
     }
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = `rgba(255,247,252,${0.74 * alpha})`;
-    ctx.beginPath();
-    ctx.arc(0, flowerY, size * 0.055, 0, TAU);
-    ctx.fill();
     ctx.restore();
 
     ctx.save();
@@ -1277,13 +1313,14 @@
     ctx.save();
     ctx.globalCompositeOperation = "screen";
     ctx.lineCap = "round";
-    const motherCoreY = state.center.y - radius * 0.49;
+    const motherVeinY = state.center.y - radius * 0.1;
+    const motherCoreY = state.center.y - radius * 0.66;
     for (let vein = 0; vein < 24; vein += 1) {
       const angle = (vein / 24) * TAU;
       const startX = state.center.x + Math.cos(angle) * radius * 0.23;
-      const startY = motherCoreY + Math.sin(angle) * radius * 0.14;
+      const startY = motherVeinY + Math.sin(angle) * radius * 0.14;
       const endX = state.center.x + Math.cos(angle) * radius * (0.7 + (vein % 3) * 0.025);
-      const endY = motherCoreY + Math.sin(angle) * radius * (0.5 + (vein % 2) * 0.018);
+      const endY = motherVeinY + Math.sin(angle) * radius * (0.5 + (vein % 2) * 0.018);
       const bend = Math.sin(state.elapsed * 0.32 + vein * 1.7) * radius * 0.022;
       ctx.beginPath();
       ctx.moveTo(startX, startY);
@@ -1335,9 +1372,10 @@
     ctx.globalCompositeOperation = "screen";
     ctx.shadowBlur = radius * 0.13;
     ctx.shadowColor = "rgba(255,218,241,0.68)";
+    ctx.translate(state.center.x, motherCoreY);
+    ctx.scale(1.28, 0.68);
     for (let petal = 0; petal < 4; petal += 1) {
       ctx.save();
-      ctx.translate(state.center.x, motherCoreY);
       ctx.rotate((petal / 4) * TAU);
       ctx.beginPath();
       ctx.ellipse(0, -radius * 0.068, radius * 0.048, radius * 0.074, 0, 0, TAU);
@@ -1351,7 +1389,7 @@
     ctx.shadowBlur = 0;
     ctx.fillStyle = "rgba(255,250,253,0.68)";
     ctx.beginPath();
-    ctx.arc(state.center.x, motherCoreY, radius * 0.032, 0, TAU);
+    ctx.arc(0, 0, radius * 0.032, 0, TAU);
     ctx.fill();
     ctx.restore();
 
