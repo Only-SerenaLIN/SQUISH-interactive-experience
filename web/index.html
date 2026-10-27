@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#d7c5ce" />
+    <meta name="description" content="《不可触摸的柔软》——一件会呼吸、回弹，并记住每次触碰的浏览器交互艺术作品。" />
+    <title>不可触摸的柔软 — Softness Without Touch</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="artwork" aria-label="《不可触摸的柔软》交互艺术作品">
+      <canvas id="world" aria-label="可按压和拉伸的柔软生命体" tabindex="0"></canvas>
+
+      <header class="topbar">
+        <a class="identity" href="#" aria-label="回到作品">
+          <span class="identity__cn">不可触摸的柔软</span>
+          <span class="identity__en">Softness Without Touch</span>
+        </a>
+        <nav class="controls" aria-label="作品控制">
+          <button id="soundButton" class="text-button" type="button" aria-pressed="false">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span class="button-copy">声音</span>
+          </button>
+          <button id="aboutButton" class="text-button" type="button" aria-expanded="false" aria-controls="aboutPanel">
+            关于作品
+          </button>
+        </nav>
+      </header>
+
+      <section class="invitation" id="invitation" aria-labelledby="invitationTitle">
+        <div class="invitation__copy">
+          <p class="eyebrow">A quiet digital encounter</p>
+          <h1 id="invitationTitle">有些柔软，<br />只能被想象。</h1>
+          <p class="invitation__note">按住它，慢慢移动，然后松手。</p>
+          <button id="enterButton" class="enter-button" type="button">
+            <span>靠近它</span>
+            <span class="enter-button__en">come closer</span>
+          </button>
+        </div>
+      </section>
+
+      <div class="bottomline" aria-live="polite">
+        <p id="hint" class="hint">按住 · 移动 · 松开</p>
+        <p class="memory-count"><span id="memoryCount">00</span> 枚触碰记忆</p>
+      </div>
+
+      <aside class="about" id="aboutPanel" aria-hidden="true">
+        <button id="closeAbout" class="close-button" type="button" aria-label="关闭作品说明">关闭</button>
+        <div class="about__inner">
+          <p class="eyebrow">Artist’s note</p>
+          <h2>它不需要被完成。</h2>
+          <p>这是一种生活在屏幕里的柔软生命。你无法真正触摸它，却可以让它凹陷、延展、呼吸和回弹。</p>
+          <p>每一次触碰都会在它体内留下一枚微小记忆。没有分数，也没有正确的方法；你们只是短暂地互相改变。</p>
+          <div class="about__divider"></div>
+          <p class="about__small">鼠标 / 单指拖动<br />Space 按压 · M 静音 · R 清除记忆</p>
+          <button id="resetButton" class="reset-button" type="button">重新成为陌生人</button>
+          <p class="disclaimer">本作品用于艺术体验，不是医疗或治疗工具。</p>
+        </div>
+      </aside>
+
+      <div class="veil" id="veil" aria-hidden="true"></div>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

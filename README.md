@@ -2,6 +2,16 @@
 
 Public repository: <https://github.com/Only-SerenaLIN/SQUISH-interactive-experience>
 
+## 浏览器作品：《不可触摸的柔软》
+
+项目现在包含一个视觉与交互均重新设计的独立网页作品。它不需要摄像头、Python 环境或任何安装：直接双击 `web/index.html`，即可用浏览器体验。鼠标或单指按住中央生命体，慢慢移动并松手；它会拉伸、回弹、发出柔和声音，并留下细微的触碰记忆。
+
+- `web/index.html`：网页作品入口
+- `WEB_ART_DIRECTION.md`：完整艺术设计与交互规格
+- 网页快捷键：`Space` 按压、`M` 静音、`R` 清除触碰记忆
+
+网页版本与下方的 Python 摄像头版本彼此独立，不会改变原有演示的运行方式。
+
 **SQUISH!** is a webcam-based augmented-reality co-creation experience built around a glossy, translucent 3D hydrogel ball. The mirrored live camera becomes the background and the ball follows the midpoint between two detected palms. Bring the palms together from any angle to compress it along the palm-to-palm line, rub them in opposite directions across that line to roll it round again, and release pressure to create a visual ripple and generated musical chord.
 
 The default **Ripple Jelly** mode is the focused Assignment 3 experience. Earlier Cyber Apple, Soft Blob, Crispy Peach, and Ramen Pack studies remain available as development experiments. If the camera is unavailable, the complete main interaction still works with the keyboard or mouse.
