@@ -6,6 +6,7 @@
   const invitation = document.querySelector("#invitation");
   const enterButton = document.querySelector("#enterButton");
   const soundButton = document.querySelector("#soundButton");
+  const cameraButton = document.querySelector("#cameraButton");
   const aboutButton = document.querySelector("#aboutButton");
   const aboutPanel = document.querySelector("#aboutPanel");
   const closeAbout = document.querySelector("#closeAbout");
@@ -53,6 +54,27 @@
     babies: [],
     dust: [],
     audio: null,
+    camera: {
+      enabled: false,
+      ready: false,
+      starting: false,
+      active: false,
+      stream: null,
+      video: null,
+      frameCanvas: null,
+      frameContext: null,
+      background: null,
+      warmupFrames: 0,
+      lastFrameAt: 0,
+      x: 0,
+      y: 0,
+      presence: 0,
+      presenceFrames: 0,
+      absentFrames: 0,
+      cursorAlpha: 0,
+      suspendedUntil: 0,
+      requestToken: 0,
+    },
   };
 
   const memorySeed = state.count;
@@ -187,6 +209,209 @@
     soundButton.setAttribute("aria-label", state.soundOn ? "关闭声音" : "开启声音");
   }
 
+  function updateCameraButton(label = "手势") {
+    cameraButton.setAttribute("aria-pressed", String(state.camera.enabled));
+    cameraButton.setAttribute("aria-label", state.camera.enabled ? "关闭摄像头手势" : "开启摄像头手势");
+    cameraButton.querySelector(".camera-copy").textContent = label;
+    cameraButton.classList.toggle("is-calibrating", state.camera.starting || (state.camera.enabled && !state.camera.ready));
+  }
+
+  function cancelCameraGesture() {
+    state.camera.active = false;
+    if (state.pointer.id === "camera") {
+      state.pointer.down = false;
+      state.pointer.id = null;
+      state.activeBaby = null;
+      canvas.classList.remove("is-touching");
+    }
+  }
+
+  function stopCamera(message = "摄像头手势已关闭") {
+    state.camera.requestToken += 1;
+    cancelCameraGesture();
+    if (state.camera.stream) {
+      state.camera.stream.getTracks().forEach((track) => track.stop());
+    }
+    if (state.camera.video) state.camera.video.srcObject = null;
+    Object.assign(state.camera, {
+      enabled: false,
+      ready: false,
+      starting: false,
+      stream: null,
+      video: null,
+      frameCanvas: null,
+      frameContext: null,
+      background: null,
+      warmupFrames: 0,
+      presence: 0,
+      presenceFrames: 0,
+      absentFrames: 0,
+      cursorAlpha: 0,
+    });
+    updateCameraButton();
+    if (message) hint.textContent = message;
+  }
+
+  async function startCamera() {
+    if (state.camera.starting || state.camera.enabled) return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      hint.textContent = "这个浏览器暂时无法使用摄像头手势";
+      return;
+    }
+    if (!state.entered) enter();
+    const requestToken = ++state.camera.requestToken;
+    state.camera.starting = true;
+    updateCameraButton("连接中");
+    hint.textContent = "正在请求摄像头权限";
+    let requestedStream = null;
+    try {
+      requestedStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: "user",
+          width: { ideal: 320 },
+          height: { ideal: 240 },
+          frameRate: { ideal: 20, max: 30 },
+        },
+      });
+      if (state.camera.requestToken !== requestToken) {
+        requestedStream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      const video = document.createElement("video");
+      video.autoplay = true;
+      video.muted = true;
+      video.playsInline = true;
+      video.srcObject = requestedStream;
+      await video.play();
+      const frameCanvas = document.createElement("canvas");
+      frameCanvas.width = 96;
+      frameCanvas.height = 72;
+      const frameContext = frameCanvas.getContext("2d", { willReadFrequently: true });
+      Object.assign(state.camera, {
+        enabled: true,
+        ready: false,
+        starting: false,
+        stream: requestedStream,
+        video,
+        frameCanvas,
+        frameContext,
+        background: new Float32Array(96 * 72 * 3),
+        warmupFrames: 0,
+        lastFrameAt: 0,
+        x: state.center.x,
+        y: state.center.y,
+        presence: 0,
+        presenceFrames: 0,
+        absentFrames: 0,
+        cursorAlpha: 0,
+      });
+      updateCameraButton("校准中");
+      hint.textContent = "请暂时保持画面不动，正在记住背景";
+    } catch (error) {
+      if (requestedStream) requestedStream.getTracks().forEach((track) => track.stop());
+      if (state.camera.requestToken !== requestToken) return;
+      state.camera.starting = false;
+      updateCameraButton();
+      const blocked = error?.name === "NotAllowedError" || error?.name === "SecurityError";
+      hint.textContent = blocked ? "没有获得摄像头权限，仍可用鼠标或触屏" : "摄像头暂时不可用，仍可继续触碰";
+    }
+  }
+
+  function toggleCamera() {
+    if (state.camera.enabled || state.camera.starting) stopCamera();
+    else startCamera();
+  }
+
+  function processCameraGesture(now) {
+    const camera = state.camera;
+    if (!camera.enabled || !camera.video || camera.video.readyState < 2 || now - camera.lastFrameAt < 78) return;
+    camera.lastFrameAt = now;
+    const width = camera.frameCanvas.width;
+    const height = camera.frameCanvas.height;
+    camera.frameContext.drawImage(camera.video, 0, 0, width, height);
+    const pixels = camera.frameContext.getImageData(0, 0, width, height).data;
+
+    if (camera.warmupFrames < 28) {
+      const blend = camera.warmupFrames === 0 ? 1 : 1 / (camera.warmupFrames + 1);
+      for (let pixel = 0, sample = 0; pixel < pixels.length; pixel += 4, sample += 3) {
+        camera.background[sample] = mix(camera.background[sample], pixels[pixel], blend);
+        camera.background[sample + 1] = mix(camera.background[sample + 1], pixels[pixel + 1], blend);
+        camera.background[sample + 2] = mix(camera.background[sample + 2], pixels[pixel + 2], blend);
+      }
+      camera.warmupFrames += 1;
+      if (camera.warmupFrames === 28) {
+        camera.ready = true;
+        updateCameraButton("手势已开");
+        hint.textContent = "把一只手慢慢伸进镜头，移动它触碰水母";
+      }
+      return;
+    }
+
+    let foreground = 0;
+    let totalWeight = 0;
+    let weightedX = 0;
+    let weightedY = 0;
+    for (let y = 0, pixel = 0, sample = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1, pixel += 4, sample += 3) {
+        const difference = (
+          Math.abs(pixels[pixel] - camera.background[sample]) +
+          Math.abs(pixels[pixel + 1] - camera.background[sample + 1]) +
+          Math.abs(pixels[pixel + 2] - camera.background[sample + 2])
+        ) / 3;
+        const backgroundBlend = difference < 34 ? 0.025 : 0.0007;
+        camera.background[sample] = mix(camera.background[sample], pixels[pixel], backgroundBlend);
+        camera.background[sample + 1] = mix(camera.background[sample + 1], pixels[pixel + 1], backgroundBlend);
+        camera.background[sample + 2] = mix(camera.background[sample + 2], pixels[pixel + 2], backgroundBlend);
+        if (difference > 42) {
+          const weight = Math.min(100, difference - 34);
+          foreground += 1;
+          totalWeight += weight;
+          weightedX += x * weight;
+          weightedY += y * weight;
+        }
+      }
+    }
+
+    const area = foreground / (width * height);
+    const present = totalWeight > 0 && area > 0.022 && area < 0.62;
+    if (present) {
+      const targetX = (1 - weightedX / totalWeight / width) * state.width;
+      const targetY = (weightedY / totalWeight / height) * state.height;
+      camera.x = mix(camera.x || targetX, targetX, 0.32);
+      camera.y = mix(camera.y || targetY, targetY, 0.32);
+      camera.presence = mix(camera.presence, clamp((area - 0.022) / 0.18, 0, 1), 0.28);
+      camera.presenceFrames += 1;
+      camera.absentFrames = 0;
+    } else {
+      camera.presence *= 0.82;
+      camera.presenceFrames = 0;
+      camera.absentFrames += 1;
+    }
+    camera.cursorAlpha = mix(camera.cursorAlpha, present ? 1 : 0, present ? 0.3 : 0.16);
+
+    const canControl = now >= camera.suspendedUntil && (!state.pointer.down || state.pointer.id === "camera");
+    if (present && canControl) {
+      if (!camera.active) {
+        const distance = Math.hypot(camera.x - state.center.x, camera.y - state.center.y);
+        if (camera.presenceFrames >= 3 && distance <= baseRadius() * 1.16) {
+          camera.active = true;
+          state.pointer = { x: camera.x, y: camera.y, down: true, id: "camera", startedAt: now };
+          state.touchAngle = Math.atan2(camera.y - state.center.y, camera.x - state.center.x);
+          canvas.classList.add("is-touching");
+          hint.textContent = "手势正在触碰它，移开手就会松开";
+        }
+      } else {
+        state.pointer.x = camera.x;
+        state.pointer.y = camera.y;
+        state.touchAngle = Math.atan2(camera.y - state.center.y, camera.x - state.center.x);
+      }
+    } else if (camera.active && camera.absentFrames >= 5) {
+      camera.active = false;
+      releasePointer();
+    }
+  }
+
   function showAbout(open) {
     aboutPanel.classList.toggle("is-open", open);
     veil.classList.toggle("is-visible", open);
@@ -209,6 +434,8 @@
 
   function pointerDown(event) {
     if (!state.entered || aboutPanel.classList.contains("is-open")) return;
+    if (state.camera.active) cancelCameraGesture();
+    state.camera.suspendedUntil = performance.now() + 1400;
     const point = pointerPosition(event);
     for (let i = state.babies.length - 1; i >= 0; i -= 1) {
       const baby = state.babies[i];
@@ -369,7 +596,11 @@
     const pointerDistance = Math.hypot(dx, dy);
     const holdTime = state.pointer.down ? (performance.now() - state.pointer.startedAt) / 1000 : 0;
     const mainActive = state.pointer.down && !state.activeBaby;
-    const targetPressure = mainActive ? clamp(0.28 + holdTime * 0.36, 0, 1) : 0;
+    const targetPressure = mainActive
+      ? state.pointer.id === "camera"
+        ? clamp(0.2 + state.camera.presence * 0.8, 0, 1)
+        : clamp(0.28 + holdTime * 0.36, 0, 1)
+      : 0;
     state.pressureVelocity += (targetPressure - state.pressure) * 16 * dt;
     state.pressureVelocity *= Math.pow(0.035, dt);
     state.pressure += state.pressureVelocity * dt * 7;
@@ -384,8 +615,10 @@
       state.contourAngle += shortestAngle(state.touchAngle, state.contourAngle) * contourEase * 0.58;
     }
 
-    const centerTargetX = state.width * 0.5 + (mainActive ? dx * 0.075 : 0);
-    const centerTargetY = state.height * 0.51 + (mainActive ? dy * 0.075 : 0);
+    const idleFloatX = reduceMotion ? 0 : Math.sin(state.elapsed * 0.31) * 3.8;
+    const idleFloatY = reduceMotion ? 0 : Math.sin(state.elapsed * 0.27 + 1.2) * 5.2;
+    const centerTargetX = state.width * 0.5 + idleFloatX + (mainActive ? dx * 0.075 : 0);
+    const centerTargetY = state.height * 0.51 + idleFloatY + (mainActive ? dy * 0.075 : 0);
     state.center.vx += (centerTargetX - state.center.x) * 8.5 * dt;
     state.center.vy += (centerTargetY - state.center.y) * 8.5 * dt;
     state.center.vx *= Math.pow(0.018, dt);
@@ -400,7 +633,7 @@
       const indentation = mainActive && inside ? -state.pressure * 0.24 * proximity : 0;
       const pull = mainActive && !inside ? clamp((pointerDistance - radius) / radius, 0, 0.72) * 0.66 * proximity : 0;
       const volume = mainActive ? state.pressure * 0.075 * (1 - proximity) - state.pressure * 0.025 * opposite : 0;
-      const breath = (reduceMotion ? 0.006 : 0.021) * Math.sin(state.elapsed * 0.92 + node.phase * 0.22);
+      const breath = (reduceMotion ? 0.006 : 0.026) * Math.sin(state.elapsed * 0.92 + node.phase * 0.22);
       const membrane = (reduceMotion ? 0.002 : 0.007) * Math.sin(state.elapsed * 0.55 + node.angle * 3 + node.phase);
       const target = indentation + pull + volume + breath + membrane;
       node.velocity += (target - node.value) * 31 * dt;
@@ -577,7 +810,7 @@
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(rotation);
-    const pulse = 1 + Math.sin(phase * 2) * 0.055;
+    const pulse = 1 + Math.sin(phase * 2) * (reduceMotion ? 0.025 : 0.072);
     ctx.scale(pulse, 1 / Math.sqrt(pulse));
     ctx.rotate(touchAngle);
     ctx.scale(1 - squash * 0.26, 1 + squash * 0.18);
@@ -615,7 +848,7 @@
       ctx.shadowBlur = size * 0.45;
       for (let i = -1; i <= 1; i += 1) {
         const rootX = i * size * 0.38;
-        const sway = Math.sin(phase + i * 1.2) * size * 0.22 * grown;
+        const sway = Math.sin(phase + i * 1.2) * size * (reduceMotion ? 0.16 : 0.29) * grown;
         ctx.beginPath();
         ctx.moveTo(rootX, size * 0.06);
         ctx.bezierCurveTo(
@@ -649,9 +882,12 @@
         ? baby.birthAngle - birthRotation
         : baby.touchAngle;
       const tentacleGrowth = easeOut(clamp((separatedAge - 0.08) / 0.62, 0, 1));
+      const idleMotion = baby.detached ? clamp(separatedAge / 1.2, 0, 1) : 0;
+      const idleX = Math.sin(baby.phase * 1.7 + baby.hue) * baby.size * 0.08 * idleMotion;
+      const idleY = Math.cos(baby.phase * 1.34 + baby.hue * 0.7) * baby.size * 0.06 * idleMotion;
       drawJellyfishBody(
-        baby.x,
-        baby.y,
+        baby.x + (reduceMotion ? 0 : idleX),
+        baby.y + (reduceMotion ? 0 : idleY),
         baby.size * (0.58 + clamp(baby.age / baby.birthDuration, 0, 1) * 0.42),
         baby.phase,
         baby.hue,
@@ -694,6 +930,28 @@
       }
       ctx.restore();
     });
+  }
+
+  function drawGestureCursor() {
+    const camera = state.camera;
+    if (!camera.enabled || !camera.ready || camera.cursorAlpha < 0.01) return;
+    const alpha = camera.cursorAlpha;
+    const radius = 18 + camera.presence * 22 + (camera.active ? Math.sin(state.elapsed * 4.2) * 2 : 0);
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    const glow = ctx.createRadialGradient(camera.x, camera.y, 0, camera.x, camera.y, radius * 2.2);
+    glow.addColorStop(0, `rgba(225,255,250,${0.28 * alpha})`);
+    glow.addColorStop(0.32, `rgba(126,229,220,${0.17 * alpha})`);
+    glow.addColorStop(1, "rgba(126,229,220,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(camera.x, camera.y, radius * 2.2, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = `rgba(225,255,250,${0.52 * alpha})`;
+    ctx.beginPath();
+    ctx.arc(camera.x, camera.y, 2.1 + camera.presence * 1.6, 0, TAU);
+    ctx.fill();
+    ctx.restore();
   }
 
   function drawContourMountainAura() {
@@ -963,6 +1221,7 @@
   function render(now) {
     const dt = Math.min((now - state.lastTime) / 1000, 0.033);
     state.lastTime = now;
+    processCameraGesture(now);
     update(dt);
     ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
     ctx.clearRect(0, 0, state.width, state.height);
@@ -971,6 +1230,7 @@
     drawRipples();
     drawContourMountainAura();
     drawCreature();
+    drawGestureCursor();
     requestAnimationFrame(render);
   }
 
@@ -980,6 +1240,7 @@
     if (state.soundOn) initAudio();
     updateSoundButton();
   });
+  cameraButton.addEventListener("click", toggleCamera);
   aboutButton.addEventListener("click", () => showAbout(true));
   closeAbout.addEventListener("click", () => showAbout(false));
   veil.addEventListener("click", () => showAbout(false));
@@ -995,6 +1256,7 @@
       state.soundOn = !state.soundOn;
       updateSoundButton();
     }
+    if (event.key.toLowerCase() === "c" && !event.repeat) toggleCamera();
     if (event.key.toLowerCase() === "r") resetMemories();
     if (event.code === "Space" && !event.repeat && state.entered) {
       event.preventDefault();
@@ -1015,8 +1277,14 @@
     }
   });
 
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && state.camera.enabled) stopCamera("");
+  });
+  window.addEventListener("beforeunload", () => stopCamera(""));
+
   memoryCount.textContent = String(state.count).padStart(2, "0");
   updateSoundButton();
+  updateCameraButton();
   resize();
   requestAnimationFrame(render);
 })();
