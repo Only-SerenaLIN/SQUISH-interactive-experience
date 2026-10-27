@@ -1,9 +1,9 @@
 :root {
-  color-scheme: light;
-  --ink: #29242f;
-  --paper: #f8f5f3;
-  --mist: rgba(248, 245, 243, 0.66);
-  --line: rgba(41, 36, 47, 0.16);
+  color-scheme: dark;
+  --ink: #dff7f3;
+  --paper: #effffc;
+  --mist: rgba(10, 43, 57, 0.68);
+  --line: rgba(177, 232, 226, 0.17);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -17,7 +17,7 @@ body {
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background: #d7c5ce;
+  background: #03121f;
   color: var(--ink);
   font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
 }
@@ -35,7 +35,7 @@ button {
 button:focus-visible,
 a:focus-visible,
 canvas:focus-visible {
-  outline: 1px solid rgba(41, 36, 47, 0.7);
+  outline: 1px solid rgba(182, 241, 234, 0.8);
   outline-offset: 5px;
 }
 
@@ -142,9 +142,9 @@ canvas:focus-visible {
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(224, 210, 216, 0.38);
-  backdrop-filter: blur(24px) saturate(80%);
-  -webkit-backdrop-filter: blur(24px) saturate(80%);
+  background: rgba(3, 24, 36, 0.54);
+  backdrop-filter: blur(24px) saturate(90%);
+  -webkit-backdrop-filter: blur(24px) saturate(90%);
   transition: opacity 1.4s var(--ease), visibility 1.4s;
 }
 
@@ -185,16 +185,16 @@ canvas:focus-visible {
 .enter-button {
   min-width: 158px;
   padding: 13px 25px 12px;
-  border: 1px solid rgba(41, 36, 47, 0.28);
+  border: 1px solid rgba(183, 239, 233, 0.34);
   border-radius: 999px;
-  background: rgba(248, 245, 243, 0.14);
+  background: rgba(109, 206, 203, 0.08);
   cursor: pointer;
   transition: color 300ms ease, background 300ms ease, transform 300ms var(--ease);
 }
 
 .enter-button:hover {
-  color: var(--paper);
-  background: rgba(41, 36, 47, 0.84);
+  color: #06212e;
+  background: rgba(205, 249, 243, 0.88);
   transform: translateY(-2px);
 }
 
@@ -243,10 +243,10 @@ canvas:focus-visible {
   width: min(480px, 100%);
   height: 100%;
   padding: max(30px, env(safe-area-inset-top)) clamp(30px, 5vw, 64px) max(30px, env(safe-area-inset-bottom));
-  background: rgba(246, 242, 240, 0.91);
+  background: rgba(4, 28, 41, 0.94);
   backdrop-filter: blur(30px);
   -webkit-backdrop-filter: blur(30px);
-  box-shadow: -28px 0 80px rgba(63, 44, 62, 0.08);
+  box-shadow: -28px 0 80px rgba(0, 4, 12, 0.3);
   transform: translateX(105%);
   transition: transform 800ms var(--ease);
 }
@@ -308,7 +308,7 @@ canvas:focus-visible {
   align-self: flex-start;
   margin-top: 6px;
   padding: 8px 0;
-  border-bottom: 1px solid rgba(41, 36, 47, 0.35);
+  border-bottom: 1px solid rgba(184, 238, 232, 0.38);
   background: transparent;
   font-size: 11px;
   letter-spacing: 0.12em;
@@ -325,7 +325,7 @@ canvas:focus-visible {
   position: fixed;
   z-index: 25;
   inset: 0;
-  background: rgba(72, 58, 75, 0.11);
+  background: rgba(0, 8, 17, 0.34);
   opacity: 0;
   visibility: hidden;
   transition: opacity 600ms ease, visibility 600ms;

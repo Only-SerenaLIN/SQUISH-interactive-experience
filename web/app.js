@@ -49,6 +49,7 @@
     })),
     memories: [],
     ripples: [],
+    babies: [],
     dust: [],
     audio: null,
   };
@@ -79,15 +80,15 @@
   }
 
   const palette = [
-    [232, 200, 207],
-    [175, 200, 214],
-    [201, 221, 212],
+    [126, 229, 220],
+    [139, 174, 255],
+    [230, 143, 211],
   ];
 
   const vortexPalette = [
-    [183, 133, 190],
-    [111, 167, 199],
-    [133, 190, 171],
+    [104, 221, 214],
+    [112, 173, 230],
+    [202, 126, 218],
   ];
 
   function resize() {
@@ -206,10 +207,32 @@
     canvas.classList.remove("is-touching");
     leaveMemory(strength);
     tone(strength, state.touchAngle);
-    hint.textContent = "它记住了这一次";
+    hint.textContent = "一只小水母游走了";
     window.setTimeout(() => {
-      if (!state.pointer.down) hint.textContent = "再触碰一次，或只是看它呼吸";
+      if (!state.pointer.down) hint.textContent = "再捏出一只，或只是看它们漂游";
     }, 2200);
+  }
+
+  function spawnBaby(strength, hue) {
+    const radius = baseRadius();
+    const pulledOut = state.dragDistance > radius * 0.04;
+    const surfaceX = state.center.x + Math.cos(state.touchAngle) * radius * 0.84;
+    const surfaceY = state.center.y + Math.sin(state.touchAngle) * radius * 0.84;
+    const originX = pulledOut ? mix(surfaceX, state.pointer.x, 0.58) : surfaceX;
+    const originY = pulledOut ? mix(surfaceY, state.pointer.y, 0.58) : surfaceY;
+    const size = 10 + strength * 8;
+    state.babies.push({
+      x: originX,
+      y: originY,
+      vx: Math.cos(state.touchAngle) * (5 + strength * 7),
+      vy: -7 - strength * 7,
+      size,
+      strength,
+      hue,
+      phase: state.count * 0.91 + Math.random() * 0.5,
+      age: 0,
+    });
+    if (state.babies.length > 18) state.babies.shift();
   }
 
   function leaveMemory(strength) {
@@ -233,6 +256,7 @@
       strength,
       hue,
     });
+    spawnBaby(strength, hue);
     memoryCount.textContent = String(state.count).padStart(2, "0");
   }
 
@@ -240,6 +264,7 @@
     state.count = 0;
     state.memories.length = 0;
     state.ripples.length = 0;
+    state.babies.length = 0;
     localStorage.removeItem("softness-memory-count");
     memoryCount.textContent = "00";
     hint.textContent = "它又一次，与你素不相识";
@@ -294,6 +319,18 @@
 
     state.ripples.forEach((ripple) => { ripple.age += dt; });
     state.ripples = state.ripples.filter((ripple) => ripple.age < 3.4);
+
+    state.babies.forEach((baby) => {
+      baby.age += dt;
+      baby.phase += dt * (0.42 + baby.strength * 0.16);
+      baby.vx *= Math.pow(0.72, dt);
+      baby.vy = mix(baby.vy, -4.2 - baby.strength * 2.2, 1 - Math.pow(0.3, dt));
+      baby.x += (baby.vx + Math.sin(baby.phase * 0.8) * 3.2) * dt;
+      baby.y += baby.vy * dt;
+      if (baby.y < -baby.size * 4) baby.y = state.height + baby.size * 3;
+      if (baby.x < -baby.size * 3) baby.x = state.width + baby.size * 2;
+      if (baby.x > state.width + baby.size * 3) baby.x = -baby.size * 2;
+    });
   }
 
   function blobPoint(node, radius, offset = 0) {
@@ -325,17 +362,17 @@
     const w = state.width;
     const h = state.height;
     const time = state.elapsed * (reduceMotion ? 0.03 : 0.12);
-    const gradient = ctx.createLinearGradient(0, 0, w, h);
-    gradient.addColorStop(0, "#ead9d9");
-    gradient.addColorStop(0.43, "#d8ccd7");
-    gradient.addColorStop(1, "#b7c6ce");
+    const gradient = ctx.createLinearGradient(0, 0, 0, h);
+    gradient.addColorStop(0, "#0a3144");
+    gradient.addColorStop(0.42, "#082638");
+    gradient.addColorStop(1, "#020b16");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, w, h);
 
     const clouds = [
-      { x: 0.16 + Math.sin(time * 0.31) * 0.03, y: 0.2, r: 0.42, c: "rgba(248,235,232,0.36)" },
-      { x: 0.83 + Math.cos(time * 0.22) * 0.04, y: 0.32, r: 0.34, c: "rgba(198,217,217,0.27)" },
-      { x: 0.56 + Math.sin(time * 0.17) * 0.05, y: 0.88, r: 0.4, c: "rgba(168,150,186,0.22)" },
+      { x: 0.16 + Math.sin(time * 0.31) * 0.03, y: 0.2, r: 0.42, c: "rgba(68,176,184,0.13)" },
+      { x: 0.83 + Math.cos(time * 0.22) * 0.04, y: 0.32, r: 0.34, c: "rgba(72,109,172,0.13)" },
+      { x: 0.56 + Math.sin(time * 0.17) * 0.05, y: 0.88, r: 0.4, c: "rgba(87,49,123,0.16)" },
     ];
     clouds.forEach((cloud) => {
       const max = Math.max(w, h) * cloud.r;
@@ -346,13 +383,79 @@
       ctx.fillRect(0, 0, w, h);
     });
 
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    for (let beam = 0; beam < 4; beam += 1) {
+      const topX = w * (0.12 + beam * 0.25 + Math.sin(time * 0.25 + beam) * 0.018);
+      const beamGradient = ctx.createLinearGradient(topX, 0, topX + w * 0.12, h * 0.86);
+      beamGradient.addColorStop(0, "rgba(123,226,223,0.12)");
+      beamGradient.addColorStop(0.58, "rgba(95,181,190,0.035)");
+      beamGradient.addColorStop(1, "rgba(75,150,168,0)");
+      ctx.fillStyle = beamGradient;
+      ctx.beginPath();
+      ctx.moveTo(topX - w * 0.025, 0);
+      ctx.lineTo(topX + w * 0.045, 0);
+      ctx.lineTo(topX + w * (0.16 + beam * 0.018), h);
+      ctx.lineTo(topX + w * 0.02, h);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+
     state.dust.forEach((mote) => {
       const x = ((mote.x + time * mote.speed) % 1.08) * w - w * 0.04;
       const y = (mote.y + Math.sin(time * 0.4 + mote.phase) * 0.02) * h;
       ctx.beginPath();
-      ctx.fillStyle = `rgba(255,255,255,${mote.alpha})`;
+      ctx.fillStyle = `rgba(151,226,224,${mote.alpha * 0.82})`;
       ctx.arc(x, y, mote.size, 0, TAU);
       ctx.fill();
+      if (mote.size > 1.3) {
+        ctx.strokeStyle = `rgba(185,242,239,${mote.alpha * 0.52})`;
+        ctx.lineWidth = 0.6;
+        ctx.stroke();
+      }
+    });
+  }
+
+  function drawJellyfishBody(x, y, size, phase, hue, alpha = 1) {
+    const c = palette[hue % palette.length];
+    ctx.save();
+    ctx.translate(x, y);
+    const pulse = 1 + Math.sin(phase * 2) * 0.055;
+    ctx.scale(pulse, 1 / Math.sqrt(pulse));
+    ctx.shadowBlur = size * 1.15;
+    ctx.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},${0.42 * alpha})`;
+    const bell = ctx.createRadialGradient(-size * 0.22, -size * 0.34, 0, 0, 0, size * 1.05);
+    bell.addColorStop(0, `rgba(236,255,255,${0.78 * alpha})`);
+    bell.addColorStop(0.5, `rgba(${c[0]},${c[1]},${c[2]},${0.48 * alpha})`);
+    bell.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},${0.08 * alpha})`);
+    ctx.beginPath();
+    ctx.moveTo(-size, 0);
+    ctx.bezierCurveTo(-size * 0.92, -size * 1.1, size * 0.92, -size * 1.1, size, 0);
+    ctx.quadraticCurveTo(size * 0.48, size * 0.18, 0, size * 0.04);
+    ctx.quadraticCurveTo(-size * 0.48, size * 0.18, -size, 0);
+    ctx.closePath();
+    ctx.fillStyle = bell;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(205,252,250,${0.48 * alpha})`;
+    ctx.lineWidth = Math.max(0.7, size * 0.045);
+    ctx.stroke();
+    ctx.shadowBlur = size * 0.45;
+    for (let i = -1; i <= 1; i += 1) {
+      const sway = Math.sin(phase + i * 1.2) * size * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(i * size * 0.38, size * 0.06);
+      ctx.bezierCurveTo(i * size * 0.32 + sway, size * 0.58, i * size * 0.18 - sway, size * 0.9, i * size * 0.28 + sway, size * 1.38);
+      ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${(0.42 - Math.abs(i) * 0.07) * alpha})`;
+      ctx.lineWidth = Math.max(0.65, size * 0.035);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawBabyJellyfish() {
+    state.babies.forEach((baby) => {
+      drawJellyfishBody(baby.x, baby.y, baby.size, baby.phase, baby.hue, clamp(baby.age / 0.8, 0.12, 1));
     });
   }
 
@@ -437,22 +540,44 @@
     ctx.save();
 
     ctx.save();
-    ctx.translate(state.center.x, state.center.y + radius * 1.02);
-    ctx.scale(1.18, 0.2);
-    const shadow = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
-    shadow.addColorStop(0, "rgba(61,47,65,0.17)");
-    shadow.addColorStop(0.58, "rgba(61,47,65,0.06)");
-    shadow.addColorStop(1, "rgba(61,47,65,0)");
-    ctx.fillStyle = shadow;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, TAU);
-    ctx.fill();
+    const halo = ctx.createRadialGradient(state.center.x, state.center.y, radius * 0.28, state.center.x, state.center.y, radius * 1.72);
+    halo.addColorStop(0, "rgba(129,229,223,0.13)");
+    halo.addColorStop(0.52, "rgba(104,162,207,0.07)");
+    halo.addColorStop(1, "rgba(45,99,126,0)");
+    ctx.fillStyle = halo;
+    ctx.fillRect(state.center.x - radius * 1.8, state.center.y - radius * 1.8, radius * 3.6, radius * 3.6);
+    ctx.restore();
+
+    ctx.save();
+    ctx.lineCap = "round";
+    for (let i = -3; i <= 3; i += 1) {
+      const rootX = state.center.x + i * radius * 0.18;
+      const rootY = state.center.y + radius * (0.58 + Math.abs(i) * 0.018);
+      const sway = Math.sin(state.elapsed * 0.62 + i * 0.78) * radius * (0.12 + Math.abs(i) * 0.012);
+      const length = radius * (0.72 + (3 - Math.abs(i)) * 0.095);
+      ctx.beginPath();
+      ctx.moveTo(rootX, rootY);
+      ctx.bezierCurveTo(
+        rootX + sway,
+        rootY + length * 0.3,
+        rootX - sway * 0.72,
+        rootY + length * 0.68,
+        rootX + sway * 0.45,
+        rootY + length,
+      );
+      const c = palette[(i + 6) % palette.length];
+      ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${0.22 + (3 - Math.abs(i)) * 0.035})`;
+      ctx.lineWidth = radius * (0.014 + (3 - Math.abs(i)) * 0.0025);
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},0.28)`;
+      ctx.stroke();
+    }
     ctx.restore();
 
     ctx.save();
     ctx.filter = `blur(${Math.round(radius * 0.055)}px)`;
     traceBlob(radius + 4);
-    ctx.fillStyle = "rgba(236,225,236,0.2)";
+    ctx.fillStyle = "rgba(112,220,218,0.16)";
     ctx.fill();
     ctx.restore();
 
@@ -465,10 +590,10 @@
       state.center.y + radius * 0.12,
       radius * 1.16,
     );
-    body.addColorStop(0, "rgba(255,253,250,0.95)");
-    body.addColorStop(0.35, "rgba(247,239,241,0.82)");
-    body.addColorStop(0.72, "rgba(207,209,220,0.62)");
-    body.addColorStop(1, "rgba(150,143,174,0.42)");
+    body.addColorStop(0, "rgba(232,255,253,0.9)");
+    body.addColorStop(0.32, "rgba(151,226,224,0.68)");
+    body.addColorStop(0.7, "rgba(91,148,190,0.48)");
+    body.addColorStop(1, "rgba(91,73,158,0.36)");
     ctx.fillStyle = body;
     ctx.fill();
 
@@ -477,10 +602,10 @@
     ctx.clip();
 
     const wash = ctx.createLinearGradient(state.center.x - radius, state.center.y - radius, state.center.x + radius, state.center.y + radius);
-    wash.addColorStop(0, "rgba(255,226,220,0.28)");
+    wash.addColorStop(0, "rgba(163,247,237,0.24)");
     wash.addColorStop(0.45, "rgba(255,255,255,0.04)");
-    wash.addColorStop(0.73, "rgba(183,216,216,0.24)");
-    wash.addColorStop(1, "rgba(171,151,197,0.27)");
+    wash.addColorStop(0.73, "rgba(119,182,231,0.22)");
+    wash.addColorStop(1, "rgba(188,116,211,0.22)");
     traceBlob(radius - 4);
     ctx.fillStyle = wash;
     ctx.fill();
@@ -498,6 +623,23 @@
       ctx.arc(x, y, sweep, phase + 0.2, phase + 1.42);
       ctx.stroke();
     }
+
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    for (let rib = -3; rib <= 3; rib += 1) {
+      ctx.beginPath();
+      ctx.moveTo(state.center.x + rib * radius * 0.045, state.center.y - radius * 0.7);
+      ctx.quadraticCurveTo(
+        state.center.x + rib * radius * 0.14,
+        state.center.y - radius * 0.05,
+        state.center.x + rib * radius * 0.2,
+        state.center.y + radius * 0.55,
+      );
+      ctx.strokeStyle = `rgba(176,241,236,${0.1 + (3 - Math.abs(rib)) * 0.018})`;
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+    ctx.restore();
 
     state.memories.forEach((memory) => {
       const drift = Math.sin(state.elapsed * 0.34 + memory.phase) * 0.025;
@@ -530,10 +672,10 @@
 
     ctx.save();
     traceBlob(radius);
-    ctx.strokeStyle = "rgba(194,181,210,0.26)";
+    ctx.strokeStyle = "rgba(141,230,224,0.38)";
     ctx.lineWidth = 2.2;
     ctx.shadowBlur = 10;
-    ctx.shadowColor = "rgba(246,236,246,0.38)";
+    ctx.shadowColor = "rgba(113,232,223,0.44)";
     ctx.stroke();
     ctx.restore();
 
@@ -563,6 +705,7 @@
     ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
     ctx.clearRect(0, 0, state.width, state.height);
     drawBackground();
+    drawBabyJellyfish();
     drawRipples();
     drawContourMountainAura();
     drawCreature();
