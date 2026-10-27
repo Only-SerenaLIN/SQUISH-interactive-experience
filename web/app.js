@@ -32,6 +32,10 @@
     pressureVelocity: 0,
     touchAngle: -Math.PI / 2,
     dragDistance: 0,
+    contourPressure: 0,
+    contourDrag: 0,
+    contourAngle: -Math.PI / 2,
+    contourRelease: 0,
     entered: false,
     soundOn: true,
     lastTime: performance.now(),
@@ -256,6 +260,14 @@
     state.pressure = clamp(state.pressure, -0.12, 1.08);
     state.dragDistance = state.pointer.down ? Math.max(0, pointerDistance - radius * 0.72) : mix(state.dragDistance, 0, 1 - Math.pow(0.02, dt));
 
+    const contourEase = 1 - Math.pow(0.16, dt);
+    state.contourPressure = mix(state.contourPressure, clamp(state.pressure, 0, 1), contourEase);
+    state.contourDrag = mix(state.contourDrag, clamp(state.dragDistance / radius, 0, 0.85), contourEase);
+    state.contourRelease = mix(state.contourRelease, clamp(-state.pressureVelocity * 0.34, 0, 1), contourEase * 0.72);
+    if (state.pointer.down) {
+      state.contourAngle += shortestAngle(state.touchAngle, state.contourAngle) * contourEase * 0.58;
+    }
+
     const centerTargetX = state.width * 0.5 + (state.pointer.down ? dx * 0.075 : 0);
     const centerTargetY = state.height * 0.51 + (state.pointer.down ? dy * 0.075 : 0);
     state.center.vx += (centerTargetX - state.center.x) * 8.5 * dt;
@@ -360,129 +372,62 @@
     });
   }
 
-  function drawMemoryLandscape() {
-    if (state.memories.length === 0) return;
-    const memories = state.memories.slice(-18);
-    const w = state.width;
-    const h = state.height;
-    const baseline = h * 0.88;
-    const samples = Math.max(70, Math.floor(w / 12));
-    const ridges = 8;
-
-    ctx.save();
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    for (let ridge = 0; ridge < ridges; ridge += 1) {
-      ctx.beginPath();
-      for (let sample = 0; sample <= samples; sample += 1) {
-        const x = (sample / samples) * w;
-        const nx = x / w;
-        let lift = 0;
-        memories.forEach((memory, index) => {
-          const spread = 0.07 + (index % 4) * 0.012 + ridge * 0.006;
-          const distance = (nx - memory.landX) / spread;
-          const peak = Math.exp(-distance * distance * 0.78) * memory.landPeak * h;
-          lift = Math.max(lift, peak);
-        });
-        const contour = lift * (1 - ridge * 0.072);
-        const fingerprintWave = Math.sin(nx * 24 + ridge * 0.82) * (1.4 + ridge * 0.16);
-        const y = baseline + ridge * 8.2 - contour + fingerprintWave;
-        if (sample === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      const alpha = 0.08 + (ridges - ridge) * 0.012;
-      ctx.strokeStyle = `rgba(88,75,104,${alpha})`;
-      ctx.lineWidth = ridge === 0 ? 1.25 : 0.8;
-      ctx.stroke();
-    }
-
-    memories.slice(-10).forEach((memory, index) => {
-      const x = memory.landX * w;
-      const peakY = baseline - memory.landPeak * h;
-      const width = clamp(w * 0.018 + memory.size * 1.7, 13, 31);
-      ctx.save();
-      ctx.translate(x, peakY + 7);
-      ctx.rotate((memory.phase % 0.5) - 0.25);
-      for (let ring = 0; ring < 4; ring += 1) {
-        ctx.beginPath();
-        ctx.ellipse(0, 0, width + ring * 4.2, width * 0.46 + ring * 3.1, 0, Math.PI * 1.08, Math.PI * 1.94);
-        ctx.strokeStyle = `rgba(88,75,104,${0.13 - ring * 0.017})`;
-        ctx.lineWidth = 0.75;
-        ctx.stroke();
-      }
-      ctx.restore();
-    });
-    ctx.restore();
-  }
-
-  function drawFingerprintVortex() {
+  function drawContourMountainAura() {
     const radius = baseRadius();
-    const pressure = clamp(state.pressure, 0, 1);
-    const drag = clamp(state.dragDistance / radius, 0, 0.85);
-    const release = clamp(-state.pressureVelocity * 0.42, 0, 1);
+    const pressure = state.contourPressure;
+    const drag = state.contourDrag;
+    const release = state.contourRelease;
+    const memories = state.memories.slice(-18);
     const memoryComplexity = clamp(state.memories.length / 18, 0, 1);
-    const ringCount = 7 + Math.round(memoryComplexity * 3);
-    const phase = state.elapsed * (0.07 + pressure * 0.3) + drag * 0.34;
-    const energy = 0.28 + pressure * 0.72 + drag * 0.28 + release * 0.44;
+    const ringCount = 8 + Math.round(memoryComplexity * 3);
+    const energy = 0.24 + pressure * 0.58 + drag * 0.22 + release * 0.28;
     const orbitStart = radius * 1.07;
-    const orbitLimit = Math.min(radius * 1.68, Math.min(state.width, state.height) * 0.455);
+    const orbitLimit = Math.min(radius * 1.62, Math.min(state.width, state.height) * 0.455);
     const orbitGap = Math.max(2.2, (orbitLimit - orbitStart) / Math.max(1, ringCount - 1));
 
     ctx.save();
     ctx.translate(state.center.x, state.center.y);
-    ctx.rotate(state.touchAngle);
-    ctx.scale(1 - pressure * 0.055 + release * 0.045, 1 + pressure * 0.075 + drag * 0.04);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
     for (let ring = 0; ring < ringCount; ring += 1) {
       const c = vortexPalette[(ring + state.count) % vortexPalette.length];
       const base = orbitStart + ring * orbitGap + release * radius * 0.065;
-      const alpha = (0.16 + energy * 0.13) * (1 - ring / (ringCount * 1.8));
-      const ringPhase = phase * (ring % 2 === 0 ? 1 : -0.7) + ring * 0.47;
-
-      for (let segment = 0; segment < 3; segment += 1) {
-        const start = ringPhase * 0.18 + segment * 2.13 + ring * 0.08;
-        const length = 1.55 + Math.sin(ring * 1.7 + segment) * 0.19;
-        const steps = 32;
-        ctx.beginPath();
-        for (let step = 0; step <= steps; step += 1) {
-          const t = step / steps;
-          const angle = start + length * t;
-          const touchPull = Math.exp(-Math.pow(shortestAngle(angle, 0) / 0.54, 2));
-          const membrane = Math.sin(angle * 3 + ring * 0.72 + phase) * radius * 0.008;
-          const spiral = (t - 0.5) * radius * (0.025 + ring * 0.0028);
-          const localRadius =
-            base + membrane + spiral - pressure * radius * 0.075 * touchPull + drag * radius * 0.12 * touchPull;
-          const x = Math.cos(angle) * localRadius;
-          const y = Math.sin(angle) * localRadius * (0.93 + Math.sin(ring * 0.8) * 0.018);
-          if (step === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.shadowBlur = 7 + energy * 14;
-        ctx.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},${Math.min(0.62, alpha * 1.8)})`;
-        ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
-        ctx.lineWidth = 0.82 + energy * 0.64 - ring * 0.018;
-        ctx.stroke();
-      }
-    }
-
-    const sparks = 5 + Math.round(pressure * 4);
-    for (let i = 0; i < sparks; i += 1) {
-      const angle = phase * (1.2 + i * 0.06) + i * (TAU / sparks);
-      const orbit = radius * (1.24 + (i % 3) * 0.13) + release * radius * 0.07;
-      const x = Math.cos(angle) * orbit;
-      const y = Math.sin(angle) * orbit * 0.94;
-      const glowRadius = 2.1 + energy * 2.4;
-      const glow = ctx.createRadialGradient(x, y, 0, x, y, glowRadius * 3.4);
-      const c = vortexPalette[i % vortexPalette.length];
-      glow.addColorStop(0, `rgba(255,255,255,${0.48 + energy * 0.18})`);
-      glow.addColorStop(0.28, `rgba(${c[0]},${c[1]},${c[2]},${0.34 + energy * 0.16})`);
-      glow.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
-      ctx.fillStyle = glow;
+      const alpha = (0.17 + energy * 0.13) * (1 - ring / (ringCount * 1.9));
+      const steps = 150;
       ctx.beginPath();
-      ctx.arc(x, y, glowRadius * 3.4, 0, TAU);
-      ctx.fill();
+      for (let step = 0; step <= steps; step += 1) {
+        const angle = (step / steps) * TAU;
+        const touchPull = Math.exp(-Math.pow(shortestAngle(angle, state.contourAngle) / 0.62, 2));
+        const opposite = Math.exp(-Math.pow(shortestAngle(angle, state.contourAngle + Math.PI) / 0.9, 2));
+        let mountain = 0;
+        memories.forEach((memory, index) => {
+          const peakAngle = memory.landX * TAU - Math.PI / 2;
+          const spread = 0.17 + (index % 4) * 0.025 + ring * 0.004;
+          const distance = shortestAngle(angle, peakAngle) / spread;
+          const peak = Math.exp(-distance * distance * 0.72) * memory.landPeak * radius * 0.56;
+          mountain = Math.max(mountain, peak);
+        });
+        const fingerprint =
+          Math.sin(angle * 3 + ring * 0.76) * radius * 0.009 +
+          Math.sin(angle * 7 - ring * 0.31) * radius * 0.0035;
+        const slowBreath = reduceMotion ? 0 : Math.sin(state.elapsed * 0.38 + ring * 0.58) * radius * 0.002;
+        const deformation =
+          -pressure * radius * 0.072 * touchPull +
+          drag * radius * 0.11 * touchPull +
+          pressure * radius * 0.026 * opposite;
+        const localRadius = base + mountain + fingerprint + slowBreath + deformation;
+        const x = Math.cos(angle) * localRadius;
+        const y = Math.sin(angle) * localRadius * (0.945 + ring * 0.0018);
+        if (step === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.shadowBlur = 5 + energy * 10;
+      ctx.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},${Math.min(0.5, alpha * 1.55)})`;
+      ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
+      ctx.lineWidth = 0.78 + energy * 0.5 - ring * 0.01;
+      ctx.stroke();
     }
     ctx.restore();
   }
@@ -618,9 +563,8 @@
     ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
     ctx.clearRect(0, 0, state.width, state.height);
     drawBackground();
-    drawMemoryLandscape();
     drawRipples();
-    drawFingerprintVortex();
+    drawContourMountainAura();
     drawCreature();
     requestAnimationFrame(render);
   }
