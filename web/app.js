@@ -910,9 +910,12 @@
     for (let petal = 0; petal < 4; petal += 1) {
       ctx.save();
       ctx.translate(0, flowerY);
-      ctx.rotate((petal / 4) * TAU + Math.PI / 4);
+      ctx.rotate((petal / 4) * TAU);
       ctx.beginPath();
-      ctx.ellipse(0, -size * 0.16, size * 0.105, size * 0.205, 0, 0, TAU);
+      ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(-size * 0.11, -size * 0.04, -size * 0.12, -size * 0.23, 0, -size * 0.27);
+      ctx.bezierCurveTo(size * 0.12, -size * 0.23, size * 0.11, -size * 0.04, 0, 0);
+      ctx.closePath();
       ctx.fillStyle = `rgba(255,231,250,${0.16 * alpha})`;
       ctx.fill();
       ctx.strokeStyle = `rgba(255,230,249,${0.82 * alpha})`;
@@ -1276,19 +1279,25 @@
 
     ctx.save();
     ctx.globalCompositeOperation = "screen";
-    for (let rib = -6; rib <= 6; rib += 1) {
+    ctx.lineCap = "round";
+    const motherCoreY = state.center.y - radius * 0.34;
+    for (let vein = 0; vein < 24; vein += 1) {
+      const angle = (vein / 24) * TAU;
+      const startX = state.center.x + Math.cos(angle) * radius * 0.23;
+      const startY = motherCoreY + Math.sin(angle) * radius * 0.14;
+      const endX = state.center.x + Math.cos(angle) * radius * (0.7 + (vein % 3) * 0.025);
+      const endY = motherCoreY + Math.sin(angle) * radius * (0.5 + (vein % 2) * 0.018);
+      const bend = Math.sin(state.elapsed * 0.32 + vein * 1.7) * radius * 0.022;
       ctx.beginPath();
-      ctx.moveTo(state.center.x + rib * radius * 0.018, state.center.y - radius * 0.62);
-      ctx.bezierCurveTo(
-        state.center.x + rib * radius * 0.055,
-        state.center.y - radius * 0.34,
-        state.center.x + rib * radius * 0.105,
-        state.center.y + radius * 0.12,
-        state.center.x + rib * radius * 0.128,
-        state.center.y + radius * 0.47,
+      ctx.moveTo(startX, startY);
+      ctx.quadraticCurveTo(
+        (startX + endX) * 0.5 + bend,
+        (startY + endY) * 0.5,
+        endX,
+        endY,
       );
-      ctx.strokeStyle = `rgba(255,226,241,${0.1 + (6 - Math.abs(rib)) * 0.012})`;
-      ctx.lineWidth = Math.max(0.65, radius * 0.0055);
+      ctx.strokeStyle = `rgba(255,234,246,${0.1 + (vein % 4 === 0 ? 0.08 : 0)})`;
+      ctx.lineWidth = Math.max(0.55, radius * 0.0048);
       ctx.stroke();
     }
     ctx.restore();
@@ -1325,40 +1334,62 @@
     ctx.stroke();
     ctx.shadowBlur = 0;
 
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.shadowBlur = radius * 0.13;
+    ctx.shadowColor = "rgba(255,218,241,0.68)";
+    for (let petal = 0; petal < 4; petal += 1) {
+      ctx.save();
+      ctx.translate(state.center.x, motherCoreY);
+      ctx.rotate((petal / 4) * TAU);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(-radius * 0.057, -radius * 0.02, -radius * 0.062, -radius * 0.115, 0, -radius * 0.135);
+      ctx.bezierCurveTo(radius * 0.062, -radius * 0.115, radius * 0.057, -radius * 0.02, 0, 0);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(255,235,248,0.1)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,232,247,0.62)";
+      ctx.lineWidth = Math.max(1.1, radius * 0.014);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(255,250,253,0.68)";
+    ctx.beginPath();
+    ctx.arc(state.center.x, motherCoreY, radius * 0.032, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+
     const blinkCycle = state.elapsed % 8.2;
     const blink = blinkCycle > 7.72 ? Math.abs(blinkCycle - 7.96) / 0.24 : 1;
-    const eyeY = state.center.y + radius * 0.02;
+    const eyeY = state.center.y + radius * 0.035;
     [-1, 1].forEach((side) => {
       const x = state.center.x + side * radius * 0.112;
       ctx.beginPath();
-      ctx.fillStyle = "rgba(91,36,77,0.66)";
+      ctx.fillStyle = "rgba(91,36,77,0.64)";
       ctx.ellipse(x, eyeY, radius * 0.018, Math.max(0.7, radius * 0.031 * blink), 0, 0, TAU);
       ctx.fill();
       ctx.beginPath();
-      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.fillStyle = "rgba(255,255,255,0.72)";
       ctx.arc(x - radius * 0.005, eyeY - radius * 0.009, radius * 0.0045, 0, TAU);
       ctx.fill();
     });
     ctx.beginPath();
-    ctx.strokeStyle = "rgba(101,42,83,0.55)";
-    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = "rgba(101,42,83,0.52)";
+    ctx.lineWidth = Math.max(1.1, radius * 0.007);
     ctx.lineCap = "round";
-    ctx.arc(state.center.x, eyeY + radius * 0.045, radius * 0.055, 0.16, Math.PI - 0.16);
+    ctx.arc(state.center.x, eyeY + radius * 0.044, radius * 0.052, 0.16, Math.PI - 0.16);
     ctx.stroke();
     [-1, 1].forEach((side) => {
-      const blush = ctx.createRadialGradient(
-        state.center.x + side * radius * 0.22,
-        eyeY + radius * 0.055,
-        0,
-        state.center.x + side * radius * 0.22,
-        eyeY + radius * 0.055,
-        radius * 0.055,
-      );
-      blush.addColorStop(0, "rgba(255,119,181,0.42)");
+      const blushX = state.center.x + side * radius * 0.22;
+      const blushY = eyeY + radius * 0.054;
+      const blush = ctx.createRadialGradient(blushX, blushY, 0, blushX, blushY, radius * 0.05);
+      blush.addColorStop(0, "rgba(255,119,181,0.3)");
       blush.addColorStop(1, "rgba(255,119,181,0)");
       ctx.fillStyle = blush;
       ctx.beginPath();
-      ctx.arc(state.center.x + side * radius * 0.22, eyeY + radius * 0.055, radius * 0.055, 0, TAU);
+      ctx.arc(blushX, blushY, radius * 0.05, 0, TAU);
       ctx.fill();
     });
     ctx.restore();
