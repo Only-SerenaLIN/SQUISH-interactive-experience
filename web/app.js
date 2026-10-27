@@ -439,7 +439,7 @@
             radius: baby.size,
           });
           popTone(baby.strength, baby.birthAngle);
-          hint.textContent = "啵——它学会自己游了";
+          hint.textContent = "啵——它正慢慢翻过身";
         }
         baby.vx *= Math.pow(0.72, dt);
         baby.vy = mix(baby.vy, -2.2 - baby.strength * 1.5, 1 - Math.pow(0.3, dt));
@@ -548,10 +548,23 @@
     });
   }
 
-  function drawJellyfishBody(x, y, size, phase, hue, alpha = 1, squash = 0, touchAngle = 0, releaseGlow = 0) {
+  function drawJellyfishBody(
+    x,
+    y,
+    size,
+    phase,
+    hue,
+    alpha = 1,
+    squash = 0,
+    touchAngle = 0,
+    releaseGlow = 0,
+    rotation = 0,
+    tentacleGrowth = 1,
+  ) {
     const c = palette[hue % palette.length];
     ctx.save();
     ctx.translate(x, y);
+    ctx.rotate(rotation);
     const pulse = 1 + Math.sin(phase * 2) * 0.055;
     ctx.scale(pulse, 1 / Math.sqrt(pulse));
     ctx.rotate(touchAngle);
@@ -585,50 +598,38 @@
     ctx.lineWidth = Math.max(0.55, size * 0.035);
     ctx.arc(0, -size * 0.08, size * 0.13, 0.14, Math.PI - 0.14);
     ctx.stroke();
-    ctx.shadowBlur = size * 0.45;
-    for (let i = -1; i <= 1; i += 1) {
-      const sway = Math.sin(phase + i * 1.2) * size * 0.22;
-      ctx.beginPath();
-      ctx.moveTo(i * size * 0.38, size * 0.06);
-      ctx.bezierCurveTo(i * size * 0.32 + sway, size * 0.58, i * size * 0.18 - sway, size * 0.9, i * size * 0.28 + sway, size * 1.38);
-      ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${(0.42 - Math.abs(i) * 0.07) * alpha})`;
-      ctx.lineWidth = Math.max(0.65, size * 0.035);
-      ctx.stroke();
+    if (tentacleGrowth > 0.005) {
+      const grown = easeOut(clamp(tentacleGrowth, 0, 1));
+      ctx.shadowBlur = size * 0.45;
+      for (let i = -1; i <= 1; i += 1) {
+        const rootX = i * size * 0.38;
+        const sway = Math.sin(phase + i * 1.2) * size * 0.22 * grown;
+        ctx.beginPath();
+        ctx.moveTo(rootX, size * 0.06);
+        ctx.bezierCurveTo(
+          mix(rootX, i * size * 0.32 + sway, grown),
+          size * (0.06 + 0.52 * grown),
+          mix(rootX, i * size * 0.18 - sway, grown),
+          size * (0.06 + 0.84 * grown),
+          mix(rootX, i * size * 0.28 + sway, grown),
+          size * (0.06 + 1.32 * grown),
+        );
+        ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${(0.42 - Math.abs(i) * 0.07) * alpha * grown})`;
+        ctx.lineWidth = Math.max(0.65, size * 0.035);
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }
 
-  function drawBirthConnections() {
-    state.babies.forEach((baby) => {
-      if (baby.age >= baby.birthDuration) return;
-      const t = clamp(baby.age / baby.birthDuration, 0, 1);
-      const popT = clamp((t - 0.82) / 0.18, 0, 1);
-      const fade = 1 - easeOut(popT);
-      const anchor = bodySurfacePoint(baby.birthAngle);
-      const c = palette[baby.hue % palette.length];
-      const bend = Math.sin(t * Math.PI) * baby.size * 0.32;
-      const midX = (anchor.x + baby.x) * 0.5 - Math.sin(baby.birthAngle) * bend;
-      const midY = (anchor.y + baby.y) * 0.5 + Math.cos(baby.birthAngle) * bend;
-      const bridge = ctx.createLinearGradient(anchor.x, anchor.y, baby.x, baby.y);
-      bridge.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},${0.34 * fade})`);
-      bridge.addColorStop(0.72, `rgba(222,255,252,${0.5 * fade})`);
-      bridge.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},${0.2 * fade})`);
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(anchor.x, anchor.y);
-      ctx.quadraticCurveTo(midX, midY, baby.x, baby.y);
-      ctx.strokeStyle = bridge;
-      ctx.lineWidth = Math.max(0.8, baby.size * (0.34 * (1 - easeOut(t)) + 0.055) * (1 - popT * 0.7));
-      ctx.lineCap = "round";
-      ctx.shadowBlur = baby.size * 0.8;
-      ctx.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},${0.35 * fade})`;
-      ctx.stroke();
-      ctx.restore();
-    });
-  }
-
   function drawBabyJellyfish() {
     state.babies.forEach((baby) => {
+      const separatedAge = Math.max(0, baby.age - baby.birthDuration);
+      const turnT = clamp(separatedAge / 0.9, 0, 1);
+      const rotation = baby.age < baby.birthDuration
+        ? Math.PI
+        : Math.PI * (1 - easeOut(turnT)) + Math.sin(turnT * Math.PI) * 0.14;
+      const tentacleGrowth = easeOut(clamp((separatedAge - 0.12) / 0.82, 0, 1));
       drawJellyfishBody(
         baby.x,
         baby.y,
@@ -639,6 +640,8 @@
         baby.squash + baby.birthSquash,
         baby.age < baby.birthDuration ? baby.birthAngle : baby.touchAngle,
         baby.releaseGlow,
+        rotation,
+        tentacleGrowth,
       );
     });
   }
@@ -651,17 +654,25 @@
       ctx.save();
       ctx.translate(ripple.x, ripple.y);
       ctx.scale(1, ripple.pop ? 0.82 : 0.62);
-      ctx.beginPath();
       const startRadius = ripple.pop ? ripple.radius * 0.56 : 28;
       const travel = ripple.pop ? ripple.radius * 1.9 : 210 * ripple.strength;
-      ctx.arc(0, 0, startRadius + easeOut(t) * travel, 0, TAU);
-      ctx.strokeStyle = `rgba(${color[0]},${color[1]},${color[2]},${(1 - t) * (ripple.pop ? 0.7 : 0.42)})`;
-      ctx.lineWidth = ripple.pop ? 1.45 - t * 0.55 : 1.2;
       if (ripple.pop) {
-        ctx.shadowBlur = ripple.radius * (1 - t);
-        ctx.shadowColor = `rgba(${color[0]},${color[1]},${color[2]},${0.55 * (1 - t)})`;
+        const glowRadius = startRadius + easeOut(t) * travel;
+        const glow = ctx.createRadialGradient(0, 0, glowRadius * 0.15, 0, 0, glowRadius);
+        glow.addColorStop(0, `rgba(${color[0]},${color[1]},${color[2]},${0.18 * (1 - t)})`);
+        glow.addColorStop(0.52, `rgba(${color[0]},${color[1]},${color[2]},${0.12 * (1 - t)})`);
+        glow.addColorStop(1, `rgba(${color[0]},${color[1]},${color[2]},0)`);
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(0, 0, glowRadius, 0, TAU);
+        ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, startRadius + easeOut(t) * travel, 0, TAU);
+        ctx.strokeStyle = `rgba(${color[0]},${color[1]},${color[2]},${(1 - t) * 0.42})`;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
       }
-      ctx.stroke();
       ctx.restore();
     });
   }
@@ -937,7 +948,6 @@
     ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
     ctx.clearRect(0, 0, state.width, state.height);
     drawBackground();
-    drawBirthConnections();
     drawBabyJellyfish();
     drawRipples();
     drawContourMountainAura();
