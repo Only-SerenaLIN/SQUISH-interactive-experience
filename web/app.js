@@ -84,6 +84,9 @@
       gestureOriginY: 0,
       pointerOriginX: 0,
       pointerOriginY: 0,
+      indexPrevX: null,
+      indexPrevY: null,
+      touchBaby: null,
     },
   };
 
@@ -273,6 +276,9 @@
       pinchRatio: 2,
       pinchFrames: 0,
       openFrames: 0,
+      indexPrevX: null,
+      indexPrevY: null,
+      touchBaby: null,
     });
     updateCameraButton();
     if (message) hint.textContent = message;
@@ -373,7 +379,7 @@
       const handedness = hands.multiHandedness?.[0]?.label;
       const handSlot = handedness === "Right" ? 0 : 1;
       const pinchState = hands.pinchState?.[handSlot]?.[0] || "";
-      pinching = pinchState === "start" || pinchState === "held";
+      const pluginPinching = pinchState === "start" || pinchState === "held";
       const targetAX = (1 - thumb.x) * state.width;
       const targetAY = thumb.y * state.height;
       const targetBX = (1 - index.x) * state.width;
@@ -383,6 +389,10 @@
       const fingerGap = Math.hypot(thumb.x - index.x, thumb.y - index.y);
       const palmWidth = Math.max(0.035, Math.hypot(palmA.x - palmB.x, palmA.y - palmB.y));
       const targetPinchRatio = fingerGap / palmWidth;
+      // Handsfree can occasionally keep reporting a pinch while the thumb is
+      // already folded away from an extended index finger. Cross-check the
+      // plugin state with the actual landmark gap so single-finger play stays live.
+      pinching = (pluginPinching && targetPinchRatio < 0.92) || targetPinchRatio < 0.46;
       const smoothing = camera.presenceFrames ? 0.42 : 1;
       camera.fingerAX = mix(camera.fingerAX || targetAX, targetAX, smoothing);
       camera.fingerAY = mix(camera.fingerAY || targetAY, targetAY, smoothing);
@@ -415,52 +425,71 @@
     if (present && !camera.active && !pinching && now >= camera.suspendedUntil) {
       const fingerX = camera.fingerBX;
       const fingerY = camera.fingerBY;
-      const touchedBaby = findTouchableBaby(fingerX, fingerY, 1.08);
+      const previousX = camera.indexPrevX ?? fingerX;
+      const previousY = camera.indexPrevY ?? fingerY;
+      const deltaX = clamp(fingerX - previousX, -28, 28);
+      const deltaY = clamp(fingerY - previousY, -28, 28);
+      const speed = Math.hypot(deltaX, deltaY);
+      const heldBaby = camera.touchBaby && state.babies.includes(camera.touchBaby)
+        ? camera.touchBaby
+        : null;
+      const heldDistance = heldBaby ? Math.hypot(fingerX - heldBaby.x, fingerY - heldBaby.y) : Infinity;
+      const heldRadius = heldBaby ? Math.max(48, heldBaby.size * 4.4) : 0;
+      const touchedBaby = heldDistance <= heldRadius ? heldBaby : findTouchableBaby(fingerX, fingerY, 1.85);
       if (touchedBaby) {
         cameraTouchBaby = touchedBaby;
-        const previousX = camera.touchX ?? fingerX;
-        const previousY = camera.touchY ?? fingerY;
-        const pushX = clamp(fingerX - previousX, -18, 18);
-        const pushY = clamp(fingerY - previousY, -18, 18);
-        touchedBaby.cameraTouch = 1;
+        const distanceX = touchedBaby.x - fingerX;
+        const distanceY = touchedBaby.y - fingerY;
+        const distance = Math.max(1, Math.hypot(distanceX, distanceY));
+        const entering = camera.touchBaby !== touchedBaby;
+        touchedBaby.cameraTouch = 1.35;
         touchedBaby.touchAngle = Math.atan2(fingerY - touchedBaby.y, fingerX - touchedBaby.x);
-        touchedBaby.vx += pushX * 0.055;
-        touchedBaby.vy += pushY * 0.055;
-        touchedBaby.releaseGlow = Math.max(touchedBaby.releaseGlow, 0.16);
-        camera.touchX = fingerX;
-        camera.touchY = fingerY;
+        touchedBaby.vx += deltaX * 0.24 + (distanceX / distance) * (entering ? 3.6 : 0.34);
+        touchedBaby.vy += deltaY * 0.24 + (distanceY / distance) * (entering ? 3.6 : 0.34);
+        touchedBaby.releaseGlow = Math.max(touchedBaby.releaseGlow, entering ? 0.72 : 0.28);
+        if (entering) {
+          state.ripples.push({
+            x: touchedBaby.x,
+            y: touchedBaby.y,
+            age: 0,
+            strength: 0.11,
+            hue: touchedBaby.hue,
+            duration: 0.8,
+          });
+        }
+        camera.touchBaby = touchedBaby;
         hint.textContent = "指尖碰到了它——它软软地让开了";
       } else {
-        camera.touchX = null;
-        camera.touchY = null;
+        camera.touchBaby = null;
         const radius = baseRadius();
         const inTentacles =
-          Math.abs(fingerX - state.center.x) <= radius * 0.82 &&
-          fingerY >= state.center.y + radius * 0.38 &&
-          fingerY <= state.center.y + radius * 1.45;
+          Math.abs(fingerX - state.center.x) <= radius * 1.02 &&
+          fingerY >= state.center.y + radius * 0.24 &&
+          fingerY <= state.center.y + radius * 1.62;
         if (inTentacles) {
-          const previousX = camera.playX ?? fingerX;
-          const previousY = camera.playY ?? fingerY;
-          const deltaX = clamp(fingerX - previousX, -22, 22);
-          const deltaY = clamp(fingerY - previousY, -22, 22);
-          const speed = Math.hypot(deltaX, deltaY);
+          const positionForce = clamp((fingerX - state.center.x) / (radius * 0.72), -1, 1);
+          const motionForce = clamp(deltaX / 7, -1, 1);
+          const fingerForce = Math.abs(deltaX) > 1.4
+            ? mix(positionForce * 0.42, motionForce, 0.78)
+            : positionForce * 0.82;
           state.tentaclePlay.x = fingerX;
           state.tentaclePlay.y = fingerY;
           state.tentaclePlay.direction = mix(
             state.tentaclePlay.direction,
-            clamp(deltaX / 12, -1, 1),
-            0.55,
+            fingerForce,
+            0.72,
           );
-          state.tentaclePlay.amount = Math.max(state.tentaclePlay.amount, clamp(0.22 + speed / 15, 0.22, 1));
+          state.tentaclePlay.amount = Math.max(state.tentaclePlay.amount, clamp(0.56 + speed / 10, 0.56, 1.18));
           playingTentacles = true;
           hint.textContent = "食指拨过触须——它们顺着水流摆开了";
         }
-        camera.playX = fingerX;
-        camera.playY = fingerY;
       }
+      camera.indexPrevX = fingerX;
+      camera.indexPrevY = fingerY;
     } else if (!present || pinching) {
-      camera.playX = null;
-      camera.playY = null;
+      camera.indexPrevX = null;
+      camera.indexPrevY = null;
+      camera.touchBaby = null;
     }
 
     if (present && !pinching && !camera.active && camera.openFrames >= 4) camera.rearm = true;
@@ -768,7 +797,7 @@
       baby.releaseGlow *= Math.pow(0.055, dt);
       baby.cameraTouch = (baby.cameraTouch || 0) * Math.pow(0.008, dt);
       const heldTarget = state.pointer.down && state.activeBaby === baby ? clamp(0.48 + holdTime * 0.34, 0, 0.88) : 0;
-      const babyTarget = Math.max(heldTarget, baby.cameraTouch * 0.34);
+      const babyTarget = Math.max(heldTarget, baby.cameraTouch * 0.48);
       baby.squashVelocity += (babyTarget - baby.squash) * 32 * dt;
       baby.squashVelocity *= Math.pow(0.006, dt);
       baby.squash += baby.squashVelocity * dt * 6.4;
@@ -1264,7 +1293,7 @@
       const rootX = state.center.x + i * radius * 0.105;
       const rootY = state.center.y + radius * (0.5 + Math.abs(i) * 0.009);
       const playProximity = Math.exp(-Math.pow((rootX - state.tentaclePlay.x) / (radius * 0.52), 2));
-      const playSway = state.tentaclePlay.direction * state.tentaclePlay.amount * playProximity * radius * 0.24;
+      const playSway = state.tentaclePlay.direction * state.tentaclePlay.amount * playProximity * radius * 0.36;
       const sway = Math.sin(state.elapsed * 0.58 + i * 0.7) * radius * (0.08 + Math.abs(i) * 0.006) + playSway;
       const length = radius * (0.62 + (6 - Math.abs(i)) * 0.045);
       ctx.beginPath();
@@ -1293,7 +1322,7 @@
       const rootY = state.center.y + radius * 0.46;
       const length = radius * (0.72 + (2 - Math.abs(arm)) * 0.13);
       const playProximity = Math.exp(-Math.pow((rootX - state.tentaclePlay.x) / (radius * 0.48), 2));
-      const playSway = state.tentaclePlay.direction * state.tentaclePlay.amount * playProximity * radius * 0.2;
+      const playSway = state.tentaclePlay.direction * state.tentaclePlay.amount * playProximity * radius * 0.3;
       const sway = Math.sin(state.elapsed * 0.48 + arm * 1.4) * radius * 0.11 + playSway;
       ctx.beginPath();
       ctx.moveTo(rootX, rootY);
