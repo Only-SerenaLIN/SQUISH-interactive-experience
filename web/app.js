@@ -183,6 +183,7 @@
     const point = pointerPosition(event);
     for (let i = state.babies.length - 1; i >= 0; i -= 1) {
       const baby = state.babies[i];
+      if (baby.age < baby.birthDuration) continue;
       if (Math.hypot(point.x - baby.x, point.y - baby.y) <= Math.max(30, baby.size * 2.35)) {
         state.activeBaby = baby;
         baby.touchAngle = Math.atan2(point.y - baby.y, point.x - baby.x);
@@ -221,14 +222,27 @@
     if (!state.pointer.down) return;
     if (state.activeBaby) {
       const baby = state.activeBaby;
+      const awayAngle = baby.touchAngle + Math.PI;
+      const impulse = 15 + baby.squash * 17;
+      baby.vx += Math.cos(awayAngle) * impulse;
+      baby.vy += Math.sin(awayAngle) * impulse - 6;
+      baby.squashVelocity -= 0.16 + baby.squash * 0.16;
+      baby.releaseGlow = 1;
+      state.ripples.push({
+        x: baby.x,
+        y: baby.y,
+        age: 0,
+        strength: 0.14 + baby.squash * 0.08,
+        hue: baby.hue,
+      });
       state.pointer.down = false;
       state.pointer.id = null;
       state.activeBaby = null;
       canvas.classList.remove("is-touching");
       tone(0.22 + baby.squash * 0.35, baby.touchAngle);
-      hint.textContent = "它轻轻弹回去了";
+      hint.textContent = "它弹了一下，慢慢游走了";
       window.setTimeout(() => {
-        if (!state.pointer.down) hint.textContent = "小水母也可以被轻轻触碰";
+        if (!state.pointer.down) hint.textContent = "轻轻碰一碰漂游的小水母";
       }, 1800);
       return;
     }
@@ -238,7 +252,7 @@
     canvas.classList.remove("is-touching");
     leaveMemory(strength);
     tone(strength, state.touchAngle);
-    hint.textContent = "一只小水母游走了";
+    hint.textContent = "它正从母体慢慢分离";
     window.setTimeout(() => {
       if (!state.pointer.down) hint.textContent = "再捏出一只，或只是看它们漂游";
     }, 2200);
@@ -246,15 +260,11 @@
 
   function spawnBaby(strength, hue) {
     const radius = baseRadius();
-    const pulledOut = state.dragDistance > radius * 0.04;
-    const surfaceX = state.center.x + Math.cos(state.touchAngle) * radius * 0.84;
-    const surfaceY = state.center.y + Math.sin(state.touchAngle) * radius * 0.84;
-    const originX = pulledOut ? mix(surfaceX, state.pointer.x, 0.58) : surfaceX;
-    const originY = pulledOut ? mix(surfaceY, state.pointer.y, 0.58) : surfaceY;
+    const surface = bodySurfacePoint(state.touchAngle);
     const size = 16 + strength * 10;
     state.babies.push({
-      x: originX,
-      y: originY,
+      x: surface.x,
+      y: surface.y,
       vx: Math.cos(state.touchAngle) * (5 + strength * 7),
       vy: -4 - strength * 4,
       size,
@@ -262,9 +272,14 @@
       hue,
       phase: state.count * 0.91 + Math.random() * 0.5,
       age: 0,
+      birthAngle: state.touchAngle,
+      birthDuration: 1.05 + strength * 0.28,
+      birthTravel: clamp(state.dragDistance * 0.62, size * 1.9, radius * 0.56),
+      detached: false,
       squash: 0,
       squashVelocity: 0,
       touchAngle: 0,
+      releaseGlow: 0,
     });
     if (state.babies.length > 18) state.babies.shift();
   }
@@ -358,14 +373,30 @@
     state.babies.forEach((baby) => {
       baby.age += dt;
       baby.phase += dt * (0.42 + baby.strength * 0.16);
+      baby.releaseGlow *= Math.pow(0.055, dt);
       const babyTarget = state.pointer.down && state.activeBaby === baby ? clamp(0.48 + holdTime * 0.34, 0, 0.88) : 0;
       baby.squashVelocity += (babyTarget - baby.squash) * 32 * dt;
       baby.squashVelocity *= Math.pow(0.006, dt);
       baby.squash += baby.squashVelocity * dt * 6.4;
       baby.squash = clamp(baby.squash, -0.12, 0.94);
-      baby.vx *= Math.pow(0.72, dt);
-      baby.vy = mix(baby.vy, -2.2 - baby.strength * 1.5, 1 - Math.pow(0.3, dt));
-      if (state.activeBaby !== baby) {
+      const birthing = baby.age < baby.birthDuration;
+      if (birthing) {
+        const t = clamp(baby.age / baby.birthDuration, 0, 1);
+        const travel = easeOut(t) * baby.birthTravel;
+        const anchor = bodySurfacePoint(baby.birthAngle);
+        baby.x = anchor.x + Math.cos(baby.birthAngle) * travel;
+        baby.y = anchor.y + Math.sin(baby.birthAngle) * travel - Math.sin(t * Math.PI) * baby.size * 0.12;
+      } else {
+        if (!baby.detached) {
+          baby.detached = true;
+          baby.releaseGlow = 0.9;
+          baby.squashVelocity = -0.08;
+          state.ripples.push({ x: baby.x, y: baby.y, age: 0, strength: 0.12, hue: baby.hue });
+        }
+        baby.vx *= Math.pow(0.72, dt);
+        baby.vy = mix(baby.vy, -2.2 - baby.strength * 1.5, 1 - Math.pow(0.3, dt));
+      }
+      if (!birthing && state.activeBaby !== baby) {
         baby.x += (baby.vx + Math.sin(baby.phase * 0.8) * 2.2) * dt;
         baby.y += baby.vy * dt;
       }
@@ -386,6 +417,12 @@
       x: state.center.x + Math.cos(node.angle) * localRadius * xScale,
       y: state.center.y + sine * localRadius * yScale,
     };
+  }
+
+  function bodySurfacePoint(angle) {
+    const normalized = (angle % TAU + TAU) % TAU;
+    const index = Math.round((normalized / TAU) * NODES) % NODES;
+    return blobPoint(state.nodes[index], baseRadius());
   }
 
   function traceBlob(radius, offset = 0) {
@@ -463,7 +500,7 @@
     });
   }
 
-  function drawJellyfishBody(x, y, size, phase, hue, alpha = 1, squash = 0, touchAngle = 0) {
+  function drawJellyfishBody(x, y, size, phase, hue, alpha = 1, squash = 0, touchAngle = 0, releaseGlow = 0) {
     const c = palette[hue % palette.length];
     ctx.save();
     ctx.translate(x, y);
@@ -472,8 +509,8 @@
     ctx.rotate(touchAngle);
     ctx.scale(1 - squash * 0.26, 1 + squash * 0.18);
     ctx.rotate(-touchAngle);
-    ctx.shadowBlur = size * (1.15 + squash * 1.6);
-    ctx.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},${(0.42 + squash * 0.28) * alpha})`;
+    ctx.shadowBlur = size * (1.15 + squash * 1.6 + releaseGlow * 2.2);
+    ctx.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},${Math.min(0.9, (0.42 + squash * 0.28 + releaseGlow * 0.3) * alpha)})`;
     const bell = ctx.createRadialGradient(-size * 0.22, -size * 0.34, 0, 0, 0, size * 1.05);
     bell.addColorStop(0, `rgba(236,255,255,${0.78 * alpha})`);
     bell.addColorStop(0.5, `rgba(${c[0]},${c[1]},${c[2]},${0.48 * alpha})`);
@@ -513,17 +550,46 @@
     ctx.restore();
   }
 
+  function drawBirthConnections() {
+    state.babies.forEach((baby) => {
+      if (baby.age >= baby.birthDuration) return;
+      const t = clamp(baby.age / baby.birthDuration, 0, 1);
+      const fade = clamp((1 - t) / 0.22, 0, 1);
+      const anchor = bodySurfacePoint(baby.birthAngle);
+      const c = palette[baby.hue % palette.length];
+      const bend = Math.sin(t * Math.PI) * baby.size * 0.32;
+      const midX = (anchor.x + baby.x) * 0.5 - Math.sin(baby.birthAngle) * bend;
+      const midY = (anchor.y + baby.y) * 0.5 + Math.cos(baby.birthAngle) * bend;
+      const bridge = ctx.createLinearGradient(anchor.x, anchor.y, baby.x, baby.y);
+      bridge.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},${0.34 * fade})`);
+      bridge.addColorStop(0.72, `rgba(222,255,252,${0.5 * fade})`);
+      bridge.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},${0.2 * fade})`);
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(anchor.x, anchor.y);
+      ctx.quadraticCurveTo(midX, midY, baby.x, baby.y);
+      ctx.strokeStyle = bridge;
+      ctx.lineWidth = Math.max(1, baby.size * (0.38 * (1 - t) + 0.07));
+      ctx.lineCap = "round";
+      ctx.shadowBlur = baby.size * 0.8;
+      ctx.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},${0.35 * fade})`;
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
   function drawBabyJellyfish() {
     state.babies.forEach((baby) => {
       drawJellyfishBody(
         baby.x,
         baby.y,
-        baby.size,
+        baby.size * (0.58 + clamp(baby.age / baby.birthDuration, 0, 1) * 0.42),
         baby.phase,
         baby.hue,
         clamp(baby.age / 0.8, 0.12, 1),
         baby.squash,
         baby.touchAngle,
+        baby.releaseGlow,
       );
     });
   }
@@ -815,6 +881,7 @@
     ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
     ctx.clearRect(0, 0, state.width, state.height);
     drawBackground();
+    drawBirthConnections();
     drawBabyJellyfish();
     drawRipples();
     drawContourMountainAura();
