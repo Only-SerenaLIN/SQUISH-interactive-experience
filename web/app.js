@@ -19,6 +19,11 @@
   const veil = document.querySelector("#veil");
   const hint = document.querySelector("#hint");
   const memoryCount = document.querySelector("#memoryCount");
+  const glowCount = document.querySelector("#glowCount");
+  const glowRateLabel = document.querySelector("#glowRate");
+  const jellyCount = document.querySelector("#jellyCount");
+  const jellyCapacity = document.querySelector("#jellyCapacity");
+  const habitatButtons = Array.from(document.querySelectorAll(".habitat-card"));
 
   const TAU = Math.PI * 2;
   const NODES = 72;
@@ -27,6 +32,31 @@
   const mix = (a, b, t) => a + (b - a) * t;
   const easeOut = (t) => 1 - Math.pow(1 - t, 3);
   const shortestAngle = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+
+  function readTankState() {
+    try {
+      const saved = JSON.parse(localStorage.getItem("softness-jelly-tank") || "{}");
+      return {
+        glow: Math.max(0, Number(saved.glow) || 0),
+        population: clamp(Number.parseInt(saved.population || "0", 10), 0, 18),
+        levels: {
+          algae: clamp(Number.parseInt(saved.levels?.algae || "0", 10), 0, 5),
+          nursery: clamp(Number.parseInt(saved.levels?.nursery || "0", 10), 0, 4),
+          lantern: clamp(Number.parseInt(saved.levels?.lantern || "0", 10), 0, 3),
+        },
+        lastSavedAt: Number(saved.lastSavedAt) || Date.now(),
+      };
+    } catch (error) {
+      return {
+        glow: 0,
+        population: 0,
+        levels: { algae: 0, nursery: 0, lantern: 0 },
+        lastSavedAt: Date.now(),
+      };
+    }
+  }
+
+  const storedTank = readTankState();
 
   const state = {
     width: 0,
@@ -59,6 +89,16 @@
     ripples: [],
     babies: [],
     dust: [],
+    tank: {
+      glow: storedTank.glow,
+      population: storedTank.population,
+      levels: storedTank.levels,
+      lastSavedAt: storedTank.lastSavedAt,
+      restored: false,
+      saveElapsed: 0,
+      hudElapsed: 0,
+      awayGlow: 0,
+    },
     audio: null,
     camera: {
       enabled: false,
@@ -137,6 +177,137 @@
     [202, 126, 218],
   ];
 
+  const habitatConfig = {
+    algae: { label: "月光藻床", baseCost: 12, max: 5 },
+    nursery: { label: "珊瑚育婴湾", baseCost: 35, max: 4 },
+    lantern: { label: "深海灯塔", baseCost: 90, max: 3 },
+  };
+
+  function tankCapacity() {
+    return Math.min(18, 6 + state.tank.levels.nursery * 3);
+  }
+
+  function tankGlowRate() {
+    const algaeBoost = 1 + state.tank.levels.algae * 0.35;
+    const lanternBoost = 1 + state.tank.levels.lantern * 0.22;
+    return state.tank.population * 0.72 * algaeBoost * lanternBoost;
+  }
+
+  function habitatCost(key) {
+    const config = habitatConfig[key];
+    return Math.round(config.baseCost * Math.pow(1.85, state.tank.levels[key]));
+  }
+
+  function formatGlow(value) {
+    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}m`;
+    if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+    if (value >= 100) return String(Math.floor(value));
+    return value.toFixed(value < 10 ? 1 : 0);
+  }
+
+  function saveTank() {
+    try {
+      localStorage.setItem("softness-jelly-tank", JSON.stringify({
+        glow: state.tank.glow,
+        population: state.tank.population,
+        levels: state.tank.levels,
+        lastSavedAt: Date.now(),
+      }));
+    } catch (error) {
+      // The artwork remains playable when storage is unavailable.
+    }
+  }
+
+  function updateTankUI() {
+    const capacity = tankCapacity();
+    state.tank.population = clamp(state.tank.population, 0, capacity);
+    glowCount.textContent = formatGlow(state.tank.glow);
+    glowRateLabel.textContent = `+${tankGlowRate().toFixed(1)} / 秒`;
+    jellyCount.textContent = String(state.tank.population);
+    jellyCapacity.textContent = String(capacity);
+    habitatButtons.forEach((button) => {
+      const key = button.dataset.habitat;
+      const config = habitatConfig[key];
+      const level = state.tank.levels[key];
+      const maxed = level >= config.max;
+      const cost = habitatCost(key);
+      button.querySelector("[data-level]").textContent = `LV.${level}`;
+      button.querySelector("[data-cost]").textContent = maxed ? "已完成" : `${cost} 微光`;
+      button.classList.toggle("is-affordable", !maxed && state.tank.glow >= cost);
+      button.classList.toggle("is-maxed", maxed);
+      button.disabled = maxed;
+      button.setAttribute("aria-label", maxed
+        ? `${config.label}，已达到最高等级`
+        : `${config.label}，等级 ${level}，升级需要 ${cost} 微光`);
+    });
+  }
+
+  function addTankGlow(amount) {
+    state.tank.glow += Math.max(0, amount);
+    updateTankUI();
+  }
+
+  function restoreTankBabies() {
+    if (state.tank.restored || !state.width || !state.height) return;
+    state.tank.restored = true;
+    const restoredPopulation = Math.min(state.tank.population, tankCapacity());
+    state.tank.population = restoredPopulation;
+    for (let i = 0; i < restoredPopulation; i += 1) {
+      state.babies.push({
+        x: state.width * (0.12 + ((i * 0.618033) % 0.76)),
+        y: state.height * (0.18 + ((i * 0.371) % 0.56)),
+        vx: Math.sin(i * 1.91) * 2.4,
+        vy: -1.5 - (i % 3) * 0.5,
+        size: 14 + (i % 5) * 2.3,
+        strength: 0.35 + (i % 4) * 0.12,
+        hue: i % palette.length,
+        phase: i * 1.17,
+        age: 8 + i * 0.4,
+        birthAngle: -Math.PI / 2,
+        birthDuration: 1,
+        birthTravel: 0,
+        detached: true,
+        birthSquash: 0,
+        squash: 0,
+        squashVelocity: 0,
+        touchAngle: 0,
+        releaseGlow: 0,
+        cameraTouch: 0,
+      });
+    }
+    updateTankUI();
+  }
+
+  function upgradeHabitat(key) {
+    const config = habitatConfig[key];
+    if (!config) return;
+    const level = state.tank.levels[key];
+    if (level >= config.max) return;
+    const cost = habitatCost(key);
+    if (state.tank.glow < cost) {
+      hint.textContent = `还差 ${formatGlow(cost - state.tank.glow)} 微光，先陪水母玩一会儿`;
+      return;
+    }
+    state.tank.glow -= cost;
+    state.tank.levels[key] += 1;
+    const messages = {
+      algae: "月光藻舒展开了，微光流动得更快",
+      nursery: "育婴湾变宽了，可以住进更多小水母",
+      lantern: "深海灯塔亮了一层，整只缸都被照亮",
+    };
+    hint.textContent = messages[key];
+    state.ripples.push({
+      x: state.width * (key === "algae" ? 0.18 : key === "nursery" ? 0.79 : 0.52),
+      y: state.height * 0.86,
+      age: 0,
+      strength: 0.36,
+      hue: key === "algae" ? 3 : key === "nursery" ? 2 : 4,
+      duration: 2.2,
+    });
+    saveTank();
+    updateTankUI();
+  }
+
   function resize() {
     const rect = canvas.getBoundingClientRect();
     state.dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -150,6 +321,7 @@
       state.pointer.x = state.center.x;
       state.pointer.y = state.center.y;
     }
+    restoreTankBabies();
   }
 
   function baseRadius() {
@@ -531,6 +703,7 @@
         touchedBaby.vy += deltaY * 0.24 + (distanceY / distance) * (entering ? 3.6 : 0.34);
         touchedBaby.releaseGlow = Math.max(touchedBaby.releaseGlow, entering ? 0.72 : 0.28);
         if (entering) {
+          addTankGlow(0.8 + touchedBaby.size * 0.03);
           state.ripples.push({
             x: touchedBaby.x,
             y: touchedBaby.y,
@@ -645,6 +818,10 @@
     invitation.classList.add("is-gone");
     initAudio();
     canvas.focus({ preventScroll: true });
+    if (state.tank.awayGlow >= 1) {
+      hint.textContent = `水母缸在你离开时积攒了 ${formatGlow(state.tank.awayGlow)} 微光`;
+      state.tank.awayGlow = 0;
+    }
   }
 
   function pointerPosition(event) {
@@ -723,6 +900,7 @@
       state.activeBaby = null;
       canvas.classList.remove("is-touching");
       tone(0.22 + baby.squash * 0.35, baby.touchAngle);
+      addTankGlow(0.8 + baby.size * 0.04);
       hint.textContent = "它弹了一下，慢慢游走了";
       window.setTimeout(() => {
         if (!state.pointer.down) hint.textContent = "轻轻碰一碰漂游的小水母";
@@ -777,7 +955,11 @@
       releaseGlow: 0,
       cameraTouch: 0,
     });
-    if (state.babies.length > 18) state.babies.shift();
+    const capacity = tankCapacity();
+    if (state.babies.length > capacity) state.babies.shift();
+    state.tank.population = Math.min(capacity, state.tank.population + 1);
+    addTankGlow(3 + strength * 3);
+    saveTank();
   }
 
   function leaveMemory(strength) {
@@ -810,14 +992,32 @@
     state.memories.length = 0;
     state.ripples.length = 0;
     state.babies.length = 0;
+    state.tank.glow = 0;
+    state.tank.population = 0;
+    state.tank.levels = { algae: 0, nursery: 0, lantern: 0 };
     localStorage.removeItem("softness-memory-count");
+    localStorage.removeItem("softness-jelly-tank");
     memoryCount.textContent = "00";
+    updateTankUI();
     hint.textContent = "它又一次，与你素不相识";
     showAbout(false);
   }
 
   function update(dt) {
     state.elapsed += dt;
+    if (state.entered) {
+      state.tank.glow += tankGlowRate() * dt;
+      state.tank.hudElapsed += dt;
+      state.tank.saveElapsed += dt;
+      if (state.tank.hudElapsed >= 0.2) {
+        state.tank.hudElapsed = 0;
+        updateTankUI();
+      }
+      if (state.tank.saveElapsed >= 4) {
+        state.tank.saveElapsed = 0;
+        saveTank();
+      }
+    }
     state.tentaclePlay.amount *= Math.pow(0.018, dt);
     state.tentaclePlay.direction *= Math.pow(0.08, dt);
     const radius = baseRadius();
@@ -1029,6 +1229,89 @@
         ctx.stroke();
       }
     });
+  }
+
+  function drawTankHabitat() {
+    const w = state.width;
+    const h = state.height;
+    const floorY = h * 0.875;
+    const algaeLevel = state.tank.levels.algae;
+    const nurseryLevel = state.tank.levels.nursery;
+    const lanternLevel = state.tank.levels.lantern;
+    ctx.save();
+
+    const floorGlow = ctx.createLinearGradient(0, floorY - 30, 0, h);
+    floorGlow.addColorStop(0, "rgba(79,199,200,0)");
+    floorGlow.addColorStop(0.55, "rgba(62,168,175,0.08)");
+    floorGlow.addColorStop(1, "rgba(12,45,62,0.3)");
+    ctx.fillStyle = floorGlow;
+    ctx.fillRect(0, floorY - 30, w, h - floorY + 30);
+
+    ctx.strokeStyle = "rgba(136,229,225,0.13)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(w * 0.045, 0);
+    ctx.bezierCurveTo(w * 0.02, h * 0.3, w * 0.025, h * 0.7, w * 0.07, floorY);
+    ctx.quadraticCurveTo(w * 0.5, h * 0.94, w * 0.93, floorY);
+    ctx.bezierCurveTo(w * 0.975, h * 0.7, w * 0.98, h * 0.3, w * 0.955, 0);
+    ctx.stroke();
+
+    if (algaeLevel > 0) {
+      ctx.globalCompositeOperation = "screen";
+      for (let i = 0; i < 3 + algaeLevel * 2; i += 1) {
+        const x = w * (0.08 + i * 0.028);
+        const height = 25 + (i % 3) * 14 + algaeLevel * 7;
+        const sway = Math.sin(state.elapsed * 0.7 + i * 1.7) * (4 + algaeLevel);
+        ctx.strokeStyle = `rgba(${96 + i * 3},${215 + i * 2},210,${0.2 + algaeLevel * 0.055})`;
+        ctx.lineWidth = 2 + (i % 2) * 1.2;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(x, floorY + 12);
+        ctx.bezierCurveTo(x - sway, floorY - height * 0.34, x + sway, floorY - height * 0.7, x + sway * 0.6, floorY - height);
+        ctx.stroke();
+      }
+    }
+
+    if (nurseryLevel > 0) {
+      ctx.globalCompositeOperation = "screen";
+      const baseX = w * 0.82;
+      ctx.strokeStyle = `rgba(255,145,198,${0.22 + nurseryLevel * 0.08})`;
+      ctx.lineWidth = 3 + nurseryLevel * 0.6;
+      ctx.lineCap = "round";
+      for (let branch = 0; branch < 2 + nurseryLevel; branch += 1) {
+        const direction = branch % 2 ? 1 : -1;
+        const spread = (branch + 1) * 7;
+        ctx.beginPath();
+        ctx.moveTo(baseX + spread * 0.2, floorY + 14);
+        ctx.bezierCurveTo(
+          baseX + direction * spread * 0.3,
+          floorY - 18,
+          baseX + direction * spread,
+          floorY - 30 - branch * 6,
+          baseX + direction * spread * 1.15,
+          floorY - 45 - nurseryLevel * 6,
+        );
+        ctx.stroke();
+      }
+    }
+
+    if (lanternLevel > 0) {
+      const x = w * 0.52;
+      const y = floorY + 2;
+      const radius = 18 + lanternLevel * 4;
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, radius * 5.2);
+      glow.addColorStop(0, `rgba(255,224,171,${0.42 + lanternLevel * 0.1})`);
+      glow.addColorStop(0.2, `rgba(146,232,231,${0.18 + lanternLevel * 0.05})`);
+      glow.addColorStop(1, "rgba(92,211,215,0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(x - radius * 5.2, y - radius * 5.2, radius * 10.4, radius * 10.4);
+      ctx.fillStyle = `rgba(231,255,250,${0.55 + lanternLevel * 0.1})`;
+      ctx.beginPath();
+      ctx.arc(x, y, radius * 0.32, 0, TAU);
+      ctx.fill();
+    }
+
+    ctx.restore();
   }
 
   function drawJellyfishBody(
@@ -1652,6 +1935,7 @@
     ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
     ctx.clearRect(0, 0, state.width, state.height);
     drawBackground();
+    drawTankHabitat();
     drawBabyJellyfish();
     drawRipples();
     drawContourMountainAura();
@@ -1668,6 +1952,9 @@
   });
   cameraButton.addEventListener("click", toggleCamera);
   backgroundButton.addEventListener("click", toggleBackgroundMode);
+  habitatButtons.forEach((button) => {
+    button.addEventListener("click", () => upgradeHabitat(button.dataset.habitat));
+  });
   aboutButton.addEventListener("click", () => showAbout(true));
   closeAbout.addEventListener("click", () => showAbout(false));
   veil.addEventListener("click", () => showAbout(false));
@@ -1706,11 +1993,23 @@
   });
 
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden && state.camera.enabled) stopCamera("");
+    if (document.hidden) {
+      saveTank();
+      if (state.camera.enabled) stopCamera("");
+    }
   });
-  window.addEventListener("beforeunload", () => stopCamera(""));
+  window.addEventListener("beforeunload", () => {
+    saveTank();
+    stopCamera("");
+  });
+
+  const awaySeconds = Math.min(6 * 60 * 60, Math.max(0, (Date.now() - state.tank.lastSavedAt) / 1000));
+  const awayGlow = tankGlowRate() * awaySeconds * 0.7;
+  state.tank.glow += awayGlow;
+  state.tank.awayGlow = awayGlow;
 
   memoryCount.textContent = String(state.count).padStart(2, "0");
+  updateTankUI();
   updateSoundButton();
   updateCameraButton();
   updateBackgroundButton();

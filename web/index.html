@@ -7,7 +7,7 @@
     <meta name="description" content="《不可触摸的柔软》——一件会呼吸、回弹，并记住每次触碰的浏览器交互艺术作品。" />
     <title>不可触摸的柔软 — Softness Without Touch</title>
     <link rel="stylesheet" href="https://unpkg.com/handsfree@8.5.1/build/lib/assets/handsfree.css" />
-    <link rel="stylesheet" href="styles.css?v=camera-scene-1" />
+    <link rel="stylesheet" href="styles.css?v=jelly-tank-1" />
   </head>
   <body>
     <main class="artwork" aria-label="《不可触摸的柔软》交互艺术作品">
@@ -60,11 +60,58 @@
         </figcaption>
       </figure>
 
+      <section class="tank-hud" id="tankHud" aria-label="水母缸状态">
+        <div class="tank-hud__item">
+          <span class="tank-hud__label">微光</span>
+          <strong id="glowCount">0</strong>
+          <span class="tank-hud__rate" id="glowRate">+0 / 秒</span>
+        </div>
+        <div class="tank-hud__divider" aria-hidden="true"></div>
+        <div class="tank-hud__item">
+          <span class="tank-hud__label">水母</span>
+          <strong><span id="jellyCount">0</span>/<span id="jellyCapacity">6</span></strong>
+          <span class="tank-hud__rate">缸中生命</span>
+        </div>
+      </section>
+
+      <section class="habitat-dock" id="habitatDock" aria-label="水母缸栖息地">
+        <p class="habitat-dock__eyebrow">培育水母缸</p>
+        <div class="habitat-dock__cards">
+          <button class="habitat-card" type="button" data-habitat="algae">
+            <span class="habitat-card__icon habitat-card__icon--algae" aria-hidden="true"></span>
+            <span class="habitat-card__copy">
+              <strong>月光藻床</strong>
+              <small>微光流速</small>
+            </span>
+            <span class="habitat-card__level" data-level>LV.0</span>
+            <span class="habitat-card__cost" data-cost>12 微光</span>
+          </button>
+          <button class="habitat-card" type="button" data-habitat="nursery">
+            <span class="habitat-card__icon habitat-card__icon--nursery" aria-hidden="true"></span>
+            <span class="habitat-card__copy">
+              <strong>珊瑚育婴湾</strong>
+              <small>水母容量</small>
+            </span>
+            <span class="habitat-card__level" data-level>LV.0</span>
+            <span class="habitat-card__cost" data-cost>35 微光</span>
+          </button>
+          <button class="habitat-card" type="button" data-habitat="lantern">
+            <span class="habitat-card__icon habitat-card__icon--lantern" aria-hidden="true"></span>
+            <span class="habitat-card__copy">
+              <strong>深海灯塔</strong>
+              <small>全缸增益</small>
+            </span>
+            <span class="habitat-card__level" data-level>LV.0</span>
+            <span class="habitat-card__cost" data-cost>90 微光</span>
+          </button>
+        </div>
+      </section>
+
       <section class="invitation" id="invitation" aria-labelledby="invitationTitle">
         <div class="invitation__copy">
-          <p class="eyebrow">A quiet deep-sea encounter</p>
+          <p class="eyebrow">A quiet living jelly tank</p>
           <h1 id="invitationTitle">有些柔软，<br />只在深处发光。</h1>
-          <p class="invitation__note">捏住它，拉出一小段生命，然后松手。</p>
+          <p class="invitation__note">捏出小水母，让这只缸慢慢长成自己的生态。</p>
           <button id="enterButton" class="enter-button" type="button">
             <span>靠近它</span>
             <span class="enter-button__en">come closer</span>
@@ -95,6 +142,6 @@
       <div class="veil" id="veil" aria-hidden="true"></div>
     </main>
     <script src="https://unpkg.com/handsfree@8.5.1/build/lib/handsfree.js"></script>
-    <script src="app.js?v=camera-scene-1"></script>
+    <script src="app.js?v=jelly-tank-1"></script>
   </body>
 </html>
