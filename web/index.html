@@ -7,7 +7,7 @@
     <meta name="description" content="《不可触摸的柔软》——一件会呼吸、回弹，并记住每次触碰的浏览器交互艺术作品。" />
     <title>不可触摸的柔软 — Softness Without Touch</title>
     <link rel="stylesheet" href="https://unpkg.com/handsfree@8.5.1/build/lib/assets/handsfree.css" />
-    <link rel="stylesheet" href="styles.css?v=jelly-tank-1" />
+    <link rel="stylesheet" href="styles.css?v=jelly-tank-2" />
   </head>
   <body>
     <main class="artwork" aria-label="《不可触摸的柔软》交互艺术作品">
@@ -42,6 +42,8 @@
           <button id="aboutButton" class="text-button" type="button" aria-expanded="false" aria-controls="aboutPanel">
             关于作品
           </button>
+          <button id="tutorialButton" class="text-button" type="button" aria-label="查看手势教程">玩法</button>
+          <button id="saveButton" class="text-button" type="button" aria-label="打开存档">存档</button>
         </nav>
       </header>
 
@@ -73,6 +75,13 @@
           <span class="tank-hud__rate">缸中生命</span>
         </div>
       </section>
+
+      <div class="scene-navigation" aria-label="场景导航">
+        <button id="surfaceButton" class="scene-navigation__button is-current" type="button">母水母 · 上层</button>
+        <span class="scene-navigation__line" aria-hidden="true"></span>
+        <button id="reefButton" class="scene-navigation__button" type="button">栖息地 · 下潜 ↓</button>
+        <span class="scene-navigation__hint">双指滑动 / 滚轮探索</span>
+      </div>
 
       <section class="habitat-dock" id="habitatDock" aria-label="水母缸栖息地">
         <p class="habitat-dock__eyebrow">培育水母缸</p>
@@ -111,11 +120,40 @@
         <div class="invitation__copy">
           <p class="eyebrow">A quiet living jelly tank</p>
           <h1 id="invitationTitle">有些柔软，<br />只在深处发光。</h1>
-          <p class="invitation__note">捏出小水母，让这只缸慢慢长成自己的生态。</p>
+          <p class="invitation__note">捏出小水母，潜到海底，看它们在栖息地玩耍。</p>
           <button id="enterButton" class="enter-button" type="button">
             <span>靠近它</span>
             <span class="enter-button__en">come closer</span>
           </button>
+        </div>
+      </section>
+
+      <section class="tutorial" id="tutorialPanel" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle" aria-hidden="true">
+        <div class="tutorial__card">
+          <p class="eyebrow">How to play · 水母缸</p>
+          <h2 id="tutorialTitle">从一只，变成一片海。</h2>
+          <div class="tutorial__steps">
+            <div><span>01</span><strong>捏出生命</strong><p>单手拇指与食指在母水母上捏合，向外拉，再松开。鼠标或触屏也能按住拖动。</p></div>
+            <div><span>02</span><strong>陪它玩</strong><p>一根食指逗小水母；捏合可轻轻挤压或拖它去栖息地。不同性格会有不同反应。</p></div>
+            <div><span>03</span><strong>潜入海底</strong><p>双指上下滑动看下层，张合双手放大或缩小地图；滚轮与场景按钮也可以操作。</p></div>
+            <div><span>04</span><strong>培育栖息地</strong><p>小水母产生微光，微光会游回母体；用它培育栖息地，解锁新的水母品种。</p></div>
+          </div>
+          <button id="tutorialClose" class="enter-button" type="button">开始探索</button>
+        </div>
+      </section>
+
+      <section class="save-panel" id="savePanel" role="dialog" aria-modal="true" aria-labelledby="saveTitle" aria-hidden="true">
+        <div class="save-panel__card">
+          <button id="saveClose" class="close-button" type="button" aria-label="关闭存档">关闭</button>
+          <p class="eyebrow">Jelly Tank Archive</p>
+          <h2 id="saveTitle">这一片海，留在这里。</h2>
+          <p id="saveStatus">游戏会自动保存在这台设备的浏览器里。</p>
+          <div class="save-panel__actions">
+            <button id="saveNow" type="button">立即存档</button>
+            <button id="exportSave" type="button">导出存档文件</button>
+            <label for="importSave">导入存档文件</label>
+            <input id="importSave" type="file" accept="application/json,.json" />
+          </div>
         </div>
       </section>
 
@@ -130,9 +168,9 @@
           <p class="eyebrow">Artist’s note</p>
           <h2>它不需要被完成。</h2>
           <p>这是一只生活在屏幕深海中的柔软母水母。你无法真正触摸它，却可以让它凹陷、延展、呼吸和回弹。</p>
-          <p>每一次捏取都会从它身上分离出一只小水母，在水流中继续漂游。没有分数，也没有正确的方法；你只是在创造一群新的柔软生命。</p>
+          <p>每一次捏取都会从它身上分离出一只小水母。下潜到海底，它们会在栖息地玩耍，把微光送回母体；你可以用微光培育这片海，迎来新的品种。</p>
           <div class="about__divider"></div>
-          <p class="about__small">鼠标 / 单指拖动 · 摄像头拇指食指捏合<br />Space 按压 · C 摄像头 · B 背景 · M 静音 · R 清除记忆</p>
+          <p class="about__small">双指滑动或滚轮探索 · 双手张合缩放地图<br />Space 按压 · C 摄像头 · B 背景 · M 静音 · R 清除记忆</p>
           <p class="camera-privacy">摄像头画面只在当前浏览器内分析，不录制、不保存，也不会上传。</p>
           <button id="resetButton" class="reset-button" type="button">重新成为陌生人</button>
           <p class="disclaimer">本作品用于艺术体验，不是医疗或治疗工具。</p>
@@ -142,6 +180,6 @@
       <div class="veil" id="veil" aria-hidden="true"></div>
     </main>
     <script src="https://unpkg.com/handsfree@8.5.1/build/lib/handsfree.js"></script>
-    <script src="app.js?v=jelly-tank-1"></script>
+    <script src="app.js?v=jelly-tank-2"></script>
   </body>
 </html>

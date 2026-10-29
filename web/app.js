@@ -24,6 +24,18 @@
   const jellyCount = document.querySelector("#jellyCount");
   const jellyCapacity = document.querySelector("#jellyCapacity");
   const habitatButtons = Array.from(document.querySelectorAll(".habitat-card"));
+  const surfaceButton = document.querySelector("#surfaceButton");
+  const reefButton = document.querySelector("#reefButton");
+  const tutorialPanel = document.querySelector("#tutorialPanel");
+  const tutorialButton = document.querySelector("#tutorialButton");
+  const tutorialClose = document.querySelector("#tutorialClose");
+  const savePanel = document.querySelector("#savePanel");
+  const saveButton = document.querySelector("#saveButton");
+  const saveClose = document.querySelector("#saveClose");
+  const saveNow = document.querySelector("#saveNow");
+  const exportSave = document.querySelector("#exportSave");
+  const importSave = document.querySelector("#importSave");
+  const saveStatus = document.querySelector("#saveStatus");
 
   const TAU = Math.PI * 2;
   const NODES = 72;
@@ -45,6 +57,7 @@
           lantern: clamp(Number.parseInt(saved.levels?.lantern || "0", 10), 0, 3),
         },
         lastSavedAt: Number(saved.lastSavedAt) || Date.now(),
+        babies: Array.isArray(saved.babies) ? saved.babies.slice(0, 18) : [],
       };
     } catch (error) {
       return {
@@ -52,6 +65,7 @@
         population: 0,
         levels: { algae: 0, nursery: 0, lantern: 0 },
         lastSavedAt: Date.now(),
+        babies: [],
       };
     }
   }
@@ -89,6 +103,16 @@
     ripples: [],
     babies: [],
     dust: [],
+    glowMotes: [],
+    map: {
+      scrollY: 0,
+      targetY: 0,
+      zoom: 1,
+      targetZoom: 1,
+      gesture: null,
+      pointers: new Map(),
+      worldHeight: 0,
+    },
     tank: {
       glow: storedTank.glow,
       population: storedTank.population,
@@ -98,6 +122,10 @@
       saveElapsed: 0,
       hudElapsed: 0,
       awayGlow: 0,
+      savedBabies: storedTank.babies,
+      guests: { algae: null, nursery: null, lantern: null },
+      guestTimers: { algae: 0, nursery: 0, lantern: 0 },
+      queueCursor: { algae: 0, nursery: 0, lantern: 0 },
     },
     audio: null,
     camera: {
@@ -135,6 +163,8 @@
       indexPrevX: null,
       indexPrevY: null,
       touchBaby: null,
+      mapGesture: null,
+      babyGesture: false,
     },
   };
 
@@ -176,6 +206,8 @@
     [112, 173, 230],
     [202, 126, 218],
   ];
+  const reefImage = new Image();
+  reefImage.src = "assets/connected-reef.png";
 
   const habitatConfig = {
     algae: { label: "月光藻床", baseCost: 12, max: 5 },
@@ -183,14 +215,76 @@
     lantern: { label: "深海灯塔", baseCost: 90, max: 3 },
   };
 
+  const personalityNames = ["活泼", "害羞", "好奇", "爱睡觉"];
+
+  function unlockedHues() {
+    const hues = [0];
+    if (state.tank.levels.algae > 0) hues.push(3);
+    if (state.tank.levels.nursery > 0) hues.push(2);
+    if (state.tank.levels.lantern > 0) hues.push(1);
+    if (state.tank.levels.lantern > 1) hues.push(4);
+    return hues;
+  }
+
+  function habitatPosition(key) {
+    const x = { algae: 0.2, nursery: 0.5, lantern: 0.8 }[key] || 0.5;
+    return { x: state.width * x, y: state.map.worldHeight - state.height * 0.46 };
+  }
+
+  function worldPoint(screenX, screenY) {
+    const zoom = state.map.zoom;
+    return {
+      x: (screenX - state.width * 0.5) / zoom + state.width * 0.5,
+      y: (screenY - state.height * 0.5) / zoom + state.height * 0.5 + state.map.scrollY,
+    };
+  }
+
+  function screenPoint(worldX, worldY) {
+    const zoom = state.map.zoom;
+    return {
+      x: (worldX - state.width * 0.5) * zoom + state.width * 0.5,
+      y: (worldY - state.map.scrollY - state.height * 0.5) * zoom + state.height * 0.5,
+    };
+  }
+
+  function setMapView(target) {
+    state.map.targetY = clamp(target, 0, state.map.worldHeight - state.height / state.map.targetZoom);
+    surfaceButton.classList.toggle("is-current", state.map.targetY < state.height * 0.4);
+    reefButton.classList.toggle("is-current", state.map.targetY >= state.height * 0.4);
+  }
+
+  function serializeBaby(baby) {
+    return {
+      x: clamp(baby.x / state.width, -0.1, 1.1),
+      y: clamp(baby.y / state.map.worldHeight, 0, 1),
+      size: clamp(baby.size, 12, 38),
+      hue: clamp(baby.hue, 0, 4),
+      personality: clamp(baby.personality || 0, 0, 3),
+      home: baby.home || baby.queuedFor || null,
+    };
+  }
+
+  function tankSnapshot() {
+    return {
+      version: 2,
+      glow: state.tank.glow,
+      population: state.tank.population,
+      levels: { ...state.tank.levels },
+      babies: state.babies.filter((baby) => baby.detached).map(serializeBaby),
+      lastSavedAt: Date.now(),
+      memoryCount: state.count,
+    };
+  }
+
   function tankCapacity() {
     return Math.min(18, 6 + state.tank.levels.nursery * 3);
   }
 
   function tankGlowRate() {
-    const algaeBoost = 1 + state.tank.levels.algae * 0.35;
-    const lanternBoost = 1 + state.tank.levels.lantern * 0.22;
-    return state.tank.population * 0.72 * algaeBoost * lanternBoost;
+    const base = state.tank.population * 0.28;
+    const active = Object.keys(habitatConfig).filter((key) => state.tank.levels[key] > 0).slice(0, state.tank.population);
+    const play = active.reduce((total, key) => total + 0.55 + state.tank.levels[key] * 0.38, 0);
+    return (base + play) * (1 + state.tank.levels.lantern * 0.12);
   }
 
   function habitatCost(key) {
@@ -207,12 +301,8 @@
 
   function saveTank() {
     try {
-      localStorage.setItem("softness-jelly-tank", JSON.stringify({
-        glow: state.tank.glow,
-        population: state.tank.population,
-        levels: state.tank.levels,
-        lastSavedAt: Date.now(),
-      }));
+      localStorage.setItem("softness-jelly-tank", JSON.stringify(tankSnapshot()));
+      saveStatus.textContent = `已保存 · ${new Date().toLocaleString("zh-CN", { hour12: false })}`;
     } catch (error) {
       // The artwork remains playable when storage is unavailable.
     }
@@ -253,14 +343,24 @@
     const restoredPopulation = Math.min(state.tank.population, tankCapacity());
     state.tank.population = restoredPopulation;
     for (let i = 0; i < restoredPopulation; i += 1) {
+      const saved = state.tank.savedBabies[i];
       state.babies.push({
-        x: state.width * (0.12 + ((i * 0.618033) % 0.76)),
-        y: state.height * (0.18 + ((i * 0.371) % 0.56)),
+        x: state.width * (saved && Number.isFinite(saved.x) ? clamp(saved.x, 0.05, 0.95) : 0.12 + ((i * 0.618033) % 0.76)),
+        y: state.map.worldHeight * (saved && Number.isFinite(saved.y) ? clamp(saved.y, 0.05, 0.95) : 0.25 + ((i * 0.173) % 0.55)),
         vx: Math.sin(i * 1.91) * 2.4,
         vy: -1.5 - (i % 3) * 0.5,
-        size: 14 + (i % 5) * 2.3,
+        size: saved && Number.isFinite(saved.size) ? clamp(saved.size, 12, 38) : 14 + (i % 5) * 2.3,
         strength: 0.35 + (i % 4) * 0.12,
-        hue: i % palette.length,
+        hue: saved && Number.isFinite(saved.hue) ? clamp(saved.hue, 0, 4) : unlockedHues()[i % unlockedHues().length],
+        personality: saved && Number.isFinite(saved.personality) ? clamp(saved.personality, 0, 3) : i % 4,
+        expression: i % 5,
+        moodTimer: 3 + (i % 4) * 1.9,
+        playTimer: 1 + (i % 3),
+        home: null,
+        queuedFor: saved && habitatConfig[saved.home] ? saved.home : null,
+        wanderX: state.width * (i % 2 ? 0.12 + (i % 4) * 0.045 : 0.72 + (i % 4) * 0.045),
+        wanderY: state.height * (0.55 + ((i * 0.31) % 1.18)),
+        wanderTimer: 3 + (i % 5),
         phase: i * 1.17,
         age: 8 + i * 0.4,
         birthAngle: -Math.PI / 2,
@@ -275,6 +375,17 @@
         cameraTouch: 0,
       });
     }
+    Object.keys(habitatConfig).forEach((key, index) => {
+      if (!state.tank.levels[key] || !state.babies[index]) return;
+      const guest = state.babies[index];
+      const home = habitatPosition(key);
+      guest.home = key;
+      guest.queuedFor = null;
+      guest.x = home.x + (index - 1) * 18;
+      guest.y = home.y - 52;
+      state.tank.guests[key] = guest;
+      state.tank.guestTimers[key] = 5 + index * 1.5;
+    });
     updateTankUI();
   }
 
@@ -290,6 +401,7 @@
     }
     state.tank.glow -= cost;
     state.tank.levels[key] += 1;
+    state.tank.guestTimers[key] = 0;
     const messages = {
       algae: "月光藻舒展开了，微光流动得更快",
       nursery: "育婴湾变宽了，可以住进更多小水母",
@@ -308,13 +420,66 @@
     updateTankUI();
   }
 
+  function showTutorial(open) {
+    tutorialPanel.classList.toggle("is-open", open);
+    tutorialPanel.setAttribute("aria-hidden", String(!open));
+    if (open) tutorialClose.focus();
+    else {
+      localStorage.setItem("softness-jelly-tutorial-v2", "seen");
+      canvas.focus({ preventScroll: true });
+    }
+  }
+
+  function showSavePanel(open) {
+    savePanel.classList.toggle("is-open", open);
+    savePanel.setAttribute("aria-hidden", String(!open));
+    if (open) {
+      saveStatus.textContent = `自动保存已开启 · ${state.tank.population} 只小水母 · ${formatGlow(state.tank.glow)} 微光`;
+      saveClose.focus();
+    } else canvas.focus({ preventScroll: true });
+  }
+
+  function loadSnapshot(snapshot) {
+    if (!snapshot || snapshot.version !== 2 || !snapshot.levels || !Array.isArray(snapshot.babies)) {
+      throw new Error("这不是水母缸存档文件");
+    }
+    state.tank.levels = {
+      algae: clamp(Number(snapshot.levels.algae) || 0, 0, 5),
+      nursery: clamp(Number(snapshot.levels.nursery) || 0, 0, 4),
+      lantern: clamp(Number(snapshot.levels.lantern) || 0, 0, 3),
+    };
+    state.tank.glow = clamp(Number(snapshot.glow) || 0, 0, 1e9);
+    state.tank.population = clamp(Number(snapshot.population) || snapshot.babies.length, 0, tankCapacity());
+    state.tank.savedBabies = snapshot.babies.slice(0, 18);
+    state.tank.guests = { algae: null, nursery: null, lantern: null };
+    state.tank.guestTimers = { algae: 0, nursery: 0, lantern: 0 };
+    state.tank.restored = false;
+    state.babies.length = 0;
+    state.glowMotes.length = 0;
+    state.count = clamp(Number(snapshot.memoryCount) || 0, 0, 999999);
+    memoryCount.textContent = String(state.count).padStart(2, "0");
+    localStorage.setItem("softness-memory-count", String(state.count));
+    restoreTankBabies();
+    saveTank();
+  }
+
   function resize() {
     const rect = canvas.getBoundingClientRect();
+    const oldWidth = state.width;
+    const oldWorldHeight = state.map.worldHeight;
     state.dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.round(rect.width * state.dpr);
     canvas.height = Math.round(rect.height * state.dpr);
     state.width = rect.width;
     state.height = rect.height;
+    state.map.worldHeight = Math.max(rect.height * 2.05, 1100);
+    if (oldWidth && oldWorldHeight) {
+      state.babies.forEach((baby) => {
+        baby.x *= rect.width / oldWidth;
+        baby.y *= state.map.worldHeight / oldWorldHeight;
+      });
+    }
+    setMapView(state.map.targetY);
     if (!state.center.x) {
       state.center.x = rect.width * 0.5;
       state.center.y = rect.height * 0.51;
@@ -527,6 +692,8 @@
       indexPrevX: null,
       indexPrevY: null,
       touchBaby: null,
+      mapGesture: null,
+      babyGesture: false,
     });
     updateCameraButton();
     updateBackgroundButton();
@@ -552,7 +719,7 @@
         assetsPath: "https://unpkg.com/handsfree@8.5.1/build/lib/assets",
         hands: {
           enabled: true,
-          maxNumHands: 1,
+          maxNumHands: 2,
           minDetectionConfidence: 0.55,
           minTrackingConfidence: 0.5,
         },
@@ -623,6 +790,36 @@
     if (!camera.enabled || !camera.handsfree || now - camera.lastFrameAt < 46) return;
     camera.lastFrameAt = now;
     const hands = camera.hands || camera.handsfree.data?.hands;
+    const visibleHands = hands?.multiHandLandmarks?.filter((hand) => hand?.length >= 21) || [];
+    if (visibleHands.length >= 2) {
+      const palms = visibleHands.slice(0, 2).map((hand) => ({
+        x: (1 - (hand[0].x + hand[5].x + hand[17].x) / 3) * state.width,
+        y: ((hand[0].y + hand[5].y + hand[17].y) / 3) * state.height,
+      }));
+      const midpointY = (palms[0].y + palms[1].y) * 0.5;
+      const distance = Math.max(45, Math.hypot(palms[0].x - palms[1].x, palms[0].y - palms[1].y));
+      if (!camera.mapGesture) {
+        camera.mapGesture = { midpointY, distance, scrollY: state.map.scrollY, zoom: state.map.zoom };
+        camera.active = false;
+        state.pointer.down = false;
+        state.activeBaby = null;
+        canvas.classList.remove("is-touching");
+        hint.textContent = "双手上下移动探索海底，张开或靠近来缩放地图";
+      } else {
+        state.map.zoom = clamp(camera.mapGesture.zoom * distance / camera.mapGesture.distance, 0.72, 1.65);
+        state.map.targetZoom = state.map.zoom;
+        state.map.scrollY = clamp(
+          camera.mapGesture.scrollY + (camera.mapGesture.midpointY - midpointY) / state.map.zoom,
+          0,
+          state.map.worldHeight - state.height / state.map.zoom,
+        );
+        setMapView(state.map.scrollY);
+      }
+      camera.cursorAlpha = mix(camera.cursorAlpha, 0, 0.2);
+      camera.rearm = true;
+      return;
+    }
+    camera.mapGesture = null;
     const landmarks = hands?.multiHandLandmarks?.[0];
     const present = Boolean(landmarks && landmarks.length >= 21);
     let pinching = false;
@@ -635,10 +832,12 @@
       const handSlot = handedness === "Right" ? 0 : 1;
       const pinchState = hands.pinchState?.[handSlot]?.[0] || "";
       const pluginPinching = pinchState === "start" || pinchState === "held";
-      const targetAX = (1 - thumb.x) * state.width;
-      const targetAY = thumb.y * state.height;
-      const targetBX = (1 - index.x) * state.width;
-      const targetBY = index.y * state.height;
+      const thumbPoint = worldPoint((1 - thumb.x) * state.width, thumb.y * state.height);
+      const indexPoint = worldPoint((1 - index.x) * state.width, index.y * state.height);
+      const targetAX = thumbPoint.x;
+      const targetAY = thumbPoint.y;
+      const targetBX = indexPoint.x;
+      const targetBY = indexPoint.y;
       const targetX = (targetAX + targetBX) * 0.5;
       const targetY = (targetAY + targetBY) * 0.5;
       const fingerGap = Math.hypot(thumb.x - index.x, thumb.y - index.y);
@@ -699,8 +898,21 @@
         const entering = camera.touchBaby !== touchedBaby;
         touchedBaby.cameraTouch = 1.35;
         touchedBaby.touchAngle = Math.atan2(fingerY - touchedBaby.y, fingerX - touchedBaby.x);
-        touchedBaby.vx += deltaX * 0.24 + (distanceX / distance) * (entering ? 3.6 : 0.34);
-        touchedBaby.vy += deltaY * 0.24 + (distanceY / distance) * (entering ? 3.6 : 0.34);
+        const reaction = touchedBaby.personality === 1 ? 2.8 : touchedBaby.personality === 0 ? -0.35 : 1;
+        touchedBaby.vx += deltaX * 0.24 + (distanceX / distance) * (entering ? 3.6 : 0.34) * reaction;
+        touchedBaby.vy += deltaY * 0.24 + (distanceY / distance) * (entering ? 3.6 : 0.34) * reaction;
+        if (touchedBaby.personality === 0) {
+          touchedBaby.teaseX = fingerX;
+          touchedBaby.teaseY = fingerY;
+          touchedBaby.teaseUntil = state.elapsed + 2.2;
+          touchedBaby.teaseAngle = Math.atan2(touchedBaby.y - fingerY, touchedBaby.x - fingerX);
+        } else if (touchedBaby.personality === 1) {
+          touchedBaby.fleeX = fingerX;
+          touchedBaby.fleeY = fingerY;
+          touchedBaby.fleeUntil = state.elapsed + 2;
+        }
+        touchedBaby.expression = touchedBaby.personality === 1 ? 3 : touchedBaby.personality === 0 ? 1 : 0;
+        touchedBaby.moodTimer = 1.8;
         touchedBaby.releaseGlow = Math.max(touchedBaby.releaseGlow, entering ? 0.72 : 0.28);
         if (entering) {
           addTankGlow(0.8 + touchedBaby.size * 0.03);
@@ -718,7 +930,7 @@
       } else {
         camera.touchBaby = null;
         const radius = baseRadius();
-        const inTentacles =
+      const inTentacles =
           Math.abs(fingerX - state.center.x) <= radius * 1.02 &&
           fingerY >= state.center.y + radius * 0.24 &&
           fingerY <= state.center.y + radius * 1.62;
@@ -754,18 +966,24 @@
     if (present && canControl) {
       if (!camera.active) {
         const distance = Math.hypot(camera.x - state.center.x, camera.y - state.center.y);
-        if (camera.rearm && camera.pinchFrames === 3 && distance <= baseRadius() * 1.34) {
+        const pinchedBaby = camera.pinchFrames === 3 ? findTouchableBaby(camera.x, camera.y, 1.25) : null;
+        if (camera.rearm && camera.pinchFrames === 3 && (distance <= baseRadius() * 1.34 || pinchedBaby)) {
           camera.active = true;
           camera.rearm = false;
+          camera.babyGesture = Boolean(pinchedBaby);
           camera.gestureOriginX = camera.x;
           camera.gestureOriginY = camera.y;
           camera.pointerOriginX = camera.x;
           camera.pointerOriginY = camera.y;
           state.pointer = { x: camera.x, y: camera.y, down: true, id: "camera", startedAt: now };
-          state.activeBaby = null;
+          state.activeBaby = pinchedBaby;
+          if (pinchedBaby) {
+            pinchedBaby.expression = 3;
+            pinchedBaby.moodTimer = 1.5;
+          }
           state.touchAngle = Math.atan2(camera.y - state.center.y, camera.x - state.center.x);
           canvas.classList.add("is-touching");
-          hint.textContent = "夹住母体了——保持双指合拢，向外拉";
+          hint.textContent = pinchedBaby ? "轻轻夹住小水母，可以挤压或带它去栖息地" : "夹住母体了——保持双指合拢，向外拉";
         } else if (camera.openFrames >= 2) {
           hint.textContent = cameraTouchBaby
             ? "指尖碰到了它——它软软地让开了"
@@ -773,7 +991,7 @@
               ? "食指拨过触须——它们顺着水流摆开了"
               : "食指逗小水母或拨触须；双指移到母体再捏合";
         } else if (pinching && distance > baseRadius() * 1.34) {
-          hint.textContent = "双指捏合只会抓住母体；一根食指可以逗小水母";
+          hint.textContent = "靠近母体或小水母，再合拢拇指和食指";
         }
       } else {
         const amplification = 1.55;
@@ -785,16 +1003,22 @@
         state.pointer.y = clamp(
           camera.pointerOriginY + (camera.y - camera.gestureOriginY) * amplification,
           -baseRadius() * 0.4,
-          state.height + baseRadius() * 0.4,
+          state.map.worldHeight + baseRadius() * 0.4,
         );
+        if (camera.babyGesture && state.activeBaby) {
+          state.activeBaby.x = mix(state.activeBaby.x, state.pointer.x, 0.55);
+          state.activeBaby.y = mix(state.activeBaby.y, state.pointer.y, 0.55);
+          state.activeBaby.cameraTouch = 1.4;
+        }
         state.touchAngle = Math.atan2(state.pointer.y - state.center.y, state.pointer.x - state.center.x);
         if (!pinching && camera.openFrames >= 3) {
           camera.active = false;
           camera.suspendedUntil = now + 260;
           releasePointer();
-          hint.textContent = "张开手指——啵，它松开了";
+          hint.textContent = camera.babyGesture ? "小水母软软地弹开了" : "张开手指——啵，它松开了";
+          camera.babyGesture = false;
         } else {
-          hint.textContent = "保持夹住向外拉；张开双指就松手";
+          hint.textContent = camera.babyGesture ? "继续带它游动，张开手指放下" : "保持夹住向外拉；张开双指就松手";
         }
       }
     } else if (camera.active && camera.absentFrames >= 5) {
@@ -822,11 +1046,86 @@
       hint.textContent = `水母缸在你离开时积攒了 ${formatGlow(state.tank.awayGlow)} 微光`;
       state.tank.awayGlow = 0;
     }
+    if (!localStorage.getItem("softness-jelly-tutorial-v2")) showTutorial(true);
   }
 
   function pointerPosition(event) {
     const rect = canvas.getBoundingClientRect();
+    return worldPoint(event.clientX - rect.left, event.clientY - rect.top);
+  }
+
+  function pointerScreenPosition(event) {
+    const rect = canvas.getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  function mapTouchGesture() {
+    const points = [...state.map.pointers.values()];
+    if (points.length < 2) return;
+    const midpoint = { x: (points[0].x + points[1].x) * 0.5, y: (points[0].y + points[1].y) * 0.5 };
+    const distance = Math.max(20, Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y));
+    const baby = distance < 115 ? findTouchableBaby(worldPoint(midpoint.x, midpoint.y).x, worldPoint(midpoint.x, midpoint.y).y, 1.2) : null;
+    state.pointer.down = false;
+    state.activeBaby = null;
+    canvas.classList.remove("is-touching");
+    state.map.gesture = {
+      type: baby ? "baby" : "map",
+      baby,
+      startY: midpoint.y,
+      startDistance: distance,
+      startScroll: state.map.scrollY,
+      startZoom: state.map.zoom,
+    };
+    if (baby) hint.textContent = "两指夹住小水母，拖到栖息地放开";
+    else hint.textContent = "双指滑动看海底，张合双指缩放";
+  }
+
+  function moveTouchGesture() {
+    const points = [...state.map.pointers.values()];
+    const gesture = state.map.gesture;
+    if (!gesture || points.length < 2) return;
+    const midpoint = { x: (points[0].x + points[1].x) * 0.5, y: (points[0].y + points[1].y) * 0.5 };
+    if (gesture.type === "baby") {
+      const point = worldPoint(midpoint.x, midpoint.y);
+      gesture.baby.x = point.x;
+      gesture.baby.y = point.y;
+      gesture.baby.squash = 0.42;
+      gesture.baby.expression = 3;
+      return;
+    }
+    const distance = Math.max(20, Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y));
+    state.map.zoom = clamp(gesture.startZoom * distance / gesture.startDistance, 0.72, 1.65);
+    state.map.targetZoom = state.map.zoom;
+    state.map.scrollY = clamp(gesture.startScroll + (gesture.startY - midpoint.y) / state.map.zoom, 0, state.map.worldHeight - state.height / state.map.zoom);
+    setMapView(state.map.scrollY);
+  }
+
+  function placeBabyAtHabitat(baby) {
+    if (!baby) return;
+    const closest = Object.keys(habitatConfig)
+      .filter((key) => state.tank.levels[key] > 0)
+      .map((key) => ({ key, distance: Math.hypot(baby.x - habitatPosition(key).x, baby.y - habitatPosition(key).y) }))
+      .sort((a, b) => a.distance - b.distance)[0];
+    if (closest && closest.distance < 175) {
+      Object.keys(state.tank.guests).forEach((key) => {
+        if (state.tank.guests[key] === baby) state.tank.guests[key] = null;
+      });
+      baby.queuedFor = closest.key;
+      baby.home = null;
+      if (!state.tank.guests[closest.key]) {
+        state.tank.guests[closest.key] = baby;
+        state.tank.guestTimers[closest.key] = 8;
+        baby.home = closest.key;
+        baby.queuedFor = null;
+      }
+      baby.playTimer = 0.3;
+      baby.expression = 1;
+      hint.textContent = baby.home
+        ? `${personalityNames[baby.personality]}水母来到${habitatConfig[closest.key].label}玩耍`
+        : `${habitatConfig[closest.key].label}里有朋友，它稍后再来玩`;
+      addTankGlow(1.4);
+      saveTank();
+    }
   }
 
   function findTouchableBaby(x, y, reach = 1) {
@@ -840,7 +1139,15 @@
   }
 
   function pointerDown(event) {
-    if (!state.entered || aboutPanel.classList.contains("is-open")) return;
+    if (!state.entered || aboutPanel.classList.contains("is-open") || tutorialPanel.classList.contains("is-open") || savePanel.classList.contains("is-open")) return;
+    if (event.pointerType === "touch") {
+      state.map.pointers.set(event.pointerId, pointerScreenPosition(event));
+      canvas.setPointerCapture(event.pointerId);
+      if (state.map.pointers.size >= 2) {
+        mapTouchGesture();
+        return;
+      }
+    }
     if (state.camera.active) cancelCameraGesture();
     state.camera.suspendedUntil = performance.now() + 1400;
     const point = pointerPosition(event);
@@ -867,21 +1174,41 @@
   }
 
   function pointerMove(event) {
+    if (event.pointerType === "touch" && state.map.pointers.has(event.pointerId)) {
+      state.map.pointers.set(event.pointerId, pointerScreenPosition(event));
+      if (state.map.gesture) {
+        moveTouchGesture();
+        return;
+      }
+    }
     if (!state.pointer.down || state.pointer.id !== event.pointerId) return;
     const point = pointerPosition(event);
     state.pointer.x = point.x;
     state.pointer.y = point.y;
     if (state.activeBaby) {
       state.activeBaby.touchAngle = Math.atan2(point.y - state.activeBaby.y, point.x - state.activeBaby.x);
+      state.activeBaby.x = mix(state.activeBaby.x, point.x, 0.58);
+      state.activeBaby.y = mix(state.activeBaby.y, point.y, 0.58);
       return;
     }
     state.touchAngle = Math.atan2(point.y - state.center.y, point.x - state.center.x);
   }
 
-  function releasePointer() {
+  function releasePointer(event) {
+    if (event?.pointerType === "touch") {
+      state.map.pointers.delete(event.pointerId);
+      if (state.map.gesture) {
+        if (state.map.gesture.type === "baby") placeBabyAtHabitat(state.map.gesture.baby);
+        state.map.gesture = null;
+        state.pointer.down = false;
+        state.pointer.id = null;
+        return;
+      }
+    }
     if (!state.pointer.down) return;
     if (state.activeBaby) {
       const baby = state.activeBaby;
+      placeBabyAtHabitat(baby);
       const awayAngle = baby.touchAngle + Math.PI;
       const impulse = 15 + baby.squash * 17;
       baby.vx += Math.cos(awayAngle) * impulse;
@@ -942,6 +1269,15 @@
       size,
       strength,
       hue,
+      personality: state.count % 4,
+      expression: 0,
+      moodTimer: 2.5 + Math.random() * 4,
+      playTimer: 2 + Math.random() * 3,
+      home: null,
+      queuedFor: Object.keys(habitatConfig).filter((key) => state.tank.levels[key] > 0)[state.count % Math.max(1, Object.values(state.tank.levels).filter(Boolean).length)] || null,
+      wanderX: state.width * (Math.random() < 0.5 ? 0.12 + Math.random() * 0.18 : 0.7 + Math.random() * 0.18),
+      wanderY: state.height * (0.55 + Math.random() * 0.45),
+      wanderTimer: 2 + Math.random() * 4,
       phase: state.count * 0.91 + Math.random() * 0.5,
       age: 0,
       birthAngle: state.touchAngle,
@@ -965,7 +1301,8 @@
   function leaveMemory(strength) {
     state.count += 1;
     localStorage.setItem("softness-memory-count", String(state.count));
-    const hue = state.count % palette.length;
+    const hues = unlockedHues();
+    const hue = hues[(state.count - 1) % hues.length];
     state.memories.push({
       angle: state.touchAngle + (Math.random() - 0.5) * 0.42,
       radius: 0.38 + Math.random() * 0.38,
@@ -992,9 +1329,13 @@
     state.memories.length = 0;
     state.ripples.length = 0;
     state.babies.length = 0;
+    state.glowMotes.length = 0;
     state.tank.glow = 0;
     state.tank.population = 0;
     state.tank.levels = { algae: 0, nursery: 0, lantern: 0 };
+    state.tank.savedBabies = [];
+    state.tank.guests = { algae: null, nursery: null, lantern: null };
+    state.tank.guestTimers = { algae: 0, nursery: 0, lantern: 0 };
     localStorage.removeItem("softness-memory-count");
     localStorage.removeItem("softness-jelly-tank");
     memoryCount.textContent = "00";
@@ -1003,8 +1344,46 @@
     showAbout(false);
   }
 
+  function updateHabitatGuests(dt) {
+    Object.keys(habitatConfig).forEach((key) => {
+      if (state.tank.levels[key] <= 0) return;
+      let guest = state.tank.guests[key];
+      state.tank.guestTimers[key] -= dt;
+      if (guest && (!state.babies.includes(guest) || guest === state.activeBaby || state.tank.guestTimers[key] <= 0)) {
+        guest.home = null;
+        guest.lastPlayedAt = state.elapsed;
+        guest.wanderTimer = 0;
+        state.tank.guests[key] = null;
+        state.tank.guestTimers[key] = 1.8;
+        guest = null;
+      }
+      if (guest || state.tank.guestTimers[key] > 0) return;
+      const candidates = state.babies.filter((baby) =>
+        baby.detached && baby !== state.activeBaby && !baby.home &&
+        (baby.queuedFor === key || !baby.queuedFor) &&
+        state.elapsed - (baby.lastPlayedAt || -100) > 5,
+      );
+      if (!candidates.length) return;
+      const queued = candidates.filter((baby) => baby.queuedFor === key);
+      const pool = queued.length ? queued : candidates;
+      const selected = pool[state.tank.queueCursor[key] % pool.length];
+      state.tank.queueCursor[key] += 1;
+      selected.home = key;
+      selected.queuedFor = null;
+      selected.playTimer = 1 + Math.random() * 1.2;
+      selected.expression = 1;
+      state.tank.guests[key] = selected;
+      state.tank.guestTimers[key] = 7 + Math.random() * 4;
+    });
+  }
+
   function update(dt) {
     state.elapsed += dt;
+    if (!state.map.gesture && !state.camera.mapGesture) {
+      const ease = 1 - Math.pow(0.002, dt);
+      state.map.zoom = mix(state.map.zoom, state.map.targetZoom, ease);
+      state.map.scrollY = mix(state.map.scrollY, state.map.targetY, ease);
+    }
     if (state.entered) {
       state.tank.glow += tankGlowRate() * dt;
       state.tank.hudElapsed += dt;
@@ -1020,6 +1399,7 @@
     }
     state.tentaclePlay.amount *= Math.pow(0.018, dt);
     state.tentaclePlay.direction *= Math.pow(0.08, dt);
+    updateHabitatGuests(dt);
     const radius = baseRadius();
     const dx = state.pointer.x - state.center.x;
     const dy = state.pointer.y - state.center.y;
@@ -1074,6 +1454,15 @@
     state.ripples.forEach((ripple) => { ripple.age += dt; });
     state.ripples = state.ripples.filter((ripple) => ripple.age < (ripple.duration || 3.4));
 
+    state.glowMotes.forEach((mote) => {
+      mote.age += dt;
+      if (mote.age >= mote.duration && !mote.collected) {
+        mote.collected = true;
+        addTankGlow(mote.amount);
+      }
+    });
+    state.glowMotes = state.glowMotes.filter((mote) => !mote.collected);
+
     state.babies.forEach((baby) => {
       baby.age += dt;
       baby.phase += dt * (0.42 + baby.strength * 0.16);
@@ -1085,6 +1474,11 @@
       baby.squashVelocity *= Math.pow(0.006, dt);
       baby.squash += baby.squashVelocity * dt * 6.4;
       baby.squash = clamp(baby.squash, -0.12, 0.94);
+      baby.moodTimer -= dt;
+      if (baby.moodTimer <= 0) {
+        baby.expression = baby.personality === 1 ? 4 : baby.personality === 3 ? 2 : Math.floor(Math.random() * 4);
+        baby.moodTimer = 2.4 + Math.random() * 5.6;
+      }
       const birthing = baby.age < baby.birthDuration;
       if (birthing) {
         const t = clamp(baby.age / baby.birthDuration, 0, 1);
@@ -1118,14 +1512,65 @@
           popTone(baby.strength, baby.birthAngle);
           hint.textContent = "啵——它翻过身了";
         }
-        baby.vx *= Math.pow(0.72, dt);
-        baby.vy = mix(baby.vy, -2.2 - baby.strength * 1.5, 1 - Math.pow(0.3, dt));
+        if (baby.home && state.tank.levels[baby.home] > 0) {
+          const home = habitatPosition(baby.home);
+          const orbit = state.elapsed * (baby.personality === 0 ? 1.25 : 0.55) + baby.phase;
+          const targetX = home.x + Math.cos(orbit) * (baby.personality === 0 ? 55 : 28);
+          const targetY = home.y - 55 + Math.sin(orbit) * (baby.personality === 0 ? 38 : 20);
+          const deltaX = targetX - baby.x;
+          const deltaY = targetY - baby.y;
+          baby.vx = mix(baby.vx, clamp(deltaX * 0.9, -48, 48), 1 - Math.pow(0.08, dt));
+          baby.vy = mix(baby.vy, clamp(deltaY * 0.9, -44, 44), 1 - Math.pow(0.08, dt));
+          if (Math.hypot(deltaX, deltaY) < 115) {
+            baby.playTimer -= dt;
+            if (baby.playTimer <= 0) {
+              baby.expression = baby.personality === 3 ? 2 : 1;
+              baby.moodTimer = 2.2;
+              baby.playTimer = 3.2 + Math.random() * 2.5;
+              state.glowMotes.push({
+                x: baby.x,
+                y: baby.y,
+                age: 0,
+                delay: 2 + Math.random() * 3.2,
+                duration: 16 + Math.random() * 7,
+                seed: Math.random() * TAU,
+                amount: 0.75 + state.tank.levels[baby.home] * 0.45,
+                hue: baby.hue,
+              });
+              if (state.glowMotes.length > 80) state.glowMotes.shift();
+            }
+          }
+        } else {
+          baby.wanderTimer -= dt;
+          if (baby.wanderTimer <= 0 && state.elapsed >= (baby.teaseUntil || 0) && state.elapsed >= (baby.fleeUntil || 0)) {
+            baby.wanderX = state.width * (Math.random() < 0.5 ? 0.1 + Math.random() * 0.2 : 0.7 + Math.random() * 0.2);
+            baby.wanderY = state.height * (0.55 + Math.random() * 1.18);
+            baby.wanderTimer = 5 + Math.random() * 5;
+          }
+          let targetX = baby.wanderX;
+          let targetY = baby.wanderY;
+          if (state.elapsed < (baby.teaseUntil || 0)) {
+            const angle = baby.teaseAngle + (state.elapsed - (baby.teaseUntil - 2.2)) * 2.3;
+            targetX = baby.teaseX + Math.cos(angle) * 60;
+            targetY = baby.teaseY + Math.sin(angle) * 45;
+          } else if (state.elapsed < (baby.fleeUntil || 0)) {
+            const awayX = baby.x - baby.fleeX;
+            const awayY = baby.y - baby.fleeY;
+            const distance = Math.max(1, Math.hypot(awayX, awayY));
+            targetX = baby.x + awayX / distance * 145;
+            targetY = baby.y + awayY / distance * 110;
+          }
+          const dx = targetX - baby.x;
+          const dy = targetY - baby.y;
+          baby.vx = mix(baby.vx, clamp(dx * 0.37 + Math.sin(baby.phase) * 4, -23, 23), 1 - Math.pow(0.3, dt));
+          baby.vy = mix(baby.vy, clamp(dy * 0.37 + Math.cos(baby.phase) * 4, -23, 23), 1 - Math.pow(0.3, dt));
+        }
       }
       if (!birthing && state.activeBaby !== baby) {
         baby.x += (baby.vx + Math.sin(baby.phase * 0.8) * 2.2) * dt;
         baby.y += baby.vy * dt;
       }
-      if (baby.y < -baby.size * 4) baby.y = state.height + baby.size * 3;
+      baby.y = clamp(baby.y, baby.size * 2, state.map.worldHeight - baby.size * 2);
       if (baby.x < -baby.size * 3) baby.x = state.width + baby.size * 2;
       if (baby.x > state.width + baby.size * 3) baby.x = -baby.size * 2;
     });
@@ -1314,6 +1759,206 @@
     ctx.restore();
   }
 
+  function drawReefScene() {
+    const w = state.width;
+    const h = state.height;
+    const bottom = state.map.worldHeight;
+    const floorY = bottom - h * 0.24;
+    ctx.save();
+    const depth = ctx.createLinearGradient(0, h * 0.82, 0, bottom);
+    depth.addColorStop(0, "rgba(5,31,48,0)");
+    depth.addColorStop(0.48, "rgba(11,43,63,0.4)");
+    depth.addColorStop(1, "rgba(31,42,76,0.82)");
+    ctx.fillStyle = depth;
+    ctx.fillRect(0, h * 0.82, w, bottom - h * 0.82);
+
+    const currentStartY = state.center.y + baseRadius() * 1.45;
+    const currentEndY = habitatPosition("nursery").y - h * 0.12;
+    const sway = Math.sin(state.elapsed * 0.23) * w * 0.018;
+    const current = ctx.createLinearGradient(0, currentStartY, 0, currentEndY);
+    current.addColorStop(0, "rgba(156,230,231,0.025)");
+    current.addColorStop(0.5, "rgba(126,217,231,0.075)");
+    current.addColorStop(1, "rgba(181,192,248,0.04)");
+    ctx.lineCap = "round";
+    [18, 5].forEach((width) => {
+      ctx.beginPath();
+      ctx.moveTo(state.center.x, currentStartY);
+      ctx.bezierCurveTo(w * 0.43 + sway, h * 0.9, w * 0.57 - sway, h * 1.02, w * 0.52, currentEndY);
+      ctx.strokeStyle = current;
+      ctx.lineWidth = width;
+      ctx.stroke();
+    });
+
+    ctx.strokeStyle = "rgba(154,235,229,0.13)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(w * 0.035, h * 0.05);
+    ctx.bezierCurveTo(w * 0.015, h * 0.65, w * 0.02, bottom - h * 0.15, w * 0.09, bottom - h * 0.07);
+    ctx.quadraticCurveTo(w * 0.5, bottom + h * 0.04, w * 0.91, bottom - h * 0.07);
+    ctx.bezierCurveTo(w * 0.98, bottom - h * 0.15, w * 0.985, h * 0.65, w * 0.965, h * 0.05);
+    ctx.stroke();
+
+    const sand = ctx.createLinearGradient(0, floorY - 20, 0, bottom);
+    sand.addColorStop(0, "rgba(98,156,170,0)");
+    sand.addColorStop(0.45, "rgba(92,113,155,0.14)");
+    sand.addColorStop(1, "rgba(35,59,87,0.42)");
+    ctx.fillStyle = sand;
+    ctx.fillRect(0, floorY - 20, w, bottom - floorY + 20);
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(218,245,245,0.28)";
+    ctx.font = `10px "PingFang SC", sans-serif`;
+    ctx.fillText("深海花园 · 小水母的游乐场", w * 0.5, h * 1.04);
+    ctx.strokeStyle = "rgba(162,230,228,0.12)";
+    ctx.beginPath();
+    ctx.moveTo(w * 0.35, h * 1.065);
+    ctx.lineTo(w * 0.65, h * 1.065);
+    ctx.stroke();
+
+    const imageReady = reefImage.complete && reefImage.naturalWidth > 0;
+    if (imageReady) {
+      const imageWidth = Math.min(w * 0.97, 940);
+      const imageHeight = imageWidth * reefImage.naturalHeight / reefImage.naturalWidth;
+      const imageX = (w - imageWidth) * 0.5;
+      const imageY = habitatPosition("nursery").y - imageHeight * 0.62;
+      ctx.globalAlpha = 0.73;
+      ctx.drawImage(reefImage, imageX, imageY, imageWidth, imageHeight);
+      ctx.globalAlpha = 1;
+      Object.keys(habitatConfig).forEach((key) => {
+        const level = state.tank.levels[key];
+        if (!level) return;
+        const center = habitatPosition(key);
+        const color = key === "algae" ? "121,240,212" : key === "nursery" ? "255,184,216" : "190,180,255";
+        const glow = ctx.createRadialGradient(center.x, center.y - 18, 10, center.x, center.y - 18, 160);
+        glow.addColorStop(0, `rgba(${color},${0.17 + level * 0.035})`);
+        glow.addColorStop(1, `rgba(${color},0)`);
+        ctx.fillStyle = glow;
+        ctx.fillRect(center.x - 170, center.y - 188, 340, 340);
+      });
+    }
+
+    Object.keys(habitatConfig).forEach((key) => {
+      const center = habitatPosition(key);
+      const level = state.tank.levels[key];
+      ctx.save();
+      ctx.translate(center.x, center.y);
+      ctx.globalAlpha = level ? 1 : 0.28;
+      const colors = { algae: [115, 226, 205], nursery: [255, 174, 208], lantern: [180, 170, 255] };
+      const color = colors[key];
+      if (!imageReady) {
+        const halo = ctx.createRadialGradient(0, 12, 4, 0, 12, 125 + level * 12);
+        halo.addColorStop(0, `rgba(${color.join(",")},${level ? 0.17 + level * 0.04 : 0.05})`);
+        halo.addColorStop(1, `rgba(${color.join(",")},0)`);
+        ctx.fillStyle = halo;
+        ctx.fillRect(-170, -150, 340, 300);
+        if (key === "algae") drawAlgaeHabitat(level);
+        if (key === "nursery") drawNurseryHabitat(level);
+        if (key === "lantern") drawLanternHabitat(level);
+      }
+      ctx.fillStyle = `rgba(${color.join(",")},0.78)`;
+      ctx.font = `12px "PingFang SC", sans-serif`;
+      ctx.fillText(habitatConfig[key].label, 0, 132);
+      ctx.fillStyle = "rgba(224,247,244,0.43)";
+      ctx.font = `9px "PingFang SC", sans-serif`;
+      ctx.fillText(level ? `LV.${level} · 小水母正在玩耍` : "收集微光后培育", 0, 149);
+      ctx.restore();
+    });
+    ctx.restore();
+  }
+
+  function drawAlgaeHabitat(level) {
+    const sway = Math.sin(state.elapsed * 0.65) * 7;
+    ctx.save();
+    ctx.lineCap = "round";
+    for (let i = -3; i <= 3; i += 1) {
+      const length = 78 + (i % 3) * 15 + level * 9;
+      ctx.beginPath();
+      ctx.moveTo(i * 15, 77);
+      ctx.bezierCurveTo(i * 16 - 18, 20, i * 10 + sway, -length * 0.58, i * 13 + sway, 77 - length);
+      ctx.strokeStyle = `rgba(109,221,198,${0.25 + level * 0.08})`;
+      ctx.lineWidth = 5 + (i % 2);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(203,255,238,0.28)";
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.ellipse(0, 46, 58, 25, -0.12, Math.PI, TAU);
+    ctx.strokeStyle = "rgba(182,248,225,0.6)";
+    ctx.lineWidth = 5;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = "rgba(108,236,211,0.5)";
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawNurseryHabitat(level) {
+    ctx.save();
+    ctx.shadowBlur = 17;
+    ctx.shadowColor = "rgba(255,162,202,0.42)";
+    const shell = ctx.createLinearGradient(0, -80, 0, 85);
+    shell.addColorStop(0, "rgba(255,221,222,0.5)");
+    shell.addColorStop(1, "rgba(199,102,164,0.44)");
+    ctx.beginPath();
+    ctx.moveTo(-68, 72);
+    ctx.bezierCurveTo(-95, -10, -68, -85, 0, -72);
+    ctx.bezierCurveTo(72, -98, 96, -8, 68, 72);
+    ctx.quadraticCurveTo(0, 109, -68, 72);
+    ctx.fillStyle = shell;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,214,230,0.68)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    for (let i = -2; i <= 2; i += 1) {
+      ctx.beginPath();
+      ctx.moveTo(i * 12, 71);
+      ctx.quadraticCurveTo(i * 25, -12, i * 20, -58);
+      ctx.strokeStyle = "rgba(255,238,238,0.27)";
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.ellipse(0, 55, 33, 17, 0, 0, TAU);
+    ctx.fillStyle = "rgba(255,239,244,0.72)";
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawLanternHabitat(level) {
+    ctx.save();
+    ctx.shadowBlur = 22;
+    ctx.shadowColor = "rgba(178,177,255,0.7)";
+    ctx.strokeStyle = "rgba(200,205,255,0.72)";
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.arc(0, -7, 60 + level * 2, -Math.PI * 0.1, Math.PI * 1.47);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(242,240,255,0.76)";
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.moveTo(-70, 77);
+    ctx.quadraticCurveTo(0, 52, 70, 77);
+    ctx.strokeStyle = "rgba(154,160,227,0.6)";
+    ctx.lineWidth = 13;
+    ctx.stroke();
+    for (let i = -1; i <= 1; i += 1) {
+      const x = i * 29;
+      ctx.beginPath();
+      ctx.moveTo(x, -58);
+      ctx.lineTo(x, -22 + (i % 2) * 13);
+      ctx.strokeStyle = "rgba(211,212,255,0.42)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,239,190,0.84)";
+      ctx.beginPath();
+      ctx.arc(x, -19 + (i % 2) * 13, 3.4, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function drawJellyfishBody(
     x,
     y,
@@ -1326,6 +1971,7 @@
     releaseGlow = 0,
     rotation = 0,
     tentacleGrowth = 1,
+    mood = 0,
   ) {
     const c = palette[hue % palette.length];
     ctx.save();
@@ -1376,7 +2022,43 @@
 
     ctx.restore();
 
-    const expression = hue % 5;
+    if (hue !== 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      ctx.translate(0, -size * 0.42);
+      ctx.strokeStyle = `rgba(255,255,255,${0.54 * alpha})`;
+      ctx.lineWidth = Math.max(0.75, size * 0.035);
+      ctx.lineCap = "round";
+      if (hue === 1) {
+        ctx.beginPath();
+        ctx.arc(0, 0, size * 0.16, -Math.PI * 0.3, Math.PI * 0.8);
+        ctx.stroke();
+      } else if (hue === 2) {
+        for (let i = 0; i < 5; i += 1) {
+          const angle = i * TAU / 5;
+          ctx.beginPath();
+          ctx.ellipse(Math.cos(angle) * size * 0.085, Math.sin(angle) * size * 0.085, size * 0.045, size * 0.075, angle, 0, TAU);
+          ctx.stroke();
+        }
+      } else if (hue === 3) {
+        ctx.beginPath();
+        ctx.moveTo(-size * 0.12, size * 0.04);
+        ctx.quadraticCurveTo(0, -size * 0.18, size * 0.12, size * 0.04);
+        ctx.quadraticCurveTo(0, size * 0.1, -size * 0.12, size * 0.04);
+        ctx.stroke();
+      } else {
+        for (let i = 0; i < 5; i += 1) {
+          const angle = i * TAU / 5 - Math.PI / 2;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(angle) * size * 0.17, Math.sin(angle) * size * 0.17);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+
+    const expression = mood % 5;
     const faceY = -size * 0.045;
     const eyeX = size * 0.21;
     ctx.save();
@@ -1499,7 +2181,31 @@
         baby.releaseGlow,
         rotation,
         tentacleGrowth,
+        baby.expression,
       );
+    });
+  }
+
+  function drawGlowMotes() {
+    state.glowMotes.forEach((mote) => {
+      const t = clamp((mote.age - mote.delay) / Math.max(1, mote.duration - mote.delay), 0, 1);
+      const glide = t * t * (3 - 2 * t);
+      const wander = Math.sin(Math.PI * t);
+      const driftX = Math.sin(mote.age * 0.67 + mote.seed) * 22 + Math.sin(mote.age * 0.31 + mote.seed * 2.1) * 14;
+      const driftY = Math.cos(mote.age * 0.48 + mote.seed) * 13;
+      const x = mix(mote.x, state.center.x, glide) + driftX * (1 - glide) + Math.sin(mote.seed * 3.1) * wander * 42;
+      const y = mix(mote.y, state.center.y, glide) + driftY * (1 - glide) - wander * 18;
+      const color = palette[mote.hue];
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      ctx.shadowBlur = 16;
+      ctx.shadowColor = `rgba(${color[0]},${color[1]},${color[2]},0.55)`;
+      const flicker = 0.48 + Math.sin(mote.age * 1.1 + mote.seed) * 0.14;
+      ctx.fillStyle = `rgba(${color[0]},${color[1]},${color[2]},${flicker * (1 - glide * 0.25)})`;
+      ctx.beginPath();
+      ctx.arc(x, y, 2 + Math.sin(mote.age * 0.9 + mote.seed) * 0.35, 0, TAU);
+      ctx.fill();
+      ctx.restore();
     });
   }
 
@@ -1935,12 +2641,18 @@
     ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
     ctx.clearRect(0, 0, state.width, state.height);
     drawBackground();
-    drawTankHabitat();
+    ctx.save();
+    ctx.translate(state.width * 0.5, state.height * 0.5);
+    ctx.scale(state.map.zoom, state.map.zoom);
+    ctx.translate(-state.width * 0.5, -state.height * 0.5 - state.map.scrollY);
+    drawReefScene();
     drawBabyJellyfish();
+    drawGlowMotes();
     drawRipples();
     drawContourMountainAura();
     drawCreature();
     drawGestureCursor();
+    ctx.restore();
     requestAnimationFrame(render);
   }
 
@@ -1952,6 +2664,40 @@
   });
   cameraButton.addEventListener("click", toggleCamera);
   backgroundButton.addEventListener("click", toggleBackgroundMode);
+  surfaceButton.addEventListener("click", () => setMapView(0));
+  reefButton.addEventListener("click", () => setMapView(state.map.worldHeight - state.height));
+  tutorialButton.addEventListener("click", () => showTutorial(true));
+  tutorialClose.addEventListener("click", () => showTutorial(false));
+  saveButton.addEventListener("click", () => showSavePanel(true));
+  saveClose.addEventListener("click", () => showSavePanel(false));
+  saveNow.addEventListener("click", () => {
+    saveTank();
+    hint.textContent = "这一片海已经存好了";
+  });
+  exportSave.addEventListener("click", () => {
+    saveTank();
+    const blob = new Blob([JSON.stringify(tankSnapshot(), null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `jelly-tank-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    saveStatus.textContent = "存档文件已导出，可以在另一台设备导入";
+  });
+  importSave.addEventListener("change", async () => {
+    const file = importSave.files?.[0];
+    if (!file) return;
+    try {
+      if (file.size > 250000) throw new Error("存档文件过大");
+      loadSnapshot(JSON.parse(await file.text()));
+      saveStatus.textContent = `已读取 ${file.name} · ${state.tank.population} 只小水母`;
+      hint.textContent = "熟悉的小水母又回到了这片海";
+    } catch (error) {
+      saveStatus.textContent = error?.message || "无法读取存档文件";
+    }
+    importSave.value = "";
+  });
   habitatButtons.forEach((button) => {
     button.addEventListener("click", () => upgradeHabitat(button.dataset.habitat));
   });
@@ -1963,6 +2709,16 @@
   canvas.addEventListener("pointermove", pointerMove);
   canvas.addEventListener("pointerup", releasePointer);
   canvas.addEventListener("pointercancel", releasePointer);
+  canvas.addEventListener("wheel", (event) => {
+    if (!state.entered || tutorialPanel.classList.contains("is-open")) return;
+    event.preventDefault();
+    if (event.ctrlKey || event.metaKey) {
+      state.map.targetZoom = clamp(state.map.targetZoom - event.deltaY * 0.003, 0.72, 1.65);
+      setMapView(state.map.targetY);
+    } else {
+      setMapView(state.map.targetY + event.deltaY * 0.9 / state.map.zoom);
+    }
+  }, { passive: false });
   window.addEventListener("resize", resize);
 
   window.addEventListener("keydown", (event) => {
@@ -1982,7 +2738,13 @@
       state.touchAngle = -Math.PI / 2;
       hint.textContent = "慢一点，它正在改变";
     }
-    if (event.key === "Escape") showAbout(false);
+    if (event.key === "Escape") {
+      showAbout(false);
+      if (tutorialPanel.classList.contains("is-open")) showTutorial(false);
+      showSavePanel(false);
+    }
+    if (event.key === "ArrowDown") setMapView(state.map.targetY + state.height * 0.32);
+    if (event.key === "ArrowUp") setMapView(state.map.targetY - state.height * 0.32);
   });
 
   window.addEventListener("keyup", (event) => {
