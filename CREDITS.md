@@ -1,5 +1,12 @@
 # Credits and Attribution
 
+## Jellyfish Grove browser game (2026-10-29)
+
+- Creative direction and visual references: Serena Lin.
+- Stage 1 implementation: original HTML, CSS and Canvas 2D code in this repository.
+- The supplied “Luminous Abyss / 浮光之域” concept screenshot was used as a visual reference only and is not redistributed in the repository.
+- No external image, audio, font, tracking library or runtime dependency is required by the new browser game.
+
 ## Project authorship
 
 Project concept and direction: **student author — add your name here before submission**.

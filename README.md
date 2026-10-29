@@ -1,4 +1,41 @@
-# SQUISH!
+# Jellyfish Grove（水母之森）
+
+一个浏览器里的温柔深海生态缸。巨大的母水母位于世界顶部，发光触须向下生长为整座栖息地的中央树干；小水母会自由漫游、轮流休息和玩耍，把产生的浮光缓慢送回母体。玩家用浮光让贝壳、滑梯和新的小水母逐步生长出来。
+
+这是按照 `JELLYFISH_GROVE_PLAN.md` 完成的第一阶段核心版本。它使用原生 HTML、CSS 和 Canvas，不需要安装第三方前端依赖。
+
+## 一分钟启动
+
+```bash
+cd web
+python3 -m http.server 4173
+```
+
+然后在浏览器打开 <http://127.0.0.1:4173/>。直接双击 `index.html` 也能显示页面，但建议使用本地服务器，以确保 ES Module 正常加载。
+
+## 第一阶段怎么玩
+
+- 初始有 35 点浮光和一只蓝水母；浮光会随时间自动增加。
+- 花费 30 点建造贝壳休息台，解锁粉色害羞水母。
+- 花费 150 点建造水母滑梯，解锁金色活泼水母。
+- 母水母每次消耗 50 点浮光孕育一只新水母。
+- 拖动画面探索纵向世界；滚轮平移，`Ctrl/⌘ + 滚轮` 或工具按钮缩放。
+- 点击小水母会触发凹陷、回弹和性格反应；拖动它到栖息地可安排游玩。
+- 进度每 5 秒保存到浏览器，本次也包含最多四小时的离线浮光收益。
+
+## 浏览器项目结构
+
+- `web/index.html`：游戏界面与 HUD
+- `web/styles.css`：玻璃质感界面与响应式布局
+- `web/config.js`：经济数值、品种和栖息地配置
+- `web/app.js`：生态状态机、绘制、输入、存档和声音
+- `JELLYFISH_GROVE_PLAN.md`：阶段清单和后续范围
+
+原有 Python 摄像头作品仍保留在 `src/`、`tests/` 和 `run_squish.py` 中，本次没有删除；网页入口已更新为新的水母之森第一阶段。
+
+---
+
+## Legacy SQUISH prototype
 
 Public repository: <https://github.com/Only-SerenaLIN/SQUISH-interactive-experience>
 

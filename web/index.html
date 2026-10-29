@@ -1,185 +1,49 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#d7c5ce" />
-    <meta name="description" content="《不可触摸的柔软》——一件会呼吸、回弹，并记住每次触碰的浏览器交互艺术作品。" />
-    <title>不可触摸的柔软 — Softness Without Touch</title>
-    <link rel="stylesheet" href="https://unpkg.com/handsfree@8.5.1/build/lib/assets/handsfree.css" />
-    <link rel="stylesheet" href="styles.css?v=jelly-tank-2" />
-  </head>
-  <body>
-    <main class="artwork" aria-label="《不可触摸的柔软》交互艺术作品">
-      <video class="camera-backdrop" id="cameraBackdrop" autoplay muted playsinline aria-hidden="true"></video>
-      <div class="camera-backdrop__shade" aria-hidden="true"></div>
-      <canvas id="world" aria-label="可按压和拉伸的柔软生命体" tabindex="0"></canvas>
-
-      <header class="topbar">
-        <a class="identity" href="#" aria-label="回到作品">
-          <span class="identity__cn">不可触摸的柔软</span>
-          <span class="identity__en">Softness Without Touch</span>
-        </a>
-        <nav class="controls" aria-label="作品控制">
-          <button id="soundButton" class="text-button" type="button" aria-pressed="false">
-            <span class="status-dot" aria-hidden="true"></span>
-            <span class="button-copy">声音</span>
-          </button>
-          <button id="cameraButton" class="text-button camera-button" type="button" aria-pressed="false">
-            <span class="status-dot" aria-hidden="true"></span>
-            <span class="camera-copy">手势</span>
-          </button>
-          <button
-            id="backgroundButton"
-            class="text-button background-button"
-            type="button"
-            aria-pressed="false"
-            aria-label="切换为摄像头背景"
-          >
-            <span class="status-dot" aria-hidden="true"></span>
-            <span class="background-copy">背景·深海</span>
-          </button>
-          <button id="aboutButton" class="text-button" type="button" aria-expanded="false" aria-controls="aboutPanel">
-            关于作品
-          </button>
-          <button id="tutorialButton" class="text-button" type="button" aria-label="查看手势教程">玩法</button>
-          <button id="saveButton" class="text-button" type="button" aria-label="打开存档">存档</button>
-        </nav>
-      </header>
-
-      <figure class="camera-preview" id="cameraPreviewShell" aria-hidden="true">
-        <video
-          class="camera-preview__video"
-          id="cameraPreview"
-          autoplay
-          muted
-          playsinline
-          aria-label="实时摄像头镜像预览"
-        ></video>
-        <figcaption class="camera-preview__label">
-          <span class="camera-preview__live" aria-hidden="true"></span>
-          镜中手势 · LIVE
-        </figcaption>
-      </figure>
-
-      <section class="tank-hud" id="tankHud" aria-label="水母缸状态">
-        <div class="tank-hud__item">
-          <span class="tank-hud__label">微光</span>
-          <strong id="glowCount">0</strong>
-          <span class="tank-hud__rate" id="glowRate">+0 / 秒</span>
-        </div>
-        <div class="tank-hud__divider" aria-hidden="true"></div>
-        <div class="tank-hud__item">
-          <span class="tank-hud__label">水母</span>
-          <strong><span id="jellyCount">0</span>/<span id="jellyCapacity">6</span></strong>
-          <span class="tank-hud__rate">缸中生命</span>
-        </div>
-      </section>
-
-      <div class="scene-navigation" aria-label="场景导航">
-        <button id="surfaceButton" class="scene-navigation__button is-current" type="button">母水母 · 上层</button>
-        <span class="scene-navigation__line" aria-hidden="true"></span>
-        <button id="reefButton" class="scene-navigation__button" type="button">栖息地 · 下潜 ↓</button>
-        <span class="scene-navigation__hint">双指滑动 / 滚轮探索</span>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#06152d">
+  <meta name="description" content="Jellyfish Grove 水母之森——一座会持续生长的深海水母生态缸。">
+  <title>Jellyfish Grove · 水母之森</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main id="game-shell" aria-label="Jellyfish Grove 水母之森">
+    <canvas id="game" aria-label="可拖动和缩放的水母之森游戏画布"></canvas>
+    <header class="brand glass"><div class="brand-mark" aria-hidden="true">✦</div><div><h1>水母之森</h1><p>JELLYFISH GROVE · 浮光之域</p></div></header>
+    <section class="hud glass" aria-label="生态状态">
+      <div class="hud-item"><span class="hud-icon glow-icon">◆</span><div><strong id="glow-value">0</strong><small>浮光</small></div></div>
+      <div class="hud-item"><span class="hud-icon">↗</span><div><strong id="rate-value">0 / 秒</strong><small>自然产出</small></div></div>
+      <div class="hud-item"><span class="hud-icon">◌</span><div><strong id="jelly-value">1</strong><small>小水母</small></div></div>
+    </section>
+    <nav class="view-tools glass" aria-label="视野工具">
+      <button id="zoom-in" title="放大">＋</button><button id="zoom-out" title="缩小">−</button><button id="home-view" title="回到母水母">⌂</button><button id="sound-toggle" title="环境音" aria-pressed="false">♪</button>
+    </nav>
+    <aside id="inspector" class="inspector glass is-hidden" aria-live="polite">
+      <button id="close-inspector" class="close" aria-label="关闭">×</button>
+      <span id="inspect-species" class="eyebrow">蓝水母 · 沉静</span><h2 id="inspect-name">小浮光</h2><p id="inspect-state">正在缓慢游动</p>
+      <div class="mood-bar"><span id="mood-fill"></span></div><small>轻点它会有不同反应；拖到栖息地可以安排游玩。</small>
+    </aside>
+    <section class="action-dock glass" aria-label="建造和孕育">
+      <div class="dock-group"><span class="dock-label">孕育</span>
+        <button class="species-card is-unlocked" data-species="blue"><i class="swatch blue"></i><span>沉静</span><b>50 ◆</b></button>
+        <button class="species-card" data-species="pink"><i class="swatch pink"></i><span>害羞</span><b>贝壳解锁</b></button>
+        <button class="species-card" data-species="yellow"><i class="swatch yellow"></i><span>活泼</span><b>滑梯解锁</b></button>
+      </div><div class="dock-separator"></div>
+      <div class="dock-group"><span class="dock-label">生长</span>
+        <button class="build-card" data-build="shell"><span>◡</span><em>贝壳休息台</em><b>30 ◆</b></button>
+        <button class="build-card" data-build="slide"><span>〽</span><em>水母滑梯</em><b>150 ◆</b></button>
       </div>
-
-      <section class="habitat-dock" id="habitatDock" aria-label="水母缸栖息地">
-        <p class="habitat-dock__eyebrow">培育水母缸</p>
-        <div class="habitat-dock__cards">
-          <button class="habitat-card" type="button" data-habitat="algae">
-            <span class="habitat-card__icon habitat-card__icon--algae" aria-hidden="true"></span>
-            <span class="habitat-card__copy">
-              <strong>月光藻床</strong>
-              <small>微光流速</small>
-            </span>
-            <span class="habitat-card__level" data-level>LV.0</span>
-            <span class="habitat-card__cost" data-cost>12 微光</span>
-          </button>
-          <button class="habitat-card" type="button" data-habitat="nursery">
-            <span class="habitat-card__icon habitat-card__icon--nursery" aria-hidden="true"></span>
-            <span class="habitat-card__copy">
-              <strong>珊瑚育婴湾</strong>
-              <small>水母容量</small>
-            </span>
-            <span class="habitat-card__level" data-level>LV.0</span>
-            <span class="habitat-card__cost" data-cost>35 微光</span>
-          </button>
-          <button class="habitat-card" type="button" data-habitat="lantern">
-            <span class="habitat-card__icon habitat-card__icon--lantern" aria-hidden="true"></span>
-            <span class="habitat-card__copy">
-              <strong>深海灯塔</strong>
-              <small>全缸增益</small>
-            </span>
-            <span class="habitat-card__level" data-level>LV.0</span>
-            <span class="habitat-card__cost" data-cost>90 微光</span>
-          </button>
-        </div>
-      </section>
-
-      <section class="invitation" id="invitation" aria-labelledby="invitationTitle">
-        <div class="invitation__copy">
-          <p class="eyebrow">A quiet living jelly tank</p>
-          <h1 id="invitationTitle">有些柔软，<br />只在深处发光。</h1>
-          <p class="invitation__note">捏出小水母，潜到海底，看它们在栖息地玩耍。</p>
-          <button id="enterButton" class="enter-button" type="button">
-            <span>靠近它</span>
-            <span class="enter-button__en">come closer</span>
-          </button>
-        </div>
-      </section>
-
-      <section class="tutorial" id="tutorialPanel" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle" aria-hidden="true">
-        <div class="tutorial__card">
-          <p class="eyebrow">How to play · 水母缸</p>
-          <h2 id="tutorialTitle">从一只，变成一片海。</h2>
-          <div class="tutorial__steps">
-            <div><span>01</span><strong>捏出生命</strong><p>单手拇指与食指在母水母上捏合，向外拉，再松开。鼠标或触屏也能按住拖动。</p></div>
-            <div><span>02</span><strong>陪它玩</strong><p>一根食指逗小水母；捏合可轻轻挤压或拖它去栖息地。不同性格会有不同反应。</p></div>
-            <div><span>03</span><strong>潜入海底</strong><p>双指上下滑动看下层，张合双手放大或缩小地图；滚轮与场景按钮也可以操作。</p></div>
-            <div><span>04</span><strong>培育栖息地</strong><p>小水母产生微光，微光会游回母体；用它培育栖息地，解锁新的水母品种。</p></div>
-          </div>
-          <button id="tutorialClose" class="enter-button" type="button">开始探索</button>
-        </div>
-      </section>
-
-      <section class="save-panel" id="savePanel" role="dialog" aria-modal="true" aria-labelledby="saveTitle" aria-hidden="true">
-        <div class="save-panel__card">
-          <button id="saveClose" class="close-button" type="button" aria-label="关闭存档">关闭</button>
-          <p class="eyebrow">Jelly Tank Archive</p>
-          <h2 id="saveTitle">这一片海，留在这里。</h2>
-          <p id="saveStatus">游戏会自动保存在这台设备的浏览器里。</p>
-          <div class="save-panel__actions">
-            <button id="saveNow" type="button">立即存档</button>
-            <button id="exportSave" type="button">导出存档文件</button>
-            <label for="importSave">导入存档文件</label>
-            <input id="importSave" type="file" accept="application/json,.json" />
-          </div>
-        </div>
-      </section>
-
-      <div class="bottomline" aria-live="polite">
-        <p id="hint" class="hint">按住 · 移动 · 松开</p>
-        <p class="memory-count"><span id="memoryCount">00</span> 枚触碰记忆</p>
-      </div>
-
-      <aside class="about" id="aboutPanel" aria-hidden="true">
-        <button id="closeAbout" class="close-button" type="button" aria-label="关闭作品说明">关闭</button>
-        <div class="about__inner">
-          <p class="eyebrow">Artist’s note</p>
-          <h2>它不需要被完成。</h2>
-          <p>这是一只生活在屏幕深海中的柔软母水母。你无法真正触摸它，却可以让它凹陷、延展、呼吸和回弹。</p>
-          <p>每一次捏取都会从它身上分离出一只小水母。下潜到海底，它们会在栖息地玩耍，把微光送回母体；你可以用微光培育这片海，迎来新的品种。</p>
-          <div class="about__divider"></div>
-          <p class="about__small">双指滑动或滚轮探索 · 双手张合缩放地图<br />Space 按压 · C 摄像头 · B 背景 · M 静音 · R 清除记忆</p>
-          <p class="camera-privacy">摄像头画面只在当前浏览器内分析，不录制、不保存，也不会上传。</p>
-          <button id="resetButton" class="reset-button" type="button">重新成为陌生人</button>
-          <p class="disclaimer">本作品用于艺术体验，不是医疗或治疗工具。</p>
-        </div>
-      </aside>
-
-      <div class="veil" id="veil" aria-hidden="true"></div>
-    </main>
-    <script src="https://unpkg.com/handsfree@8.5.1/build/lib/handsfree.js"></script>
-    <script src="app.js?v=jelly-tank-2"></script>
-  </body>
+    </section>
+    <div id="toast" class="toast" role="status"></div>
+    <section id="tutorial" class="tutorial glass" aria-labelledby="tutorial-title">
+      <div class="tutorial-step">初次潜入 · <span id="tutorial-count">1 / 4</span></div><h2 id="tutorial-title">欢迎来到水母之森</h2>
+      <p id="tutorial-copy">这里没有被切开的楼层。母水母的触须长成一棵发光的树，所有生命都生活在同一片深海里。</p>
+      <div class="tutorial-actions"><button id="tutorial-skip" class="quiet">跳过</button><button id="tutorial-next" class="primary">继续</button></div>
+    </section>
+    <footer class="hint">拖动画面探索 · 滚轮缩放 · 点击水母互动 · 拖动水母安排栖息地</footer>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
 </html>
