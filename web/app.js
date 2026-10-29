@@ -17,7 +17,6 @@ const state={
   lastSeen:Date.now(),
   tutorialDone:false,
   selectedId:null,
-  armedSpecies:null,
   birthGesture:null,
   sound:false,
   habitats:{shell:{...CONFIG.habitats.shell,built:false,level:1,occupantId:null},slide:{...CONFIG.habitats.slide,built:false,level:1,occupantId:null}},
@@ -28,10 +27,10 @@ const camera={x:600,y:650,zoom:.7,targetX:600,targetY:650,targetZoom:.7};
 let width=innerWidth,height=innerHeight,dpr=1,lastTime=performance.now(),toastTimer=null,autosave=0;
 let pointer={down:false,id:null,sx:0,sy:0,lastX:0,lastY:0,moved:false,jelly:null,startedAt:0};
 
-function createJelly(species='blue',x=rand(430,770),y=rand(620,900),born=false,size=1){
+function createJelly(species='blue',x=rand(430,770),y=rand(620,900),born=false,size=1,birthAngle=Math.PI/2){
   const cfg=CONFIG.species[species];
   const adultScale=(species==='yellow'?.88:species==='pink'?.94:1)*size;
-  const j={id:state.nextId++,name:NAMES[(state.nextId-2)%NAMES.length],species,personality:cfg.personality,x,y,vx:rand(-7,7),vy:rand(-4,4),targetX:x,targetY:y,state:born?'born':'wander',stateTime:born?2.5:rand(2,6),expression:'normal',mood:rand(.62,.9),squish:0,rotation:0,phase:rand(0,TAU),scale:adultScale,adultScale,habitatId:null,birth:born?1:0};
+  const j={id:state.nextId++,name:NAMES[(state.nextId-2)%NAMES.length],species,personality:cfg.personality,x,y,vx:rand(-7,7),vy:rand(-4,4),targetX:x,targetY:y,state:born?'born':'wander',stateTime:born?2.5:rand(2,6),expression:'normal',mood:rand(.62,.9),squish:0,rotation:0,phase:rand(0,TAU),scale:adultScale,adultScale,habitatId:null,birth:born?1:0,birthAngle};
   state.jellies.push(j); return j;
 }
 
@@ -70,10 +69,9 @@ function updateUI(){
   $('#glow-value').textContent=Math.floor(state.glow).toLocaleString('zh-CN'); $('#rate-value').textContent=`${glowRate().toFixed(1)} / 秒`; $('#jelly-value').textContent=state.jellies.length;
   $$('.species-card').forEach(btn=>{
     const key=btn.dataset.species; const unlocked=key==='blue'||(key==='pink'&&state.habitats.shell.built)||(key==='yellow'&&state.habitats.slide.built);
-    btn.disabled=!unlocked||state.glow<CONFIG.economy.reproductionCost;
     btn.classList.toggle('is-unlocked',unlocked);
-    btn.classList.toggle('is-armed',state.armedSpecies===key);
-    btn.querySelector('b').textContent=state.armedSpecies===key?'已选择 · 去伞盖':unlocked?'50 ◆':key==='pink'?'贝壳解锁':'滑梯解锁';
+    btn.classList.toggle('is-locked',!unlocked);
+    btn.querySelector('b').textContent=unlocked?'母体已学会':key==='pink'?'贝壳解锁':'滑梯解锁';
   });
   $$('.build-card').forEach(btn=>{
     const h=state.habitats[btn.dataset.build]; btn.classList.toggle('is-built',h.built); btn.disabled=h.built||state.glow<h.cost;
@@ -89,22 +87,22 @@ function build(type){
   toast(`${h.label}已经从树干上生长出来了`); save(); updateUI();
 }
 
-function armBirth(species){
-  const unlocked=species==='blue'||(species==='pink'&&state.habitats.shell.built)||(species==='yellow'&&state.habitats.slide.built);
-  if(!unlocked){toast('先建造对应栖息地，母水母才会学会孕育它');return;}
-  if(state.glow<CONFIG.economy.reproductionCost){toast('还需要更多浮光');return;}
-  state.armedSpecies=species; setView(600,540,.82);
-  toast(`已选择${CONFIG.species[species].personality}胚光：到母水母伞盖里按住，向下轻轻拉出`); updateUI();
+function chooseBirthSpecies(){
+  const unlocked=['blue'];
+  if(state.habitats.shell.built)unlocked.push('pink');
+  if(state.habitats.slide.built)unlocked.push('yellow');
+  return unlocked[(state.nextId-1)%unlocked.length];
 }
 
 function completeBirth(gesture){
   const dx=gesture.x-gesture.startX,dy=gesture.y-gesture.startY,dist=Math.hypot(dx,dy);
-  if(dy<72||dist<92){state.birthGesture=null;toast('还差一点点——从伞盖里向下拉长，再松手');return;}
-  if(state.glow<CONFIG.economy.reproductionCost){state.birthGesture=null;state.armedSpecies=null;toast('浮光不够，胚光轻轻缩回了母体');return;}
+  if(dist<92){state.birthGesture=null;toast('还差一点点——从伞盖向外拉长，再松手');return;}
+  if(state.glow<CONFIG.economy.reproductionCost){state.birthGesture=null;toast('浮光不够，柔软的胚光轻轻缩回了母体');return;}
   state.glow-=CONFIG.economy.reproductionCost;
   const size=clamp(.78+dist/360,.86,1.16);
-  const j=createJelly(gesture.species,gesture.x,gesture.y,true,size);
-  j.vx=dx*.14;j.vy=32;state.selectedId=j.id;state.birthGesture=null;state.armedSpecies=null;
+  const birthAngle=Math.atan2(dy,dx);
+  const j=createJelly(gesture.species,gesture.x,gesture.y,true,size,birthAngle);
+  j.vx=dx*.14;j.vy=dy*.1+14;state.selectedId=j.id;state.birthGesture=null;
   burst(gesture.x,gesture.y,CONFIG.species[gesture.species].color,30);
   toast(`啵——${j.name}被你从伞盖里轻轻捏出来了`);updateUI();save();
 }
@@ -197,23 +195,21 @@ function drawMother(t){
   const g=ctx.createRadialGradient(-75,-85,10,0,0,235);g.addColorStop(0,'#fff8ff');g.addColorStop(.15,'#efd6ff');g.addColorStop(.52,'#a8a8ef');g.addColorStop(.8,'rgba(112,125,210,.86)');g.addColorStop(1,'rgba(75,86,161,.48)');ctx.fillStyle=g;ctx.shadowBlur=45;ctx.shadowColor='#c7bbff';ctx.beginPath();ctx.moveTo(-245,35);ctx.bezierCurveTo(-225,-160,-116,-222,0,-224);ctx.bezierCurveTo(132,-220,224,-154,245,35);ctx.quadraticCurveTo(180,92,110,66);ctx.quadraticCurveTo(55,112,0,70);ctx.quadraticCurveTo(-55,112,-110,66);ctx.quadraticCurveTo(-180,92,-245,35);ctx.closePath();ctx.fill();
   ctx.shadowBlur=0;ctx.strokeStyle='rgba(240,235,255,.45)';ctx.lineWidth=4;ctx.stroke();
   for(let i=-4;i<=4;i++){ctx.strokeStyle=`rgba(${i%2?190:235},220,255,.28)`;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(i*45,55);ctx.quadraticCurveTo(i*50,10,i*40,-145);ctx.stroke();}
+  if(state.birthGesture){const bg=state.birthGesture,dx=bg.x-bg.startX,dy=bg.y-bg.startY,pull=clamp(Math.hypot(dx,dy)/150,0,1);const lx=bg.startX-x,ly=bg.startY-y;const touch=ctx.createRadialGradient(lx,ly,2,lx,ly,48+pull*18);touch.addColorStop(0,'rgba(255,255,255,.7)');touch.addColorStop(.35,CONFIG.species[bg.species].accent+'88');touch.addColorStop(1,'transparent');ctx.fillStyle=touch;ctx.beginPath();ctx.arc(lx,ly,55+pull*12,0,TAU);ctx.fill();ctx.strokeStyle='rgba(255,245,255,.38)';ctx.lineWidth=3-pull;ctx.beginPath();ctx.ellipse(lx+dx*.035,ly+dy*.035,30+pull*10,18-pull*5,Math.atan2(dy,dx),0,TAU);ctx.stroke();}
   ctx.fillStyle='#3f426f';ctx.beginPath();ctx.arc(-36,4,6,0,TAU);ctx.arc(36,4,6,0,TAU);ctx.fill();ctx.strokeStyle='#55517c';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,10,22,.22*Math.PI,.78*Math.PI);ctx.stroke();
   ctx.fillStyle='rgba(255,153,205,.26)';ctx.beginPath();ctx.ellipse(-65,23,20,9,0,0,TAU);ctx.ellipse(65,23,20,9,0,0,TAU);ctx.fill();ctx.restore();
   ctx.save();ctx.fillStyle='rgba(210,231,255,.8)';ctx.font='500 13px Inter, sans-serif';ctx.textAlign='center';ctx.fillText('母水母 · 浮光孕育区',x,y-258);ctx.fillStyle='rgba(154,190,217,.62)';ctx.font='10px Inter, sans-serif';ctx.fillText('收集浮光，孕育新的生命',x,y-240);ctx.restore();
 }
 
 function drawBirthGesture(t){
-  const species=state.birthGesture?.species||state.armedSpecies;if(!species)return;
-  const cfg=CONFIG.species[species],g=state.birthGesture;
+  const g=state.birthGesture;if(!g)return;const cfg=CONFIG.species[g.species];
   ctx.save();ctx.globalCompositeOperation='screen';
-  if(!g){
-    const pulse=1+Math.sin(t*2)*.08;ctx.strokeStyle=cfg.accent+'aa';ctx.lineWidth=2;ctx.setLineDash([5,8]);ctx.beginPath();ctx.arc(600,245,30*pulse,0,TAU);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle=cfg.accent;ctx.shadowBlur=20;ctx.shadowColor=cfg.color;ctx.beginPath();ctx.arc(600,245,7,0,TAU);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='rgba(225,243,255,.76)';ctx.font='11px Inter';ctx.textAlign='center';ctx.fillText('在伞盖内按住，向下轻轻拉',600,205);
-  }else{
-    const dx=g.x-g.startX,dy=g.y-g.startY,dist=Math.hypot(dx,dy),progress=clamp(dist/130,0,1);
-    ctx.strokeStyle=cfg.color+'99';ctx.lineWidth=lerp(26,9,progress);ctx.lineCap='round';ctx.shadowBlur=18;ctx.shadowColor=cfg.color;ctx.beginPath();ctx.moveTo(g.startX,g.startY);ctx.bezierCurveTo(g.startX+dx*.18,g.startY+dy*.2,g.x-dx*.24,g.y-dy*.18,g.x,g.y);ctx.stroke();
-    const r=lerp(14,35,progress);const bud=ctx.createRadialGradient(g.x-r*.35,g.y-r*.4,2,g.x,g.y,r);bud.addColorStop(0,'#fff');bud.addColorStop(.35,cfg.accent);bud.addColorStop(1,cfg.color+'aa');ctx.fillStyle=bud;ctx.beginPath();ctx.ellipse(g.x,g.y,r,r*.78,0,0,TAU);ctx.fill();
-    ctx.shadowBlur=0;ctx.strokeStyle='rgba(244,250,255,.62)';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='rgba(231,247,255,.82)';ctx.font='10px Inter';ctx.textAlign='center';ctx.fillText(progress>.72?'松开 · 啵':'继续轻轻向下拉',g.x,g.y+r+24);
-  }
+  const dx=g.x-g.startX,dy=g.y-g.startY,dist=Math.hypot(dx,dy),progress=clamp(dist/130,0,1),angle=Math.atan2(g.y-300,g.x-600);
+  const anchorX=600+Math.cos(angle)*235,anchorY=300+Math.sin(angle)*(Math.sin(angle)>0?78:210);
+  ctx.strokeStyle=cfg.color+'99';ctx.lineWidth=lerp(34,8,progress);ctx.lineCap='round';ctx.shadowBlur=18;ctx.shadowColor=cfg.color;ctx.beginPath();ctx.moveTo(anchorX,anchorY);ctx.bezierCurveTo(anchorX+dx*.16,anchorY+dy*.16,g.x-dx*.22,g.y-dy*.18,g.x,g.y);ctx.stroke();
+  ctx.strokeStyle='rgba(245,239,255,.28)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(anchorX,anchorY);ctx.quadraticCurveTo((anchorX+g.x)/2-dy*.05,(anchorY+g.y)/2+dx*.05,g.x,g.y);ctx.stroke();
+  const r=lerp(12,35,progress);const bud=ctx.createRadialGradient(g.x-r*.35,g.y-r*.4,2,g.x,g.y,r);bud.addColorStop(0,'#fff');bud.addColorStop(.35,cfg.accent);bud.addColorStop(1,cfg.color+'aa');ctx.fillStyle=bud;ctx.beginPath();ctx.ellipse(g.x,g.y,r,r*.78,angle,0,TAU);ctx.fill();
+  ctx.shadowBlur=0;ctx.strokeStyle='rgba(244,250,255,.62)';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='rgba(231,247,255,.82)';ctx.font='10px Inter';ctx.textAlign='center';ctx.fillText(progress>.72?'松开 · 啵':'继续向外轻轻拉',g.x,g.y+r+24);
   ctx.restore();
 }
 
@@ -248,7 +244,7 @@ function drawHabitat(h,t){
 function drawExpansion(t){const x=600,y=2505;ctx.save();const g=ctx.createRadialGradient(x,y,3,x,y,95);g.addColorStop(0,'rgba(190,238,255,.45)');g.addColorStop(1,'transparent');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,95,0,TAU);ctx.fill();ctx.strokeStyle='rgba(161,216,246,.32)';ctx.setLineDash([6,10]);ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,48+Math.sin(t)*4,0,TAU);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='rgba(194,229,247,.7)';ctx.font='12px Inter';ctx.textAlign='center';ctx.fillText('深层生长点',x,y+5);ctx.font='9px Inter';ctx.fillStyle='rgba(138,180,207,.56)';ctx.fillText('后续阶段将在这里继续向下生长',x,y+23);ctx.restore();}
 
 function drawJelly(j,t){
-  const cfg=CONFIG.species[j.species],selected=j.id===state.selectedId;ctx.save();ctx.translate(j.x,j.y);ctx.rotate(j.rotation);const breathe=1+Math.sin(j.phase)*.035;const sx=(1-j.squish*.26)*j.scale*breathe,sy=(1+j.squish*.24)*j.scale/breathe;ctx.scale(sx,sy);if(j.state==='born')ctx.rotate(Math.PI*j.birth);
+  const cfg=CONFIG.species[j.species],selected=j.id===state.selectedId;ctx.save();ctx.translate(j.x,j.y);ctx.rotate(j.rotation);const breathe=1+Math.sin(j.phase)*.035;const sx=(1-j.squish*.26)*j.scale*breathe,sy=(1+j.squish*.24)*j.scale/breathe;ctx.scale(sx,sy);if(j.state==='born')ctx.rotate(((j.birthAngle??Math.PI/2)-Math.PI/2)*j.birth);
   if(selected){ctx.strokeStyle='rgba(210,244,255,.64)';ctx.lineWidth=2;ctx.setLineDash([5,7]);ctx.beginPath();ctx.arc(0,-7,55,0,TAU);ctx.stroke();ctx.setLineDash([]);}
   const halo=ctx.createRadialGradient(0,-10,5,0,-10,70);halo.addColorStop(0,cfg.accent+'44');halo.addColorStop(1,'transparent');ctx.fillStyle=halo;ctx.beginPath();ctx.arc(0,-10,70,0,TAU);ctx.fill();
   const tentacleGrow=j.state==='born'?1-j.birth:1;ctx.globalAlpha=.25+.75*tentacleGrow;ctx.strokeStyle=cfg.color+'99';ctx.lineWidth=7;ctx.lineCap='round';for(let i=-2;i<=2;i++){ctx.beginPath();ctx.moveTo(i*14,12);ctx.bezierCurveTo(i*18+Math.sin(j.phase+i)*9,12+22*tentacleGrow,i*11-Math.sin(j.phase*.8+i)*10,12+(38+Math.abs(i)*4)*tentacleGrow,i*13+Math.sin(j.phase*1.2+i)*9,12+(53+Math.abs(i)*5)*tentacleGrow);ctx.stroke();}ctx.globalAlpha=1;
@@ -271,10 +267,10 @@ function nearestHabitat(wx,wy){let best=null,dist=Infinity;for(const [id,h] of O
 
 function reactJelly(j,wx){releaseHabitat(j);j.state='react';j.stateTime=j.species==='pink'?1.7:1.1;j.squish=1;j.expression=j.species==='pink'?'shy':'happy';const direction=j.x<wx?-1:1;j.vx=(j.species==='pink'?95:55)*direction;j.vy=-38;j.mood=clamp(j.mood+.04,0,1);burst(j.x,j.y-10,CONFIG.species[j.species].accent,12);toast(j.species==='pink'?`${j.name}害羞地躲开了`:`${j.name}软软地回弹了一下`);}
 
-canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);const p=screenToWorld(e.clientX,e.clientY);let birth=null,j=null;if(state.armedSpecies&&insideMother(p.x,p.y)){birth={species:state.armedSpecies,startX:p.x,startY:p.y,x:p.x,y:p.y};state.birthGesture=birth;}else j=pickJelly(p.x,p.y);pointer={down:true,id:e.pointerId,sx:e.clientX,sy:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,jelly:j,birth,startedAt:performance.now()};if(j){releaseHabitat(j);j.state='dragged';j.stateTime=0;state.selectedId=j.id;updateUI();}canvas.classList.add('is-dragging');});
+canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);const p=screenToWorld(e.clientX,e.clientY);let birth=null,j=null;if(insideMother(p.x,p.y)){birth={species:chooseBirthSpecies(),startX:p.x,startY:p.y,x:p.x,y:p.y};state.birthGesture=birth;toast('夹住母体了——保持按住，向任意方向慢慢拉');}else j=pickJelly(p.x,p.y);pointer={down:true,id:e.pointerId,sx:e.clientX,sy:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,jelly:j,birth,startedAt:performance.now()};if(j){releaseHabitat(j);j.state='dragged';j.stateTime=0;state.selectedId=j.id;updateUI();}canvas.classList.add('is-dragging');});
 canvas.addEventListener('pointermove',e=>{if(!pointer.down||e.pointerId!==pointer.id)return;const dx=e.clientX-pointer.lastX,dy=e.clientY-pointer.lastY;if(Math.hypot(e.clientX-pointer.sx,e.clientY-pointer.sy)>5)pointer.moved=true;if(pointer.birth){const p=screenToWorld(e.clientX,e.clientY),vx=p.x-pointer.birth.startX,vy=p.y-pointer.birth.startY,d=Math.hypot(vx,vy)||1,max=210,ratio=Math.min(1,max/d);pointer.birth.x=pointer.birth.startX+vx*ratio;pointer.birth.y=pointer.birth.startY+vy*ratio;}else if(pointer.jelly){const p=screenToWorld(e.clientX,e.clientY);pointer.jelly.x=p.x;pointer.jelly.y=p.y;pointer.jelly.squish=.35;pointer.jelly.rotation=clamp(dx*.018,-.28,.28);}else{camera.targetX-=dx/camera.zoom;camera.targetY-=dy/camera.zoom;clampCamera();}pointer.lastX=e.clientX;pointer.lastY=e.clientY;});
 function pointerUp(e){if(!pointer.down||e.pointerId!==pointer.id)return;const p=screenToWorld(e.clientX,e.clientY),j=pointer.jelly;if(pointer.birth)completeBirth(pointer.birth);else if(j){const near=nearestHabitat(p.x,p.y);if(near&&!near.h.occupantId){near.h.occupantId=j.id;j.habitatId=near.id;j.state='approach';j.stateTime=10;j.targetX=near.h.x;j.targetY=near.h.y-68;toast(`${j.name}正游向${near.h.label}`);}else if(!pointer.moved){reactJelly(j,p.x);}else{j.state='recover';j.stateTime=1.2;j.vx=(e.clientX-pointer.lastX)*2;j.vy=(e.clientY-pointer.lastY)*2;}}pointer.down=false;pointer.jelly=null;pointer.birth=null;canvas.classList.remove('is-dragging');save();}
-canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp);
+canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',()=>{state.birthGesture=null;pointer.down=false;pointer.jelly=null;pointer.birth=null;canvas.classList.remove('is-dragging');});
 canvas.addEventListener('wheel',e=>{e.preventDefault();if(e.ctrlKey||e.metaKey||Math.abs(e.deltaX)>Math.abs(e.deltaY)){const before=screenToWorld(e.clientX,e.clientY);camera.targetZoom=clamp(camera.targetZoom*Math.exp(-e.deltaY*.0015),.38,1.35);const after={x:(e.clientX-width/2)/camera.targetZoom+camera.targetX,y:(e.clientY-height/2)/camera.targetZoom+camera.targetY};camera.targetX+=before.x-after.x;camera.targetY+=before.y-after.y;}else{camera.targetY+=e.deltaY/camera.targetZoom;camera.targetX+=e.deltaX/camera.targetZoom;}clampCamera();},{passive:false});
 
 $('#zoom-in').addEventListener('click',()=>{camera.targetZoom=clamp(camera.targetZoom*1.18,.38,1.35);clampCamera();});
@@ -282,7 +278,6 @@ $('#zoom-out').addEventListener('click',()=>{camera.targetZoom=clamp(camera.targ
 $('#home-view').addEventListener('click',()=>setView(600,650,.7));
 $('#close-inspector').addEventListener('click',()=>{state.selectedId=null;$('#inspector').classList.add('is-hidden');});
 $$('.build-card').forEach(b=>b.addEventListener('click',()=>build(b.dataset.build)));
-$$('.species-card').forEach(b=>b.addEventListener('click',()=>armBirth(b.dataset.species)));
 
 let audio=null;
 $('#sound-toggle').addEventListener('click',async e=>{
@@ -294,7 +289,7 @@ const tutorial=[
   ['欢迎来到水母之森','这里没有被切开的楼层。母水母的触须长成一棵发光的树，所有生命都生活在同一片深海里。'],
   ['观察自由生活','小水母会自己漫游、休息和玩耍。轻点它，看它凹陷、回弹，再带着不同性格游开。'],
   ['让栖息地生长','左下方的浮光会自动累积。先用 30 点浮光建造贝壳休息台，再逐步长出滑梯。'],
-  ['亲手捏出新的伙伴','先在底部选择胚光品种，再到母水母伞盖里按住一个光点，向下轻轻拉出并松开。只有成功分离后才消耗 50 点浮光。']
+  ['亲手捏出新的伙伴','直接在母水母伞盖里按住，向任意方向缓慢拉出并松开。母体会从已解锁品种中孕育幼体；成功分离才消耗 50 点浮光。']
 ];
 let tutorialIndex=0;
 function showTutorial(){if(state.tutorialDone){$('#tutorial').classList.add('is-hidden');return;}const [title,copy]=tutorial[tutorialIndex];$('#tutorial-title').textContent=title;$('#tutorial-copy').textContent=copy;$('#tutorial-count').textContent=`${tutorialIndex+1} / ${tutorial.length}`;$('#tutorial-next').textContent=tutorialIndex===tutorial.length-1?'开始照料':'继续';}
