@@ -595,13 +595,18 @@
       camera.touchBaby = null;
     }
 
-    if (present && !pinching && !camera.active && camera.openFrames >= 4) camera.rearm = true;
+    // Two open frames are enough to re-arm. The previous four-frame lockout
+    // made quick, deliberate second pinches feel randomly ignored.
+    if (present && !pinching && !camera.active && camera.openFrames >= 2) camera.rearm = true;
 
     const canControl = now >= camera.suspendedUntil && (!state.pointer.down || state.pointer.id === "camera");
     if (present && canControl) {
       if (!camera.active) {
         const distance = Math.hypot(camera.x - state.center.x, camera.y - state.center.y);
-        if (camera.rearm && camera.pinchFrames === 3 && distance <= baseRadius() * 1.34) {
+        // Keep the grab window open while the fingers remain pinched. Requiring
+        // exactly the third detected frame meant moving onto the bell one frame
+        // late could never start a gesture.
+        if (camera.rearm && camera.pinchFrames >= 2 && distance <= baseRadius() * 1.45) {
           camera.active = true;
           camera.rearm = false;
           camera.gestureOriginX = camera.x;
@@ -611,10 +616,12 @@
           state.pointer = { x: camera.x, y: camera.y, startX: camera.x, startY: camera.y, down: true, id: "camera", startedAt: now };
           state.activeBaby = null;
           state.touchAngle = Math.atan2(camera.y - state.center.y, camera.x - state.center.x);
-          state.interactionMode = isBirthZone(camera.x, camera.y) ? "birth" : "squish";
+          state.interactionMode = isBirthZone(camera.x, camera.y, true) ? "birth" : "squish";
           state.birthPull = 0;
           canvas.classList.add("is-touching");
-          hint.textContent = "夹住母体了——保持双指合拢，向外拉";
+          hint.textContent = state.interactionMode === "birth"
+            ? "顶部已抓住——保持捏合，慢慢向上拉"
+            : "已经抓住；滑到伞盖顶部后再向上拉也可以出生";
         } else if (camera.openFrames >= 2) {
           hint.textContent = cameraTouchBaby
             ? "指尖碰到了它——它软软地让开了"
@@ -636,22 +643,36 @@
           -baseRadius() * 0.4,
           state.height + baseRadius() * 0.4,
         );
+        if (
+          state.interactionMode !== "birth" &&
+          isBirthZone(state.pointer.x, state.pointer.y, true) &&
+          now - state.pointer.startedAt < 1800
+        ) {
+          state.interactionMode = "birth";
+          state.pointer.startY = state.pointer.y;
+          state.birthPull = 0;
+          hint.textContent = "顶部已抓住——继续向上拉";
+        }
         if (state.interactionMode === "birth") {
           state.birthPull = Math.max(0, state.pointer.startY - state.pointer.y);
           state.touchAngle = -Math.PI / 2;
         } else {
           state.touchAngle = Math.atan2(state.pointer.y - state.center.y, state.pointer.x - state.center.x);
         }
-        if (!pinching && camera.openFrames >= 3) {
+        if (!pinching && camera.openFrames >= 5) {
           camera.active = false;
           camera.suspendedUntil = now + 260;
           releasePointer();
-          hint.textContent = "张开手指——啵，它松开了";
         } else {
-          hint.textContent = "保持夹住向外拉；张开双指就松手";
+          const readyDistance = baseRadius() * 0.2;
+          hint.textContent = state.interactionMode === "birth"
+            ? state.birthPull >= readyDistance
+              ? "可以松开了——新的小水母已经准备好"
+              : "顶部已抓住——保持捏合并继续向上拉"
+            : "保持捏合；滑到顶部后向上拉可以出生";
         }
       }
-    } else if (camera.active && camera.absentFrames >= 5) {
+    } else if (camera.active && camera.absentFrames >= 8) {
       camera.active = false;
       releasePointer();
     } else if (!present && camera.absentFrames >= 6) {
@@ -679,9 +700,11 @@
     document.body.classList.remove("ui-idle");
   }
 
-  function isBirthZone(x, y) {
+  function isBirthZone(x, y, generous = false) {
     const radius = baseRadius();
-    return Math.abs(x - state.center.x) < radius * 0.58 && y < state.center.y - radius * 0.24;
+    const halfWidth = radius * (generous ? 0.76 : 0.58);
+    const topLine = state.center.y - radius * (generous ? 0.08 : 0.24);
+    return Math.abs(x - state.center.x) < halfWidth && y < topLine;
   }
 
   function setMotherMood() {
@@ -796,7 +819,8 @@
       return;
     }
     const strength = clamp(state.pressure * 0.72 + state.dragDistance / (baseRadius() * 2.8), 0.15, 1);
-    const shouldBirth = state.interactionMode === "birth" && state.birthPull >= baseRadius() * 0.3 && state.babies.length < 12;
+    const birthThreshold = baseRadius() * (state.pointer.id === "camera" ? 0.2 : 0.3);
+    const shouldBirth = state.interactionMode === "birth" && state.birthPull >= birthThreshold && state.babies.length < 12;
     state.pointer.down = false;
     state.pointer.id = null;
     canvas.classList.remove("is-touching");
