@@ -48,6 +48,7 @@
     contourRelease: 0,
     interactionMode: "squish",
     birthPull: 0,
+    birthAngle: -Math.PI / 2,
     motherMood: "happy",
     motherMoodUntil: 0,
     lastActivityAt: performance.now(),
@@ -617,11 +618,12 @@
           state.activeBaby = null;
           state.touchAngle = Math.atan2(camera.y - state.center.y, camera.x - state.center.x);
           state.interactionMode = isBirthZone(camera.x, camera.y, true) ? "birth" : "squish";
+          state.birthAngle = Math.atan2(camera.y - state.center.y, camera.x - state.center.x);
           state.birthPull = 0;
           canvas.classList.add("is-touching");
           hint.textContent = state.interactionMode === "birth"
-            ? "顶部已抓住——保持捏合，慢慢向上拉"
-            : "已经抓住；滑到伞盖顶部后再向上拉也可以出生";
+            ? "边缘已抓住——保持捏合，沿外侧方向拉"
+            : "已经抓住；滑到伞盖任意边缘后向外拉";
         } else if (camera.openFrames >= 2) {
           hint.textContent = cameraTouchBaby
             ? "指尖碰到了它——它软软地让开了"
@@ -649,13 +651,17 @@
           now - state.pointer.startedAt < 1800
         ) {
           state.interactionMode = "birth";
+          state.birthAngle = Math.atan2(state.pointer.y - state.center.y, state.pointer.x - state.center.x);
+          state.pointer.startX = state.pointer.x;
           state.pointer.startY = state.pointer.y;
           state.birthPull = 0;
-          hint.textContent = "顶部已抓住——继续向上拉";
+          hint.textContent = "边缘已抓住——继续向外拉";
         }
         if (state.interactionMode === "birth") {
-          state.birthPull = Math.max(0, state.pointer.startY - state.pointer.y);
-          state.touchAngle = -Math.PI / 2;
+          const pullX = state.pointer.x - state.pointer.startX;
+          const pullY = state.pointer.y - state.pointer.startY;
+          state.birthPull = Math.max(0, pullX * Math.cos(state.birthAngle) + pullY * Math.sin(state.birthAngle));
+          state.touchAngle = state.birthAngle;
         } else {
           state.touchAngle = Math.atan2(state.pointer.y - state.center.y, state.pointer.x - state.center.x);
         }
@@ -668,8 +674,8 @@
           hint.textContent = state.interactionMode === "birth"
             ? state.birthPull >= readyDistance
               ? "可以松开了——新的小水母已经准备好"
-              : "顶部已抓住——保持捏合并继续向上拉"
-            : "保持捏合；滑到顶部后向上拉可以出生";
+              : "边缘已抓住——保持捏合并继续向外拉"
+            : "保持捏合；滑到任意边缘后向外拉可以出生";
         }
       }
     } else if (camera.active && camera.absentFrames >= 8) {
@@ -702,9 +708,13 @@
 
   function isBirthZone(x, y, generous = false) {
     const radius = baseRadius();
-    const halfWidth = radius * (generous ? 0.76 : 0.58);
-    const topLine = state.center.y - radius * (generous ? 0.08 : 0.24);
-    return Math.abs(x - state.center.x) < halfWidth && y < topLine;
+    const dx = x - state.center.x;
+    const dy = y - state.center.y;
+    const xRadius = radius * (generous ? 1.12 : 1.04);
+    const yRadius = radius * (dy > 0 ? (generous ? 0.72 : 0.62) : (generous ? 1.12 : 1.04));
+    const edgeDistance = Math.hypot(dx / xRadius, dy / yRadius);
+    const innerEdge = generous ? 0.42 : 0.56;
+    return edgeDistance >= innerEdge && edgeDistance <= 1.22;
   }
 
   function setMotherMood() {
@@ -760,10 +770,11 @@
     state.pointer = { x: point.x, y: point.y, startX: point.x, startY: point.y, down: true, id: event.pointerId, startedAt: performance.now() };
     state.touchAngle = Math.atan2(point.y - state.center.y, point.x - state.center.x);
     state.interactionMode = isBirthZone(point.x, point.y) ? "birth" : "squish";
+    state.birthAngle = state.touchAngle;
     state.birthPull = 0;
     canvas.setPointerCapture(event.pointerId);
     canvas.classList.add("is-touching");
-    hint.textContent = state.interactionMode === "birth" ? "捏住伞盖顶部，慢慢向上拉" : "慢一点，它正在局部改变";
+    hint.textContent = state.interactionMode === "birth" ? "捏住伞盖边缘，沿外侧方向慢慢拉" : "慢一点，它正在局部改变";
     initAudio();
   }
 
@@ -778,9 +789,11 @@
       return;
     }
     if (state.interactionMode === "birth") {
-      state.birthPull = Math.max(0, state.pointer.startY - point.y);
-      state.touchAngle = -Math.PI / 2;
-      hint.textContent = state.birthPull > baseRadius() * 0.3 ? "再松开一点——新的生命准备好了" : "保持向上拉，让果冻慢慢隆起";
+      const pullX = point.x - state.pointer.startX;
+      const pullY = point.y - state.pointer.startY;
+      state.birthPull = Math.max(0, pullX * Math.cos(state.birthAngle) + pullY * Math.sin(state.birthAngle));
+      state.touchAngle = state.birthAngle;
+      hint.textContent = state.birthPull > baseRadius() * 0.3 ? "可以松开了——新的生命准备好了" : "保持向外拉，让果冻慢慢隆起";
     } else {
       state.touchAngle = Math.atan2(point.y - state.center.y, point.x - state.center.x);
     }
@@ -828,20 +841,20 @@
     leaveMemory(strength, shouldBirth);
     tone(strength, state.touchAngle);
     hint.textContent = shouldBirth
-      ? "啵——一只小水母正从伞盖顶部脱离"
+      ? "啵——一只小水母正从伞盖边缘脱离"
       : state.babies.length >= 12 && state.interactionMode === "birth"
         ? "水母之森已经住满 12 只小生命"
         : "软软地弹回来了；普通触摸不会繁殖";
     state.birthPull = 0;
     state.interactionMode = "squish";
     window.setTimeout(() => {
-      if (!state.pointer.down) hint.textContent = "触摸小水母，或从母水母顶部向上拉";
+      if (!state.pointer.down) hint.textContent = "触摸小水母，或从母水母任意边缘向外拉";
     }, 2600);
   }
 
   function spawnBaby(strength, hue) {
     const radius = baseRadius();
-    const birthAngle = -Math.PI / 2;
+    const birthAngle = state.birthAngle;
     const surface = bodySurfacePoint(birthAngle);
     const pullRatio = clamp(state.birthPull / (radius * 0.72), 0, 1);
     const size = 16 + Math.pow(pullRatio, 0.78) * 21;
