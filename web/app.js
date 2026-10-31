@@ -131,6 +131,12 @@
       pinchRatio: 2,
       pinchFrames: 0,
       openFrames: 0,
+      fistFrames: 0,
+      openPalmFrames: 0,
+      bubbleArmedAt: 0,
+      bubbleCooldownUntil: 0,
+      palmX: 0,
+      palmY: 0,
       gestureOriginX: 0,
       gestureOriginY: 0,
       pointerOriginX: 0,
@@ -395,6 +401,10 @@
       pinchRatio: 2,
       pinchFrames: 0,
       openFrames: 0,
+      fistFrames: 0,
+      openPalmFrames: 0,
+      bubbleArmedAt: 0,
+      bubbleCooldownUntil: 0,
       indexPrevX: null,
       indexPrevY: null,
       touchBaby: null,
@@ -416,7 +426,7 @@
     const requestToken = ++state.camera.requestToken;
     state.camera.starting = true;
     updateCameraButton("手势·加载中");
-    hint.textContent = "正在准备双指捏合模型，首次打开会稍慢";
+    hint.textContent = "正在准备手部动作模型，首次打开会稍慢";
     try {
       const handsfree = new window.Handsfree({
         showDebug: false,
@@ -446,6 +456,10 @@
         pinchRatio: 2,
         pinchFrames: 0,
         openFrames: 0,
+        fistFrames: 0,
+        openPalmFrames: 0,
+        bubbleArmedAt: 0,
+        bubbleCooldownUntil: 0,
       });
       handsfree.use("squishBridge", ({ hands }) => {
         if (state.camera.requestToken === requestToken) state.camera.hands = hands || null;
@@ -470,7 +484,7 @@
         });
         updateCameraButton("模式·手势");
         showCameraPreview(handsfree);
-        hint.textContent = "一指逗水母；双指捏母体会出生；在空白海水捏一下会吹出气泡";
+        hint.textContent = "一指逗水母；双指捏母体会出生；在空白海水握拳再张开会释放气泡";
       });
     } catch (error) {
       if (state.camera.requestToken !== requestToken) return;
@@ -490,6 +504,19 @@
     else startCamera();
   }
 
+  function landmarkDistance(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y, (a.z || 0) - (b.z || 0));
+  }
+
+  function extendedFingerCount(landmarks) {
+    const wrist = landmarks[0];
+    return [[8, 6], [12, 10], [16, 14], [20, 18]].reduce((count, [tipIndex, jointIndex]) => {
+      const tipDistance = landmarkDistance(wrist, landmarks[tipIndex]);
+      const jointDistance = landmarkDistance(wrist, landmarks[jointIndex]);
+      return count + (tipDistance > jointDistance * 1.18 ? 1 : 0);
+    }, 0);
+  }
+
   function processCameraGesture(now) {
     const camera = state.camera;
     if (!camera.enabled || !camera.handsfree || now - camera.lastFrameAt < 30) return;
@@ -503,6 +530,7 @@
       const index = landmarks[8];
       const palmA = landmarks[5];
       const palmB = landmarks[17];
+      const palmCenter = landmarks[9];
       const handedness = hands.multiHandedness?.[0]?.label;
       const handSlot = handedness === "Right" ? 0 : 1;
       const pinchState = hands.pinchState?.[handSlot]?.[0] || "";
@@ -516,6 +544,9 @@
       const fingerGap = Math.hypot(thumb.x - index.x, thumb.y - index.y);
       const palmWidth = Math.max(0.035, Math.hypot(palmA.x - palmB.x, palmA.y - palmB.y));
       const targetPinchRatio = fingerGap / palmWidth;
+      const openFingerCount = extendedFingerCount(landmarks);
+      const fistDetected = openFingerCount <= 1;
+      const openPalmDetected = openFingerCount >= 4;
       // Handsfree can occasionally keep reporting a pinch while the thumb is
       // already folded away from an extended index finger. Cross-check the
       // plugin state with the actual landmark gap so single-finger play stays live.
@@ -529,6 +560,8 @@
       camera.fingerBY = mix(camera.fingerBY || targetBY, targetBY, smoothing);
       camera.x = mix(camera.x || targetX, targetX, smoothing);
       camera.y = mix(camera.y || targetY, targetY, smoothing);
+      camera.palmX = mix(camera.palmX || (1 - palmCenter.x) * state.width, (1 - palmCenter.x) * state.width, smoothing);
+      camera.palmY = mix(camera.palmY || palmCenter.y * state.height, palmCenter.y * state.height, smoothing);
       camera.pinchRatio = mix(camera.pinchRatio, targetPinchRatio, 0.62);
       camera.presence = mix(camera.presence, clamp((0.76 - camera.pinchRatio) / 0.56, 0, 1), 0.56);
       camera.presenceFrames += 1;
@@ -540,12 +573,17 @@
         camera.openFrames += 1;
         camera.pinchFrames = 0;
       }
+      camera.fistFrames = fistDetected ? Math.min(12, camera.fistFrames + 1) : Math.max(0, camera.fistFrames - 2);
+      camera.openPalmFrames = openPalmDetected ? Math.min(12, camera.openPalmFrames + 1) : 0;
     } else {
       camera.presence *= 0.82;
       camera.presenceFrames = 0;
       camera.absentFrames += 1;
       camera.pinchFrames = 0;
       camera.openFrames += 1;
+      camera.fistFrames = 0;
+      camera.openPalmFrames = 0;
+      if (camera.absentFrames >= 8) camera.bubbleArmedAt = 0;
     }
     camera.cursorAlpha = mix(camera.cursorAlpha, present ? 1 : 0, present ? 0.3 : 0.16);
 
@@ -594,15 +632,23 @@
       }
     }
 
-    // In free play, a quick pinch in open water blows a real bubble. This was
-    // previously only available inside the old step-by-step tutorial.
-    if (present && !state.tutorial.active && !camera.active && pinching && camera.pinchFrames === 2 && camera.rearm) {
-      const distance = Math.hypot(camera.x - state.center.x, camera.y - state.center.y);
-      if (distance > baseRadius() * 1.48) {
-        createBubble(camera.x, camera.y, "gesture");
-        camera.rearm = false;
-        camera.suspendedUntil = now + 120;
-        hint.textContent = "啵——空白海水里捏一下，就吹出了一枚气泡";
+    // Bubble vocabulary is deliberately different from pinching the mother:
+    // hold a fist in open water, then open the palm to release a small cluster.
+    if (present && !state.tutorial.active && !camera.active && now >= camera.bubbleCooldownUntil) {
+      const palmDistance = Math.hypot(camera.palmX - state.center.x, camera.palmY - state.center.y);
+      const inOpenWater = palmDistance > baseRadius() * 1.48;
+      if (!camera.bubbleArmedAt && inOpenWater && camera.fistFrames >= 4) {
+        camera.bubbleArmedAt = now;
+        hint.textContent = "气泡已经聚在拳心——现在慢慢张开手掌";
+      }
+      if (camera.bubbleArmedAt && camera.openPalmFrames >= 2) {
+        createBubbleBurst(camera.palmX, camera.palmY);
+        camera.bubbleArmedAt = 0;
+        camera.bubbleCooldownUntil = now + 850;
+        camera.suspendedUntil = now + 220;
+      } else if (camera.bubbleArmedAt && now - camera.bubbleArmedAt > 2200) {
+        camera.bubbleArmedAt = 0;
+        hint.textContent = "在空白海水重新握拳，再完整张开手掌";
       }
     }
 
@@ -736,7 +782,9 @@
               ? "食指拨过触须——它们顺着水流摆开了"
               : "食指逗小水母或拨触须；双指移到母体再捏合";
         } else if (pinching && distance > baseRadius() * 1.34) {
-          hint.textContent = "空白海水快速捏一下会吹出气泡；张开后可以再次操作";
+          hint.textContent = camera.bubbleArmedAt
+            ? "拳心已经聚起气泡——张开整只手掌来释放"
+            : "在空白海水握拳再张开，可以释放一串气泡";
         }
       } else {
         const amplification = 1.55;
@@ -787,7 +835,7 @@
       camera.active = false;
       releasePointer();
     } else if (!present && camera.absentFrames >= 6) {
-      hint.textContent = "把拇指和食指伸进镜头";
+      hint.textContent = "把整只手完整地放进镜头";
     }
   }
 
@@ -845,8 +893,8 @@
     BUBBLE_INTERACTION: {
       title: "气泡互动",
       mouse: "在小水母下方的空白海水点击，吹出气泡。",
-      gesture: "在小水母下方的空白处双指捏合，生成气泡。",
-      help: "气泡会向上漂；请在小水母下方生成，让它们相碰。",
+      gesture: "在小水母下方的空白处握拳，再张开手掌释放气泡。",
+      help: "先稳定握拳，再完整张开；气泡会向上漂向小水母。",
     },
   };
 
@@ -1063,7 +1111,7 @@
     return Math.abs(x - state.center.x) < radius * 0.62 && y < state.center.y - radius * 0.34;
   }
 
-  function createBubble(x, y, source = "mouse") {
+  function createBubble(x, y, source = "mouse", quiet = false) {
     const size = 10 + Math.random() * 8;
     state.bubbles.push({
       x,
@@ -1077,8 +1125,18 @@
       hit: false,
     });
     if (state.bubbles.length > 18) state.bubbles.shift();
-    popTone(0.12, -Math.PI / 2);
-    hint.textContent = "一枚气泡正向小水母漂去";
+    if (!quiet) {
+      popTone(0.12, -Math.PI / 2);
+      hint.textContent = "一枚气泡正向小水母漂去";
+    }
+  }
+
+  function createBubbleBurst(x, y) {
+    for (let i = 0; i < 5; i += 1) {
+      createBubble(x + (Math.random() - 0.5) * 54, y + (Math.random() - 0.5) * 34, "gesture", true);
+    }
+    popTone(0.22, -Math.PI / 2);
+    hint.textContent = "呼——张开的手掌释放出一串气泡";
   }
 
   function ensureTutorialBaby() {
