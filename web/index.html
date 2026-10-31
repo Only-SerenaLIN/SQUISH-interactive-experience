@@ -7,7 +7,7 @@
     <meta name="description" content="SQUISH — A Soft Jellyfish Interaction Experience. 触摸、挤压并拉出柔软的数字水母。" />
     <title>水母之森 — SQUISH</title>
     <link rel="stylesheet" href="https://unpkg.com/handsfree@8.5.1/build/lib/assets/handsfree.css" />
-    <link rel="stylesheet" href="styles.css?v=gesture-tutorial-1" />
+    <link rel="stylesheet" href="styles.css?v=quick-guide-2" />
   </head>
   <body>
     <main class="artwork" aria-label="《水母之森》柔软水母交互体验">
@@ -24,7 +24,7 @@
           <button id="cameraButton" class="text-button camera-button" type="button" aria-pressed="false"><span class="status-dot" aria-hidden="true"></span><span class="camera-copy">模式·鼠标</span></button>
           <button id="soundButton" class="text-button" type="button" aria-pressed="true"><span class="status-dot" aria-hidden="true"></span><span class="button-copy">声音</span></button>
           <button id="backgroundButton" class="text-button background-button" type="button" aria-pressed="false" aria-label="切换为摄像头背景"><span class="status-dot" aria-hidden="true"></span><span class="background-copy">背景·深海</span></button>
-          <button id="tutorialButton" class="text-button" type="button" aria-expanded="false">操作教程</button>
+          <button id="tutorialButton" class="text-button" type="button" aria-expanded="false">操作说明</button>
           <button id="aboutButton" class="text-button text-button--quiet" type="button" aria-expanded="false" aria-controls="aboutPanel">作品说明</button>
         </nav>
       </header>
@@ -54,6 +54,20 @@
           <div class="tutorial__meta"><span id="tutorialKicker">INTERACTIVE TUTORIAL</span><span id="tutorialCounter">准备</span></div>
           <h2 id="tutorialTitle">选择操作方式</h2>
           <p class="tutorial__instruction" id="tutorialInstruction">请选择鼠标或摄像头手势模式。</p>
+          <div class="tutorial__quick-guide" id="tutorialQuickGuide" hidden>
+            <section>
+              <span>鼠标</span>
+              <p><b>轻触 / 挤压</b>：点按或拖动水母。</p>
+              <p><b>生小水母</b>：从伞盖边缘按住，向外拉，再松开。</p>
+              <p><b>吹气泡</b>：点击水母外的空白海水。</p>
+            </section>
+            <section>
+              <span>摄像头手势</span>
+              <p><b>逗水母</b>：用一根食指靠近它。</p>
+              <p><b>挤压 / 生小水母</b>：拇指与食指在母体上捏合；拉向边缘外，再张开。</p>
+              <p><b>吹气泡</b>：把手移到母体外的空白海水，拇指与食指捏一下再张开。</p>
+            </section>
+          </div>
           <div class="tutorial__demo" id="tutorialDemo" aria-hidden="true">
             <span class="tutorial__cursor-dot"></span><span class="tutorial__gesture-line"></span>
           </div>
@@ -91,6 +105,6 @@
       <div class="veil" id="veil" aria-hidden="true"></div>
     </main>
     <script src="https://unpkg.com/handsfree@8.5.1/build/lib/handsfree.js"></script>
-    <script src="app.js?v=gesture-tutorial-1"></script>
+    <script src="app.js?v=quick-guide-2"></script>
   </body>
 </html>

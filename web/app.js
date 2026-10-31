@@ -22,6 +22,7 @@
   const tutorialCounter = document.querySelector("#tutorialCounter");
   const tutorialTitle = document.querySelector("#tutorialTitle");
   const tutorialInstruction = document.querySelector("#tutorialInstruction");
+  const tutorialQuickGuide = document.querySelector("#tutorialQuickGuide");
   const tutorialModePicker = document.querySelector("#tutorialModePicker");
   const tutorialProgressBar = document.querySelector("#tutorialProgressBar");
   const tutorialStatus = document.querySelector("#tutorialStatus");
@@ -423,6 +424,7 @@
         hands: {
           enabled: true,
           maxNumHands: 1,
+          modelComplexity: 0,
           minDetectionConfidence: 0.55,
           minTrackingConfidence: 0.5,
         },
@@ -468,7 +470,7 @@
         });
         updateCameraButton("模式·手势");
         showCameraPreview(handsfree);
-        hint.textContent = "一根食指可以逗小水母、拨触须；双指捏母体会出生";
+        hint.textContent = "一指逗水母；双指捏母体会出生；在空白海水捏一下会吹出气泡";
       });
     } catch (error) {
       if (state.camera.requestToken !== requestToken) return;
@@ -490,7 +492,7 @@
 
   function processCameraGesture(now) {
     const camera = state.camera;
-    if (!camera.enabled || !camera.handsfree || now - camera.lastFrameAt < 46) return;
+    if (!camera.enabled || !camera.handsfree || now - camera.lastFrameAt < 30) return;
     camera.lastFrameAt = now;
     const hands = camera.hands || camera.handsfree.data?.hands;
     const landmarks = hands?.multiHandLandmarks?.[0];
@@ -518,15 +520,17 @@
       // already folded away from an extended index finger. Cross-check the
       // plugin state with the actual landmark gap so single-finger play stays live.
       pinching = (pluginPinching && targetPinchRatio < 0.92) || targetPinchRatio < 0.46;
-      const smoothing = camera.presenceFrames ? 0.42 : 1;
+      // A quicker follow factor keeps the cursor attached to the real hand
+      // without removing the small amount of smoothing needed for jitter.
+      const smoothing = camera.presenceFrames ? 0.66 : 1;
       camera.fingerAX = mix(camera.fingerAX || targetAX, targetAX, smoothing);
       camera.fingerAY = mix(camera.fingerAY || targetAY, targetAY, smoothing);
       camera.fingerBX = mix(camera.fingerBX || targetBX, targetBX, smoothing);
       camera.fingerBY = mix(camera.fingerBY || targetBY, targetBY, smoothing);
       camera.x = mix(camera.x || targetX, targetX, smoothing);
       camera.y = mix(camera.y || targetY, targetY, smoothing);
-      camera.pinchRatio = mix(camera.pinchRatio, targetPinchRatio, 0.44);
-      camera.presence = mix(camera.presence, clamp((0.76 - camera.pinchRatio) / 0.56, 0, 1), 0.38);
+      camera.pinchRatio = mix(camera.pinchRatio, targetPinchRatio, 0.62);
+      camera.presence = mix(camera.presence, clamp((0.76 - camera.pinchRatio) / 0.56, 0, 1), 0.56);
       camera.presenceFrames += 1;
       camera.absentFrames = 0;
       if (pinching) {
@@ -587,6 +591,18 @@
           tutorial.progress = 0.45;
           renderTutorialPanel();
         }
+      }
+    }
+
+    // In free play, a quick pinch in open water blows a real bubble. This was
+    // previously only available inside the old step-by-step tutorial.
+    if (present && !state.tutorial.active && !camera.active && pinching && camera.pinchFrames === 2 && camera.rearm) {
+      const distance = Math.hypot(camera.x - state.center.x, camera.y - state.center.y);
+      if (distance > baseRadius() * 1.48) {
+        createBubble(camera.x, camera.y, "gesture");
+        camera.rearm = false;
+        camera.suspendedUntil = now + 120;
+        hint.textContent = "啵——空白海水里捏一下，就吹出了一枚气泡";
       }
     }
 
@@ -677,7 +693,7 @@
 
     // Two open frames are enough to re-arm. The previous four-frame lockout
     // made quick, deliberate second pinches feel randomly ignored.
-    if (present && !pinching && !camera.active && camera.openFrames >= 2) camera.rearm = true;
+    if (present && !pinching && !camera.active && camera.openFrames >= 1) camera.rearm = true;
 
     const canControl = now >= camera.suspendedUntil && (!state.pointer.down || state.pointer.id === "camera");
     if (present && canControl) {
@@ -720,7 +736,7 @@
               ? "食指拨过触须——它们顺着水流摆开了"
               : "食指逗小水母或拨触须；双指移到母体再捏合";
         } else if (pinching && distance > baseRadius() * 1.34) {
-          hint.textContent = "双指捏合只会抓住母体；一根食指可以逗小水母";
+          hint.textContent = "空白海水快速捏一下会吹出气泡；张开后可以再次操作";
         }
       } else {
         const amplification = 1.55;
@@ -754,9 +770,9 @@
         } else {
           state.touchAngle = Math.atan2(state.pointer.y - state.center.y, state.pointer.x - state.center.x);
         }
-        if (!pinching && camera.openFrames >= 5) {
+        if (!pinching && camera.openFrames >= 3) {
           camera.active = false;
-          camera.suspendedUntil = now + 260;
+          camera.suspendedUntil = now + 160;
           releasePointer();
         } else {
           const readyDistance = baseRadius() * 0.2;
@@ -859,23 +875,31 @@
     const step = tutorial.step;
     const copy = TUTORIAL_COPY[step];
     const stepNumber = tutorialStepNumber(step);
-    const blocking = ["WELCOME", "INPUT_SELECTION", "CAMERA_CHECK", "COMPLETE"].includes(step);
+    const quickGuide = step === "QUICK_GUIDE";
+    const blocking = quickGuide || ["WELCOME", "INPUT_SELECTION", "CAMERA_CHECK", "COMPLETE"].includes(step);
     tutorialPanel.dataset.step = step;
     tutorialPanel.classList.toggle("is-blocking", blocking);
     tutorialPanel.classList.toggle("is-guiding", !blocking);
     tutorialPanel.classList.toggle("is-success", tutorial.success);
     tutorialModePicker.hidden = step !== "INPUT_SELECTION";
+    tutorialQuickGuide.hidden = !quickGuide;
     tutorialResume.hidden = step !== "WELCOME";
-    tutorialBack.hidden = ["WELCOME", "INPUT_SELECTION", "COMPLETE"].includes(step);
+    tutorialBack.hidden = quickGuide || ["WELCOME", "INPUT_SELECTION", "COMPLETE"].includes(step);
     tutorialRetry.hidden = blocking;
-    skipTutorial.hidden = step === "COMPLETE";
-    switchToMouse.hidden = tutorial.mode !== "gesture" || step === "INPUT_SELECTION" || step === "COMPLETE";
-    startTutorial.hidden = !["CAMERA_CHECK", "COMPLETE"].includes(step);
+    skipTutorial.hidden = quickGuide || step === "COMPLETE";
+    switchToMouse.hidden = quickGuide || tutorial.mode !== "gesture" || step === "INPUT_SELECTION" || step === "COMPLETE";
+    startTutorial.hidden = !quickGuide && !["CAMERA_CHECK", "COMPLETE"].includes(step);
     tutorialProgressBar.style.width = `${Math.round(tutorial.progress * 100)}%`;
     tutorialKicker.textContent = stepNumber > 0 ? "INTERACTIVE GESTURE TUTORIAL" : "SQUISH · FIRST ENCOUNTER";
     tutorialCounter.textContent = stepNumber > 0 ? `${stepNumber} / 6` : step === "COMPLETE" ? "完成" : "准备";
 
-    if (step === "WELCOME") {
+    if (quickGuide) {
+      tutorialKicker.textContent = "SQUISH · QUICK GUIDE";
+      tutorialCounter.textContent = "简明说明";
+      tutorialTitle.textContent = "三种动作，就够了";
+      startTutorial.textContent = "知道了，开始体验";
+      startTutorial.disabled = false;
+    } else if (step === "WELCOME") {
       tutorialTitle.textContent = "继续认识它？";
       tutorialInstruction.textContent = "检测到尚未完成的教学进度。";
       tutorialStatus.textContent = `上次停在第 ${Math.max(1, tutorialStepNumber(localStorage.getItem("tutorialCurrentStep")))} 步`;
@@ -931,16 +955,7 @@
   }
 
   function beginTutorial(restart = false) {
-    if (restart) {
-      state.babies.length = 0;
-      state.bubbles.length = 0;
-      state.memories.length = 0;
-      state.count = 0;
-      babyCount.textContent = "00";
-      localStorage.removeItem("tutorialCompleted");
-      localStorage.setItem("tutorialCurrentStep", "INPUT_SELECTION");
-    }
-    setTutorialStep("INPUT_SELECTION");
+    setTutorialStep("QUICK_GUIDE", { save: false });
   }
 
   function completeTutorialStep(expectedStep) {
@@ -961,7 +976,7 @@
     localStorage.setItem("tutorialCompleted", "true");
     localStorage.setItem("tutorialCurrentStep", "COMPLETE");
     showTutorial(false);
-    hint.textContent = skipped ? "教程已跳过，随时可以重新学习" : "教学完成——现在自由地和它们相处吧";
+    hint.textContent = skipped ? "操作说明已关闭，随时可以重新查看" : "说明看完了——现在自由地和它们相处吧";
   }
 
   function tutorialAllows(kind) {
@@ -1025,14 +1040,7 @@
     canvas.focus({ preventScroll: true });
     recordActivity();
     if (localStorage.getItem("tutorialCompleted") === "true") return;
-    const savedStep = localStorage.getItem("tutorialCurrentStep");
-    if (savedStep && !["WELCOME", "INPUT_SELECTION", "COMPLETE"].includes(savedStep)) {
-      state.tutorial.step = "WELCOME";
-      showTutorial(true);
-      renderTutorialPanel();
-    } else {
-      beginTutorial(false);
-    }
+    beginTutorial(false);
   }
 
   function pointerPosition(event) {
@@ -2379,7 +2387,9 @@
   });
   skipTutorial.addEventListener("click", () => finishTutorial(true));
   startTutorial.addEventListener("click", () => {
-    if (state.tutorial.step === "CAMERA_CHECK" && state.tutorial.progress >= 1) {
+    if (state.tutorial.step === "QUICK_GUIDE") {
+      finishTutorial(false);
+    } else if (state.tutorial.step === "CAMERA_CHECK" && state.tutorial.progress >= 1) {
       const next = state.tutorial.resumeStep || "APPROACH";
       state.tutorial.resumeStep = null;
       setTutorialStep(next);

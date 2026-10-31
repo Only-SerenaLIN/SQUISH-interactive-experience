@@ -475,6 +475,39 @@ body.ui-idle .bottomline { transform: translateY(7px); }
 
 .tutorial__instruction { min-height: 3.4em; margin: 0; font-size: 12px; line-height: 1.8; letter-spacing: 0.06em; opacity: 0.72; }
 
+.tutorial__quick-guide {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 18px;
+}
+.tutorial__quick-guide[hidden] { display: none !important; }
+.tutorial__quick-guide section {
+  padding: 16px 17px;
+  border: 1px solid rgba(230, 202, 237, 0.14);
+  border-radius: 18px;
+  background: rgba(126, 91, 146, 0.1);
+}
+.tutorial__quick-guide span {
+  display: block;
+  margin-bottom: 10px;
+  color: rgba(255, 221, 241, 0.88);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+.tutorial__quick-guide p {
+  margin: 7px 0;
+  color: rgba(229, 244, 246, 0.66);
+  font-size: 10px;
+  line-height: 1.62;
+}
+.tutorial__quick-guide b { color: rgba(246, 231, 243, 0.88); font-weight: 500; }
+.tutorial[data-step="QUICK_GUIDE"] .tutorial__instruction,
+.tutorial[data-step="QUICK_GUIDE"] .tutorial__demo,
+.tutorial[data-step="QUICK_GUIDE"] .tutorial__progress,
+.tutorial[data-step="QUICK_GUIDE"] .tutorial__status,
+.tutorial[data-step="QUICK_GUIDE"] .tutorial__help { display: none; }
+
 .tutorial__demo {
   position: relative;
   height: 54px;
@@ -710,6 +743,7 @@ body.ui-idle .bottomline { transform: translateY(7px); }
   .tutorial__card { width: 100%; padding: 20px; border-radius: 22px; }
   .tutorial__demo { height: 44px; }
   .tutorial__mode-picker { grid-template-columns: 1fr; }
+  .tutorial__quick-guide { grid-template-columns: 1fr; }
   .tutorial__focus { width: 72vw !important; }
   .hint { max-width: 48vw; line-height: 1.6; }
   .bottom-actions { gap: 10px; }
