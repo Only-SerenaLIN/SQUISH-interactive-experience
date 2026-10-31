@@ -633,7 +633,7 @@
     }
 
     // Bubble vocabulary is deliberately different from pinching the mother:
-    // hold a fist in open water, then open the palm to release a small cluster.
+    // hold a fist in open water, then open the palm to release one bubble.
     if (present && !state.tutorial.active && !camera.active && now >= camera.bubbleCooldownUntil) {
       const palmDistance = Math.hypot(camera.palmX - state.center.x, camera.palmY - state.center.y);
       const inOpenWater = palmDistance > baseRadius() * 1.48;
@@ -642,7 +642,7 @@
         hint.textContent = "气泡已经聚在拳心——现在慢慢张开手掌";
       }
       if (camera.bubbleArmedAt && camera.openPalmFrames >= 2) {
-        createBubbleBurst(camera.palmX, camera.palmY);
+        createPalmBubble(camera.palmX, camera.palmY);
         camera.bubbleArmedAt = 0;
         camera.bubbleCooldownUntil = now + 850;
         camera.suspendedUntil = now + 220;
@@ -1131,12 +1131,9 @@
     }
   }
 
-  function createBubbleBurst(x, y) {
-    for (let i = 0; i < 5; i += 1) {
-      createBubble(x + (Math.random() - 0.5) * 54, y + (Math.random() - 0.5) * 34, "gesture", true);
-    }
-    popTone(0.22, -Math.PI / 2);
-    hint.textContent = "呼——张开的手掌释放出一串气泡";
+  function createPalmBubble(x, y) {
+    createBubble(x, y, "gesture");
+    hint.textContent = "啵——张开的手掌释放出一枚气泡";
   }
 
   function ensureTutorialBaby() {
