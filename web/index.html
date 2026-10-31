@@ -1,50 +1,79 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#06152d">
-  <meta name="description" content="Jellyfish Grove 水母之森——一座会持续生长的深海水母生态缸。">
-  <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <title>Jellyfish Grove · 水母之森</title>
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-  <main id="game-shell" aria-label="Jellyfish Grove 水母之森">
-    <canvas id="game" aria-label="可拖动和缩放的水母之森游戏画布"></canvas>
-    <header class="brand glass"><div class="brand-mark" aria-hidden="true">✦</div><div><h1>水母之森</h1><p>JELLYFISH GROVE · 浮光之域</p></div></header>
-    <section class="hud glass" aria-label="生态状态">
-      <div class="hud-item"><span class="hud-icon glow-icon">◆</span><div><strong id="glow-value">0</strong><small>浮光</small></div></div>
-      <div class="hud-item"><span class="hud-icon">↗</span><div><strong id="rate-value">0 / 秒</strong><small>自然产出</small></div></div>
-      <div class="hud-item"><span class="hud-icon">◌</span><div><strong id="jelly-value">1</strong><small>小水母</small></div></div>
-    </section>
-    <nav class="view-tools glass" aria-label="视野工具">
-      <button id="zoom-in" title="放大">＋</button><button id="zoom-out" title="缩小">−</button><button id="home-view" title="回到母水母">⌂</button><button id="sound-toggle" title="环境音" aria-pressed="false">♪</button>
-    </nav>
-    <aside id="inspector" class="inspector glass is-hidden" aria-live="polite">
-      <button id="close-inspector" class="close" aria-label="关闭">×</button>
-      <span id="inspect-species" class="eyebrow">蓝水母 · 沉静</span><h2 id="inspect-name">小浮光</h2><p id="inspect-state">正在缓慢游动</p>
-      <div class="mood-bar"><span id="mood-fill"></span></div><small>轻点它会有不同反应；拖到栖息地可以安排游玩。</small>
-    </aside>
-    <section class="action-dock glass" aria-label="建造和孕育">
-      <div class="dock-group"><span class="dock-label">母体图鉴</span>
-        <div class="species-card is-unlocked" data-species="blue"><i class="swatch blue"></i><span>沉静</span><b>母体已学会</b></div>
-        <div class="species-card" data-species="pink"><i class="swatch pink"></i><span>害羞</span><b>贝壳解锁</b></div>
-        <div class="species-card" data-species="yellow"><i class="swatch yellow"></i><span>活泼</span><b>滑梯解锁</b></div>
-      </div><div class="dock-separator"></div>
-      <div class="dock-group"><span class="dock-label">平台生长</span>
-        <button class="build-card" data-build="shell"><span>◡</span><em>贝壳休息台</em><b>30 ◆</b></button>
-        <button class="build-card" data-build="slide"><span>〽</span><em>水母滑梯</em><b>150 ◆</b></button>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#061927" />
+    <meta name="description" content="SQUISH — A Soft Jellyfish Interaction Experience. 触摸、挤压并拉出柔软的数字水母。" />
+    <title>水母之森 — SQUISH</title>
+    <link rel="stylesheet" href="https://unpkg.com/handsfree@8.5.1/build/lib/assets/handsfree.css" />
+    <link rel="stylesheet" href="styles.css?v=assignment-1" />
+  </head>
+  <body>
+    <main class="artwork" aria-label="《水母之森》柔软水母交互体验">
+      <video class="camera-backdrop" id="cameraBackdrop" autoplay muted playsinline aria-hidden="true"></video>
+      <div class="camera-backdrop__shade" aria-hidden="true"></div>
+      <canvas id="world" aria-label="可按压、拉伸并繁殖小水母的交互画布" tabindex="0"></canvas>
+
+      <header class="topbar immersive-ui">
+        <a class="identity" href="#" aria-label="水母之森">
+          <span class="identity__cn">水母之森</span>
+          <span class="identity__en">SQUISH · SOFT JELLYFISH EXPERIENCE</span>
+        </a>
+        <nav class="controls" aria-label="体验控制">
+          <button id="cameraButton" class="text-button camera-button" type="button" aria-pressed="false"><span class="status-dot" aria-hidden="true"></span><span class="camera-copy">模式·鼠标</span></button>
+          <button id="soundButton" class="text-button" type="button" aria-pressed="true"><span class="status-dot" aria-hidden="true"></span><span class="button-copy">声音</span></button>
+          <button id="backgroundButton" class="text-button background-button" type="button" aria-pressed="false" aria-label="切换为摄像头背景"><span class="status-dot" aria-hidden="true"></span><span class="background-copy">背景·深海</span></button>
+          <button id="tutorialButton" class="text-button" type="button" aria-expanded="false">操作教程</button>
+          <button id="aboutButton" class="text-button text-button--quiet" type="button" aria-expanded="false" aria-controls="aboutPanel">作品说明</button>
+        </nav>
+      </header>
+
+      <figure class="camera-preview immersive-ui" id="cameraPreviewShell" aria-hidden="true">
+        <video class="camera-preview__video" id="cameraPreview" autoplay muted playsinline aria-label="实时摄像头镜像预览"></video>
+        <figcaption class="camera-preview__label"><span class="camera-preview__live" aria-hidden="true"></span>手势识别 · LIVE</figcaption>
+      </figure>
+
+      <section class="invitation" id="invitation" aria-labelledby="invitationTitle">
+        <div class="invitation__copy">
+          <p class="eyebrow">PROGRAMMING ASSIGNMENT · INTERACTIVE DEMO</p>
+          <h1 id="invitationTitle">靠近一只<br />柔软的水母</h1>
+          <p class="invitation__note">触摸、挤压，或从伞盖顶部拉出新的生命。</p>
+          <button id="enterButton" class="enter-button" type="button"><span>进入水母之森</span><span class="enter-button__en">BEGIN SQUISHING</span></button>
+        </div>
+      </section>
+
+      <div class="bottomline immersive-ui" aria-live="polite">
+        <p id="hint" class="hint">移动靠近 · 按住挤压 · 顶部上拉出生</p>
+        <div class="bottom-actions"><p class="memory-count"><span id="babyCount">00</span> / 12 只小水母</p><button id="resetButton" class="mini-button" type="button">重置</button></div>
       </div>
-    </section>
-    <div id="toast" class="toast" role="status"></div>
-    <section id="tutorial" class="tutorial glass" aria-labelledby="tutorial-title">
-      <div class="tutorial-step">初次潜入 · <span id="tutorial-count">1 / 4</span></div><h2 id="tutorial-title">欢迎来到水母之森</h2>
-      <p id="tutorial-copy">母水母会用自己的触须长出一块柔软平台。抓住中央触须向下拉，让第一片栖息地在深海里成形。</p>
-      <div class="tutorial-actions"><button id="tutorial-skip" class="quiet">跳过</button><button id="tutorial-next" class="primary">继续</button></div>
-    </section>
-    <footer class="hint">伞盖顶部向上拉出生小水母 · 中央触须向下拉生成主干与平台 · 点击幼体互动</footer>
-  </main>
-  <script type="module" src="app.js"></script>
-</body>
+
+      <section class="tutorial" id="tutorialPanel" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle">
+        <div class="tutorial__card">
+          <p class="eyebrow">HOW TO SQUISH</p><h2 id="tutorialTitle">三步认识它</h2>
+          <ol class="tutorial__steps">
+            <li><span>01</span><strong>轻轻触摸</strong><small>点击伞盖，看它凹陷、变换表情。</small></li>
+            <li><span>02</span><strong>按住挤压</strong><small>拖动接触点，感受局部拉伸与 Q 弹回位。</small></li>
+            <li><span>03</span><strong>向上拉出生命</strong><small>从母水母伞盖顶部按住并向上拉，再松开。</small></li>
+          </ol>
+          <p class="tutorial__gesture">摄像头模式：食指逗小水母；拇指与食指捏合控制母水母。</p>
+          <div class="tutorial__actions"><button id="skipTutorial" class="link-button" type="button">跳过</button><button id="startTutorial" class="enter-button enter-button--small" type="button">开始体验</button></div>
+        </div>
+      </section>
+
+      <aside class="about" id="aboutPanel" aria-hidden="true">
+        <button id="closeAbout" class="close-button" type="button" aria-label="关闭作品说明">关闭</button>
+        <div class="about__inner">
+          <p class="eyebrow">ABOUT THE WORK</p><h2>柔软，也是一种回应。</h2>
+          <p>《水母之森》是一件浏览器交互作品。母水母的轮廓由 72 个弹簧节点组成，因此触碰会留在局部，而不是缩放整只角色。</p>
+          <p>普通触摸只产生表情与回弹；只有从伞盖顶部向上拉动，才会诞生一只有自己性格的小水母。</p>
+          <div class="about__divider"></div><p class="about__small">鼠标拖动 · 摄像头双指捏合 · M 静音 · C 手势 · B 背景 · R 重置 · ? 教程</p>
+          <p class="camera-privacy">摄像头画面只在本机浏览器内分析，不录制、不保存、不会上传。</p>
+        </div>
+      </aside>
+      <div class="veil" id="veil" aria-hidden="true"></div>
+    </main>
+    <script src="https://unpkg.com/handsfree@8.5.1/build/lib/handsfree.js"></script>
+    <script src="app.js?v=assignment-1"></script>
+  </body>
 </html>
