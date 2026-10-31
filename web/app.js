@@ -15,8 +15,25 @@
   const aboutButton = document.querySelector("#aboutButton");
   const tutorialButton = document.querySelector("#tutorialButton");
   const tutorialPanel = document.querySelector("#tutorialPanel");
+  const tutorialFocus = document.querySelector("#tutorialFocus");
   const skipTutorial = document.querySelector("#skipTutorial");
   const startTutorial = document.querySelector("#startTutorial");
+  const tutorialKicker = document.querySelector("#tutorialKicker");
+  const tutorialCounter = document.querySelector("#tutorialCounter");
+  const tutorialTitle = document.querySelector("#tutorialTitle");
+  const tutorialInstruction = document.querySelector("#tutorialInstruction");
+  const tutorialModePicker = document.querySelector("#tutorialModePicker");
+  const tutorialProgressBar = document.querySelector("#tutorialProgressBar");
+  const tutorialStatus = document.querySelector("#tutorialStatus");
+  const tutorialHelp = document.querySelector("#tutorialHelp");
+  const tutorialBack = document.querySelector("#tutorialBack");
+  const tutorialRetry = document.querySelector("#tutorialRetry");
+  const switchToMouse = document.querySelector("#switchToMouse");
+  const chooseMouseMode = document.querySelector("#chooseMouseMode");
+  const chooseGestureMode = document.querySelector("#chooseGestureMode");
+  const tutorialResume = document.querySelector("#tutorialResume");
+  const resumeTutorial = document.querySelector("#resumeTutorial");
+  const restartTutorial = document.querySelector("#restartTutorial");
   const aboutPanel = document.querySelector("#aboutPanel");
   const closeAbout = document.querySelector("#closeAbout");
   const resetButton = document.querySelector("#resetButton");
@@ -68,8 +85,23 @@
     memories: [],
     ripples: [],
     babies: [],
+    bubbles: [],
     dust: [],
     audio: null,
+    tutorial: {
+      active: false,
+      step: "WELCOME",
+      mode: localStorage.getItem("preferredInputMode") || "mouse",
+      progress: 0,
+      startedAt: 0,
+      actionStartedAt: 0,
+      stableFrames: 0,
+      success: false,
+      helpLevel: 0,
+      spawnedBaby: null,
+      initialBabyCount: 0,
+      cameraCheckFrames: 0,
+    },
     camera: {
       enabled: false,
       ready: false,
@@ -513,9 +545,55 @@
     }
     camera.cursorAlpha = mix(camera.cursorAlpha, present ? 1 : 0, present ? 0.3 : 0.16);
 
+    if (state.tutorial.active && state.tutorial.mode === "gesture") {
+      const tutorial = state.tutorial;
+      if (tutorial.step === "CAMERA_CHECK") {
+        tutorial.cameraCheckFrames = present ? Math.min(10, tutorial.cameraCheckFrames + 1) : 0;
+        tutorial.progress = tutorial.cameraCheckFrames / 10;
+        renderTutorialPanel();
+      } else if (present && tutorial.step === "APPROACH") {
+        const distance = Math.hypot(camera.fingerBX - state.center.x, camera.fingerBY - state.center.y);
+        tutorial.progress = clamp(1 - (distance - baseRadius() * 1.15) / (baseRadius() * 1.5), 0, 1);
+        renderTutorialPanel();
+        if (distance <= baseRadius() * 1.38) completeTutorialStep("APPROACH");
+      } else if (present && !pinching && tutorial.step === "TOUCH") {
+        const fingerX = camera.fingerBX;
+        const fingerY = camera.fingerBY;
+        const distance = Math.hypot(fingerX - state.center.x, fingerY - state.center.y);
+        if (distance <= baseRadius() * 0.92) {
+          tutorial.stableFrames += 1;
+          tutorial.progress = clamp(tutorial.stableFrames / 6, 0, 1);
+          state.touchAngle = Math.atan2(fingerY - state.center.y, fingerX - state.center.x);
+          state.nodes.forEach((node) => {
+            const proximity = Math.exp(-Math.pow(shortestAngle(node.angle, state.touchAngle) / 0.48, 2));
+            node.velocity -= proximity * 0.016;
+          });
+          state.pressure = Math.max(state.pressure, 0.32);
+          setMotherMood();
+          renderTutorialPanel();
+          if (tutorial.stableFrames >= 6) completeTutorialStep("TOUCH");
+        } else {
+          tutorial.stableFrames = Math.max(0, tutorial.stableFrames - 1);
+        }
+      } else if (!present && tutorial.step !== "CAMERA_CHECK") {
+        tutorialStatus.textContent = "手部识别暂时丢失，当前动作已暂停";
+      }
+
+      if (present && tutorial.step === "BUBBLE_INTERACTION" && pinching && camera.pinchFrames === 2 && camera.rearm) {
+        const distance = Math.hypot(camera.x - state.center.x, camera.y - state.center.y);
+        if (distance > baseRadius() * 1.35) {
+          createBubble(camera.x, camera.y, "gesture");
+          camera.rearm = false;
+          tutorial.progress = 0.45;
+          renderTutorialPanel();
+        }
+      }
+    }
+
     let cameraTouchBaby = null;
     let playingTentacles = false;
-    if (present && !camera.active && !pinching && now >= camera.suspendedUntil) {
+    const allowSingleFingerPlay = !state.tutorial.active || state.tutorial.step === "BABY_INTERACTION";
+    if (present && !camera.active && !pinching && now >= camera.suspendedUntil && allowSingleFingerPlay) {
       const fingerX = camera.fingerBX;
       const fingerY = camera.fingerBY;
       const previousX = camera.indexPrevX ?? fingerX;
@@ -560,6 +638,7 @@
             hue: touchedBaby.hue,
             duration: 0.8,
           });
+          if (state.tutorial.active && state.tutorial.step === "BABY_INTERACTION") completeTutorialStep("BABY_INTERACTION");
         }
         camera.touchBaby = touchedBaby;
         hint.textContent = "指尖碰到了它——它软软地让开了";
@@ -607,7 +686,11 @@
         // Keep the grab window open while the fingers remain pinched. Requiring
         // exactly the third detected frame meant moving onto the bell one frame
         // late could never start a gesture.
-        if (camera.rearm && camera.pinchFrames >= 2 && distance <= baseRadius() * 1.45) {
+        const tutorialGrabAllowed =
+          !state.tutorial.active ||
+          state.tutorial.step === "SQUISH" ||
+          (state.tutorial.step === "SPAWN" && isTutorialTopZone(camera.x, camera.y));
+        if (camera.rearm && camera.pinchFrames >= 2 && distance <= baseRadius() * 1.45 && tutorialGrabAllowed) {
           camera.active = true;
           camera.rearm = false;
           camera.gestureOriginX = camera.x;
@@ -619,6 +702,12 @@
           state.touchAngle = Math.atan2(camera.y - state.center.y, camera.x - state.center.x);
           state.interactionMode = isBirthZone(camera.x, camera.y, true) ? "birth" : "squish";
           state.birthAngle = Math.atan2(camera.y - state.center.y, camera.x - state.center.x);
+          if (state.tutorial.active && state.tutorial.step === "SQUISH") state.interactionMode = "squish";
+          if (state.tutorial.active && state.tutorial.step === "SPAWN") {
+            state.interactionMode = "birth";
+            state.birthAngle = -Math.PI / 2;
+            state.touchAngle = -Math.PI / 2;
+          }
           state.birthPull = 0;
           canvas.classList.add("is-touching");
           hint.textContent = state.interactionMode === "birth"
@@ -694,11 +783,217 @@
     if (open) closeAbout.focus();
   }
 
+  const TUTORIAL_ORDER = [
+    "INPUT_SELECTION",
+    "CAMERA_CHECK",
+    "APPROACH",
+    "TOUCH",
+    "SQUISH",
+    "SPAWN",
+    "BABY_INTERACTION",
+    "BUBBLE_INTERACTION",
+    "COMPLETE",
+  ];
+
+  const TUTORIAL_COPY = {
+    APPROACH: {
+      title: "靠近水母",
+      mouse: "移动鼠标，慢慢靠近母水母。",
+      gesture: "伸出一根食指，慢慢靠近母水母。",
+      help: "让指针进入水母周围的粉紫色感知圈。",
+    },
+    TOUCH: {
+      title: "轻触伞盖",
+      mouse: "在伞盖中央轻点一次，然后松开。",
+      gesture: "用食指轻触伞盖中央，保持片刻。",
+      help: "请触碰粉紫色伞盖，不要触碰触手。",
+    },
+    SQUISH: {
+      title: "果冻挤压",
+      mouse: "按住伞盖并拖动，保持半秒后松开。",
+      gesture: "拇指与食指捏住伞盖，保持后张开。",
+      help: "看到局部凹陷后再松开；轻点不足以完成。",
+    },
+    SPAWN: {
+      title: "孕育小水母",
+      mouse: "捏住伞盖顶部，向上拉到提示出现后松开。",
+      gesture: "在伞盖顶部双指捏合，向上拉，再张开手指。",
+      help: "本关只识别顶部向上的拉动；等待小水母完全分离。",
+    },
+    BABY_INTERACTION: {
+      title: "和小水母玩耍",
+      mouse: "移动并点击刚出生的小水母。",
+      gesture: "用食指轻轻靠近刚出生的小水母。",
+      help: "靠近小水母的伞盖，触发它的性格反应。",
+    },
+    BUBBLE_INTERACTION: {
+      title: "气泡互动",
+      mouse: "在小水母下方的空白海水点击，吹出气泡。",
+      gesture: "在小水母下方的空白处双指捏合，生成气泡。",
+      help: "气泡会向上漂；请在小水母下方生成，让它们相碰。",
+    },
+  };
+
+  function tutorialStepNumber(step = state.tutorial.step) {
+    return ["APPROACH", "TOUCH", "SQUISH", "SPAWN", "BABY_INTERACTION", "BUBBLE_INTERACTION"].indexOf(step) + 1;
+  }
+
+  function saveTutorialProgress() {
+    localStorage.setItem("tutorialCurrentStep", state.tutorial.step);
+    localStorage.setItem("preferredInputMode", state.tutorial.mode);
+  }
+
   function showTutorial(open) {
+    state.tutorial.active = open;
     tutorialPanel.classList.toggle("is-open", open);
     tutorialPanel.setAttribute("aria-hidden", String(!open));
     tutorialButton.setAttribute("aria-expanded", String(open));
-    if (open) startTutorial.focus();
+    if (!open) {
+      tutorialPanel.classList.remove("is-blocking", "is-guiding", "is-success");
+      canvas.focus({ preventScroll: true });
+    }
+  }
+
+  function renderTutorialPanel() {
+    const tutorial = state.tutorial;
+    const step = tutorial.step;
+    const copy = TUTORIAL_COPY[step];
+    const stepNumber = tutorialStepNumber(step);
+    const blocking = ["WELCOME", "INPUT_SELECTION", "CAMERA_CHECK", "COMPLETE"].includes(step);
+    tutorialPanel.dataset.step = step;
+    tutorialPanel.classList.toggle("is-blocking", blocking);
+    tutorialPanel.classList.toggle("is-guiding", !blocking);
+    tutorialPanel.classList.toggle("is-success", tutorial.success);
+    tutorialModePicker.hidden = step !== "INPUT_SELECTION";
+    tutorialResume.hidden = step !== "WELCOME";
+    tutorialBack.hidden = ["WELCOME", "INPUT_SELECTION", "COMPLETE"].includes(step);
+    tutorialRetry.hidden = blocking;
+    skipTutorial.hidden = step === "COMPLETE";
+    switchToMouse.hidden = tutorial.mode !== "gesture" || step === "INPUT_SELECTION" || step === "COMPLETE";
+    startTutorial.hidden = !["CAMERA_CHECK", "COMPLETE"].includes(step);
+    tutorialProgressBar.style.width = `${Math.round(tutorial.progress * 100)}%`;
+    tutorialKicker.textContent = stepNumber > 0 ? "INTERACTIVE GESTURE TUTORIAL" : "SQUISH · FIRST ENCOUNTER";
+    tutorialCounter.textContent = stepNumber > 0 ? `${stepNumber} / 6` : step === "COMPLETE" ? "完成" : "准备";
+
+    if (step === "WELCOME") {
+      tutorialTitle.textContent = "继续认识它？";
+      tutorialInstruction.textContent = "检测到尚未完成的教学进度。";
+      tutorialStatus.textContent = `上次停在第 ${Math.max(1, tutorialStepNumber(localStorage.getItem("tutorialCurrentStep")))} 步`;
+      tutorialHelp.textContent = "可以继续，也可以清空教学生成的小水母后重新开始。";
+    } else if (step === "INPUT_SELECTION") {
+      tutorialTitle.textContent = "选择操作方式";
+      tutorialInstruction.textContent = "教程会根据输入方式显示不同动作提示。";
+      tutorialStatus.textContent = "请选择鼠标或摄像头手势模式";
+      tutorialHelp.textContent = "摄像头模式只在本机分析画面；失败时可切换鼠标。";
+    } else if (step === "CAMERA_CHECK") {
+      tutorialTitle.textContent = "摄像头与手部检测";
+      tutorialInstruction.textContent = state.camera.ready ? "请把一只手完整放入镜头。" : "正在请求权限并载入手部模型。";
+      tutorialStatus.textContent = state.camera.ready ? "等待稳定识别手部关键点" : state.camera.starting ? "模型加载中…" : "摄像头尚未就绪";
+      tutorialHelp.textContent = "保持手掌正对镜头、光线均匀；无法识别可切换鼠标。";
+      startTutorial.textContent = "检测完成，继续";
+      startTutorial.disabled = tutorial.progress < 1;
+    } else if (copy) {
+      tutorialTitle.textContent = copy.title;
+      tutorialInstruction.textContent = copy[tutorial.mode];
+      tutorialStatus.textContent = tutorial.success ? "识别成功 · 即将进入下一步" : `动作识别 ${Math.round(tutorial.progress * 100)}%`;
+      tutorialHelp.textContent = tutorial.success ? "动作已经确认，水母会带你进入下一步。" : tutorial.helpLevel ? `还没有识别成功：${copy.help}` : copy.help;
+    } else if (step === "COMPLETE") {
+      tutorialTitle.textContent = "你已经学会了";
+      tutorialInstruction.textContent = "现在可以自由触摸、挤压、孕育水母和吹出气泡。";
+      tutorialStatus.textContent = "六项真实互动均已完成";
+      tutorialHelp.textContent = "之后可以从顶部“重新学习操作”再次进入教程。";
+      startTutorial.textContent = "进入自由互动";
+      startTutorial.disabled = false;
+    }
+  }
+
+  function setTutorialStep(step, { save = true } = {}) {
+    const tutorial = state.tutorial;
+    tutorial.step = step;
+    tutorial.progress = 0;
+    tutorial.success = false;
+    tutorial.helpLevel = 0;
+    tutorial.stableFrames = 0;
+    tutorial.actionStartedAt = 0;
+    tutorial.startedAt = performance.now();
+    if (step === "SPAWN") tutorial.initialBabyCount = state.babies.length;
+    if (["BABY_INTERACTION", "BUBBLE_INTERACTION"].includes(step)) {
+      const baby = ensureTutorialBaby();
+      const margin = Math.max(68, baby.size * 2.3);
+      baby.x = clamp(state.center.x + baseRadius() * 1.42, margin, state.width - margin);
+      baby.y = clamp(state.center.y - baseRadius() * 0.45, margin, state.height - margin);
+      baby.vx = 0;
+      baby.vy = -0.8;
+    }
+    if (save) saveTutorialProgress();
+    showTutorial(true);
+    renderTutorialPanel();
+  }
+
+  function beginTutorial(restart = false) {
+    if (restart) {
+      state.babies.length = 0;
+      state.bubbles.length = 0;
+      state.memories.length = 0;
+      state.count = 0;
+      babyCount.textContent = "00";
+      localStorage.removeItem("tutorialCompleted");
+      localStorage.setItem("tutorialCurrentStep", "INPUT_SELECTION");
+    }
+    setTutorialStep("INPUT_SELECTION");
+  }
+
+  function completeTutorialStep(expectedStep) {
+    const tutorial = state.tutorial;
+    if (!tutorial.active || tutorial.step !== expectedStep || tutorial.success) return;
+    tutorial.progress = 1;
+    tutorial.success = true;
+    renderTutorialPanel();
+    popTone(0.25, state.touchAngle);
+    window.setTimeout(() => {
+      if (!tutorial.active || tutorial.step !== expectedStep) return;
+      const index = TUTORIAL_ORDER.indexOf(expectedStep);
+      setTutorialStep(TUTORIAL_ORDER[index + 1] || "COMPLETE");
+    }, 680);
+  }
+
+  function finishTutorial(skipped = false) {
+    localStorage.setItem("tutorialCompleted", "true");
+    localStorage.setItem("tutorialCurrentStep", "COMPLETE");
+    showTutorial(false);
+    hint.textContent = skipped ? "教程已跳过，随时可以重新学习" : "教学完成——现在自由地和它们相处吧";
+  }
+
+  function tutorialAllows(kind) {
+    if (!state.tutorial.active) return true;
+    const step = state.tutorial.step;
+    return (
+      (kind === "mother" && ["TOUCH", "SQUISH", "SPAWN"].includes(step)) ||
+      (kind === "baby" && step === "BABY_INTERACTION") ||
+      (kind === "background" && step === "BUBBLE_INTERACTION")
+    );
+  }
+
+  function retryTutorialStep() {
+    const step = state.tutorial.step;
+    if (step === "SPAWN" && state.tutorial.spawnedBaby) {
+      state.babies = state.babies.filter((baby) => baby !== state.tutorial.spawnedBaby);
+      state.tutorial.spawnedBaby = null;
+      babyCount.textContent = String(state.babies.length).padStart(2, "0");
+    }
+    setTutorialStep(step);
+  }
+
+  function backTutorialStep() {
+    const index = TUTORIAL_ORDER.indexOf(state.tutorial.step);
+    if (index <= 0) return;
+    if (state.tutorial.step === "BABY_INTERACTION" && state.tutorial.spawnedBaby) {
+      state.babies = state.babies.filter((baby) => baby !== state.tutorial.spawnedBaby);
+      state.tutorial.spawnedBaby = null;
+      babyCount.textContent = String(state.babies.length).padStart(2, "0");
+    }
+    const previous = TUTORIAL_ORDER[Math.max(0, index - 1)];
+    setTutorialStep(previous === "CAMERA_CHECK" && state.tutorial.mode === "mouse" ? "INPUT_SELECTION" : previous);
   }
 
   function recordActivity() {
@@ -729,7 +1024,15 @@
     initAudio();
     canvas.focus({ preventScroll: true });
     recordActivity();
-    if (!localStorage.getItem("squish-tutorial-seen")) showTutorial(true);
+    if (localStorage.getItem("tutorialCompleted") === "true") return;
+    const savedStep = localStorage.getItem("tutorialCurrentStep");
+    if (savedStep && !["WELCOME", "INPUT_SELECTION", "COMPLETE"].includes(savedStep)) {
+      state.tutorial.step = "WELCOME";
+      showTutorial(true);
+      renderTutorialPanel();
+    } else {
+      beginTutorial(false);
+    }
   }
 
   function pointerPosition(event) {
@@ -747,6 +1050,54 @@
     return null;
   }
 
+  function isTutorialTopZone(x, y) {
+    const radius = baseRadius();
+    return Math.abs(x - state.center.x) < radius * 0.62 && y < state.center.y - radius * 0.34;
+  }
+
+  function createBubble(x, y, source = "mouse") {
+    const size = 10 + Math.random() * 8;
+    state.bubbles.push({
+      x,
+      y,
+      size,
+      vx: (Math.random() - 0.5) * 5,
+      vy: -18 - Math.random() * 8,
+      age: 0,
+      phase: Math.random() * TAU,
+      source,
+      hit: false,
+    });
+    if (state.bubbles.length > 18) state.bubbles.shift();
+    popTone(0.12, -Math.PI / 2);
+    hint.textContent = "一枚气泡正向小水母漂去";
+  }
+
+  function ensureTutorialBaby() {
+    const existing = state.tutorial.spawnedBaby && state.babies.includes(state.tutorial.spawnedBaby)
+      ? state.tutorial.spawnedBaby
+      : state.babies.find((baby) => baby.detached);
+    if (existing) {
+      state.tutorial.spawnedBaby = existing;
+      return existing;
+    }
+    state.birthAngle = -Math.PI / 2;
+    state.birthPull = baseRadius() * 0.42;
+    state.count = Math.max(1, state.count);
+    spawnBaby(0.58, state.count % palette.length);
+    const baby = state.babies[state.babies.length - 1];
+    baby.age = baby.birthDuration + 1;
+    baby.detached = true;
+    baby.birthSquash = 0;
+    baby.x = state.center.x;
+    baby.y = Math.max(78, state.center.y - baseRadius() * 1.32);
+    baby.vx = 1.4;
+    baby.vy = -1.2;
+    state.tutorial.spawnedBaby = baby;
+    babyCount.textContent = String(state.babies.length).padStart(2, "0");
+    return baby;
+  }
+
   function pointerDown(event) {
     if (!state.entered || aboutPanel.classList.contains("is-open")) return;
     if (state.camera.active) cancelCameraGesture();
@@ -754,6 +1105,12 @@
     const point = pointerPosition(event);
     recordActivity();
     const baby = findTouchableBaby(point.x, point.y, 1.1);
+    const radius = baseRadius();
+    const motherDistance = Math.hypot(point.x - state.center.x, point.y - state.center.y);
+    const onMother = motherDistance <= radius * 1.28;
+    if (state.tutorial.active && state.tutorial.mode !== "mouse") return;
+    if (state.tutorial.active && state.tutorial.step === "APPROACH") return;
+    if (baby && !tutorialAllows("baby")) return;
     if (baby) {
       state.activeBaby = baby;
       baby.touchAngle = Math.atan2(point.y - baby.y, point.x - baby.x);
@@ -764,12 +1121,32 @@
       initAudio();
       return;
     }
-    const radius = baseRadius();
-    const distance = Math.hypot(point.x - state.center.x, point.y - state.center.y);
-    if (distance > radius * 1.28) return;
+    if (!onMother) {
+      if (tutorialAllows("background")) createBubble(point.x, point.y, "mouse");
+      return;
+    }
+    if (!tutorialAllows("mother")) return;
     state.pointer = { x: point.x, y: point.y, startX: point.x, startY: point.y, down: true, id: event.pointerId, startedAt: performance.now() };
     state.touchAngle = Math.atan2(point.y - state.center.y, point.x - state.center.x);
     state.interactionMode = isBirthZone(point.x, point.y) ? "birth" : "squish";
+    if (state.tutorial.active) {
+      if (state.tutorial.step === "SPAWN") {
+        if (!isTutorialTopZone(point.x, point.y)) {
+          state.pointer.down = false;
+          state.pointer.id = null;
+          state.tutorial.helpLevel = 1;
+          tutorialStatus.textContent = "请从伞盖最顶部开始";
+          renderTutorialPanel();
+          return;
+        }
+        state.interactionMode = "birth";
+        state.touchAngle = -Math.PI / 2;
+        state.birthAngle = -Math.PI / 2;
+      } else {
+        state.interactionMode = "squish";
+      }
+      state.tutorial.actionStartedAt = performance.now();
+    }
     state.birthAngle = state.touchAngle;
     state.birthPull = 0;
     canvas.setPointerCapture(event.pointerId);
@@ -779,8 +1156,14 @@
   }
 
   function pointerMove(event) {
-    if (!state.pointer.down || state.pointer.id !== event.pointerId) return;
     const point = pointerPosition(event);
+    if (state.tutorial.active && state.tutorial.mode === "mouse" && state.tutorial.step === "APPROACH") {
+      const distance = Math.hypot(point.x - state.center.x, point.y - state.center.y);
+      state.tutorial.progress = clamp(1 - (distance - baseRadius() * 1.15) / (baseRadius() * 1.5), 0, 1);
+      renderTutorialPanel();
+      if (distance <= baseRadius() * 1.38) completeTutorialStep("APPROACH");
+    }
+    if (!state.pointer.down || state.pointer.id !== event.pointerId) return;
     state.pointer.x = point.x;
     state.pointer.y = point.y;
     recordActivity();
@@ -793,9 +1176,19 @@
       const pullY = point.y - state.pointer.startY;
       state.birthPull = Math.max(0, pullX * Math.cos(state.birthAngle) + pullY * Math.sin(state.birthAngle));
       state.touchAngle = state.birthAngle;
+      if (state.tutorial.active && state.tutorial.step === "SPAWN") {
+        state.tutorial.progress = clamp(state.birthPull / (baseRadius() * 0.3), 0, 1);
+        renderTutorialPanel();
+      }
       hint.textContent = state.birthPull > baseRadius() * 0.3 ? "可以松开了——新的生命准备好了" : "保持向外拉，让果冻慢慢隆起";
     } else {
       state.touchAngle = Math.atan2(point.y - state.center.y, point.x - state.center.x);
+      if (state.tutorial.active && state.tutorial.step === "SQUISH") {
+        const held = (performance.now() - state.pointer.startedAt) / 650;
+        const moved = Math.hypot(point.x - state.pointer.startX, point.y - state.pointer.startY) / (baseRadius() * 0.28);
+        state.tutorial.progress = clamp(Math.min(held, Math.max(0.25, moved)), 0, 0.95);
+        renderTutorialPanel();
+      }
     }
   }
 
@@ -826,11 +1219,13 @@
       canvas.classList.remove("is-touching");
       tone(0.22 + baby.squash * 0.35, baby.touchAngle);
       hint.textContent = "它弹了一下，慢慢游走了";
+      if (state.tutorial.active && state.tutorial.step === "BABY_INTERACTION") completeTutorialStep("BABY_INTERACTION");
       window.setTimeout(() => {
         if (!state.pointer.down) hint.textContent = "轻轻碰一碰漂游的小水母";
       }, 1800);
       return;
     }
+    const heldDuration = performance.now() - state.pointer.startedAt;
     const strength = clamp(state.pressure * 0.72 + state.dragDistance / (baseRadius() * 2.8), 0.15, 1);
     const birthThreshold = baseRadius() * (state.pointer.id === "camera" ? 0.2 : 0.3);
     const shouldBirth = state.interactionMode === "birth" && state.birthPull >= birthThreshold && state.babies.length < 12;
@@ -839,6 +1234,22 @@
     canvas.classList.remove("is-touching");
     setMotherMood();
     leaveMemory(strength, shouldBirth);
+    if (state.tutorial.active) {
+      if (state.tutorial.step === "TOUCH") completeTutorialStep("TOUCH");
+      if (state.tutorial.step === "SQUISH") {
+        if (heldDuration >= 520 && strength >= 0.22) completeTutorialStep("SQUISH");
+        else {
+          state.tutorial.helpLevel = 1;
+          state.tutorial.progress = Math.min(state.tutorial.progress, 0.65);
+          renderTutorialPanel();
+        }
+      }
+      if (state.tutorial.step === "SPAWN" && shouldBirth) {
+        state.tutorial.spawnedBaby = state.babies[state.babies.length - 1];
+        state.tutorial.progress = 0.92;
+        renderTutorialPanel();
+      }
+    }
     tone(strength, state.touchAngle);
     hint.textContent = shouldBirth
       ? "啵——一只小水母正从伞盖边缘脱离"
@@ -928,13 +1339,51 @@
     state.memories.length = 0;
     state.ripples.length = 0;
     state.babies.length = 0;
+    state.bubbles.length = 0;
     babyCount.textContent = "00";
     hint.textContent = "水流安静下来，母水母重新等待触碰";
     showAbout(false);
   }
 
+  function updateTutorial() {
+    const tutorial = state.tutorial;
+    if (!tutorial.active) return;
+    const now = performance.now();
+    if (!tutorial.success && now - tutorial.startedAt > 8500 && !tutorial.helpLevel) {
+      tutorial.helpLevel = 1;
+      renderTutorialPanel();
+    }
+    if (tutorial.step === "CAMERA_CHECK") {
+      if (!state.camera.starting && !state.camera.enabled && now - tutorial.startedAt > 3500) {
+        tutorialHelp.textContent = "摄像头未能启动。请允许权限，或点击“切换鼠标”。";
+        switchToMouse.hidden = false;
+      }
+    }
+    if (tutorial.step === "SQUISH" && state.pointer.down && !state.activeBaby) {
+      const hold = clamp((now - state.pointer.startedAt) / 700, 0, 0.92);
+      tutorial.progress = Math.max(tutorial.progress, hold * clamp(state.pressure + 0.25, 0.25, 1));
+      renderTutorialPanel();
+    }
+    if (tutorial.step === "SPAWN" && state.pointer.down) {
+      const threshold = baseRadius() * (state.pointer.id === "camera" ? 0.2 : 0.3);
+      tutorial.progress = clamp(state.birthPull / threshold, 0, 0.92);
+      renderTutorialPanel();
+    }
+    const target = tutorial.spawnedBaby && state.babies.includes(tutorial.spawnedBaby) ? tutorial.spawnedBaby : null;
+    if (["BABY_INTERACTION", "BUBBLE_INTERACTION"].includes(tutorial.step) && target) {
+      tutorialFocus.style.left = `${target.x}px`;
+      tutorialFocus.style.top = `${target.y}px`;
+      tutorialFocus.style.width = `${Math.max(100, target.size * 5.2)}px`;
+    } else {
+      tutorialFocus.style.left = `${state.center.x}px`;
+      tutorialFocus.style.top = `${state.center.y}px`;
+      tutorialFocus.style.width = `${baseRadius() * 2.5}px`;
+    }
+  }
+
   function update(dt) {
     state.elapsed += dt;
+    updateTutorial();
     document.body.classList.toggle("ui-idle", state.entered && performance.now() - state.lastActivityAt > 4800 && !state.pointer.down);
     state.tentaclePlay.amount *= Math.pow(0.018, dt);
     state.tentaclePlay.direction *= Math.pow(0.08, dt);
@@ -1039,6 +1488,9 @@
           });
           popTone(baby.strength, baby.birthAngle);
           hint.textContent = "啵——它翻过身了";
+          if (state.tutorial.active && state.tutorial.step === "SPAWN" && state.tutorial.spawnedBaby === baby) {
+            completeTutorialStep("SPAWN");
+          }
         }
         baby.turnTimer -= dt;
         if (baby.turnTimer <= 0) {
@@ -1055,6 +1507,15 @@
       if (!birthing && state.activeBaby !== baby) {
         baby.x += (baby.vx + Math.sin(baby.phase * 0.8) * 2.2) * dt;
         baby.y += baby.vy * dt;
+      }
+      if (
+        state.tutorial.active &&
+        state.tutorial.spawnedBaby === baby &&
+        ["BABY_INTERACTION", "BUBBLE_INTERACTION"].includes(state.tutorial.step)
+      ) {
+        const safeMargin = Math.max(64, baby.size * 2.2);
+        baby.x = clamp(baby.x, safeMargin, state.width - safeMargin);
+        baby.y = clamp(baby.y, safeMargin, state.height - safeMargin);
       }
       if (baby.y < -baby.size * 4) baby.y = state.height + baby.size * 3;
       if (baby.x < -baby.size * 3) baby.x = state.width + baby.size * 2;
@@ -1079,6 +1540,35 @@
         }
       }
     }
+
+    state.bubbles.forEach((bubble) => {
+      bubble.age += dt;
+      bubble.phase += dt * 2;
+      const nearestBaby = state.babies
+        .filter((baby) => baby.detached)
+        .sort((a, b) => Math.hypot(a.x - bubble.x, a.y - bubble.y) - Math.hypot(b.x - bubble.x, b.y - bubble.y))[0];
+      if (nearestBaby && Math.hypot(nearestBaby.x - bubble.x, nearestBaby.y - bubble.y) < 190) {
+        bubble.vx += clamp((nearestBaby.x - bubble.x) * 0.42, -18, 18) * dt;
+      }
+      bubble.x += (bubble.vx + Math.sin(bubble.phase) * 2.4) * dt;
+      bubble.y += bubble.vy * dt;
+      bubble.vy = mix(bubble.vy, -24, 1 - Math.pow(0.45, dt));
+      if (bubble.hit) return;
+      state.babies.forEach((baby) => {
+        if (bubble.hit || !baby.detached) return;
+        const collision = Math.hypot(bubble.x - baby.x, bubble.y - baby.y) < bubble.size + baby.size * 0.9;
+        if (!collision) return;
+        bubble.hit = true;
+        bubble.age = 99;
+        baby.vx += (baby.x - bubble.x) * 0.32;
+        baby.vy -= 12;
+        baby.releaseGlow = 1;
+        baby.expression = baby.personality === "shy" ? "shy" : "happy";
+        state.ripples.push({ x: bubble.x, y: bubble.y, age: 0, strength: 0.12, hue: baby.hue, duration: 0.8, pop: true, radius: bubble.size });
+        if (state.tutorial.active && state.tutorial.step === "BUBBLE_INTERACTION") completeTutorialStep("BUBBLE_INTERACTION");
+      });
+    });
+    state.bubbles = state.bubbles.filter((bubble) => bubble.age < 9 && bubble.y > -bubble.size * 3);
   }
 
   function blobPoint(node, radius, offset = 0) {
@@ -1336,6 +1826,28 @@
       }
     }
     ctx.restore();
+  }
+
+  function drawBubbles() {
+    state.bubbles.forEach((bubble) => {
+      const alpha = clamp(1 - bubble.age / 9, 0, 0.72);
+      ctx.save();
+      ctx.translate(bubble.x, bubble.y);
+      ctx.shadowBlur = bubble.size * 1.4;
+      ctx.shadowColor = `rgba(143,229,229,${alpha * 0.45})`;
+      const fill = ctx.createRadialGradient(-bubble.size * 0.3, -bubble.size * 0.35, 0, 0, 0, bubble.size);
+      fill.addColorStop(0, `rgba(255,255,255,${alpha * 0.42})`);
+      fill.addColorStop(0.28, `rgba(153,234,232,${alpha * 0.12})`);
+      fill.addColorStop(1, `rgba(95,178,205,${alpha * 0.03})`);
+      ctx.fillStyle = fill;
+      ctx.strokeStyle = `rgba(205,251,248,${alpha * 0.62})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, bubble.size, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    });
   }
 
   function drawBabyJellyfish() {
@@ -1813,6 +2325,7 @@
     ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
     ctx.clearRect(0, 0, state.width, state.height);
     drawBackground();
+    drawBubbles();
     drawBabyJellyfish();
     drawRipples();
     drawContourMountainAura();
@@ -1829,14 +2342,51 @@
   });
   cameraButton.addEventListener("click", toggleCamera);
   backgroundButton.addEventListener("click", toggleBackgroundMode);
-  tutorialButton.addEventListener("click", () => showTutorial(true));
-  const finishTutorial = () => {
-    localStorage.setItem("squish-tutorial-seen", "1");
-    showTutorial(false);
-    canvas.focus({ preventScroll: true });
-  };
-  skipTutorial.addEventListener("click", finishTutorial);
-  startTutorial.addEventListener("click", finishTutorial);
+  tutorialButton.addEventListener("click", () => beginTutorial(true));
+  chooseMouseMode.addEventListener("click", () => {
+    state.tutorial.mode = "mouse";
+    localStorage.setItem("preferredInputMode", "mouse");
+    if (state.camera.enabled || state.camera.starting) stopCamera("");
+    setTutorialStep("APPROACH");
+  });
+  chooseGestureMode.addEventListener("click", () => {
+    state.tutorial.mode = "gesture";
+    state.tutorial.resumeStep = null;
+    localStorage.setItem("preferredInputMode", "gesture");
+    setTutorialStep("CAMERA_CHECK");
+    startCamera();
+  });
+  resumeTutorial.addEventListener("click", () => {
+    const saved = localStorage.getItem("tutorialCurrentStep") || "INPUT_SELECTION";
+    state.tutorial.mode = localStorage.getItem("preferredInputMode") || "mouse";
+    if (state.tutorial.mode === "gesture") {
+      state.tutorial.resumeStep = saved;
+      setTutorialStep("CAMERA_CHECK", { save: false });
+      startCamera();
+    } else {
+      setTutorialStep(saved);
+    }
+  });
+  restartTutorial.addEventListener("click", () => beginTutorial(true));
+  tutorialBack.addEventListener("click", backTutorialStep);
+  tutorialRetry.addEventListener("click", retryTutorialStep);
+  switchToMouse.addEventListener("click", () => {
+    const next = state.tutorial.step === "CAMERA_CHECK" ? state.tutorial.resumeStep || "APPROACH" : state.tutorial.step;
+    state.tutorial.mode = "mouse";
+    localStorage.setItem("preferredInputMode", "mouse");
+    if (state.camera.enabled || state.camera.starting) stopCamera("");
+    setTutorialStep(next);
+  });
+  skipTutorial.addEventListener("click", () => finishTutorial(true));
+  startTutorial.addEventListener("click", () => {
+    if (state.tutorial.step === "CAMERA_CHECK" && state.tutorial.progress >= 1) {
+      const next = state.tutorial.resumeStep || "APPROACH";
+      state.tutorial.resumeStep = null;
+      setTutorialStep(next);
+    } else if (state.tutorial.step === "COMPLETE") {
+      finishTutorial(false);
+    }
+  });
   aboutButton.addEventListener("click", () => showAbout(true));
   closeAbout.addEventListener("click", () => showAbout(false));
   veil.addEventListener("click", () => showAbout(false));
@@ -1856,7 +2406,7 @@
     if (event.key.toLowerCase() === "c" && !event.repeat) toggleCamera();
     if (event.key.toLowerCase() === "b" && !event.repeat) toggleBackgroundMode();
     if (event.key.toLowerCase() === "r") resetMemories();
-    if (event.key === "?") showTutorial(true);
+    if (event.key === "?") beginTutorial(true);
     if (event.code === "Space" && !event.repeat && state.entered) {
       event.preventDefault();
       state.pointer.x = state.center.x;
@@ -1871,7 +2421,7 @@
     }
     if (event.key === "Escape") {
       showAbout(false);
-      showTutorial(false);
+      if (state.tutorial.active) tutorialHelp.textContent = "请使用“跳过教程”安全退出，当前进度会被保存。";
     }
   });
 

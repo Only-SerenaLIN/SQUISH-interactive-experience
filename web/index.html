@@ -7,7 +7,7 @@
     <meta name="description" content="SQUISH — A Soft Jellyfish Interaction Experience. 触摸、挤压并拉出柔软的数字水母。" />
     <title>水母之森 — SQUISH</title>
     <link rel="stylesheet" href="https://unpkg.com/handsfree@8.5.1/build/lib/assets/handsfree.css" />
-    <link rel="stylesheet" href="styles.css?v=assignment-1" />
+    <link rel="stylesheet" href="styles.css?v=gesture-tutorial-1" />
   </head>
   <body>
     <main class="artwork" aria-label="《水母之森》柔软水母交互体验">
@@ -48,16 +48,33 @@
         <div class="bottom-actions"><p class="memory-count"><span id="babyCount">00</span> / 12 只小水母</p><button id="resetButton" class="mini-button" type="button">重置</button></div>
       </div>
 
-      <section class="tutorial" id="tutorialPanel" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle">
+      <section class="tutorial" id="tutorialPanel" aria-hidden="true" role="dialog" aria-modal="false" aria-labelledby="tutorialTitle">
+        <div class="tutorial__focus" id="tutorialFocus" aria-hidden="true"></div>
         <div class="tutorial__card">
-          <p class="eyebrow">HOW TO SQUISH</p><h2 id="tutorialTitle">三步认识它</h2>
-          <ol class="tutorial__steps">
-            <li><span>01</span><strong>轻轻触摸</strong><small>点击伞盖，看它凹陷、变换表情。</small></li>
-            <li><span>02</span><strong>按住挤压</strong><small>拖动接触点，感受局部拉伸与 Q 弹回位。</small></li>
-            <li><span>03</span><strong>向外拉出生命</strong><small>从母水母伞盖任意边缘按住并向外拉，再松开。</small></li>
-          </ol>
-          <p class="tutorial__gesture">摄像头模式：食指逗小水母；拇指与食指捏合控制母水母。</p>
-          <div class="tutorial__actions"><button id="skipTutorial" class="link-button" type="button">跳过</button><button id="startTutorial" class="enter-button enter-button--small" type="button">开始体验</button></div>
+          <div class="tutorial__meta"><span id="tutorialKicker">INTERACTIVE TUTORIAL</span><span id="tutorialCounter">准备</span></div>
+          <h2 id="tutorialTitle">选择操作方式</h2>
+          <p class="tutorial__instruction" id="tutorialInstruction">请选择鼠标或摄像头手势模式。</p>
+          <div class="tutorial__demo" id="tutorialDemo" aria-hidden="true">
+            <span class="tutorial__cursor-dot"></span><span class="tutorial__gesture-line"></span>
+          </div>
+          <div class="tutorial__mode-picker" id="tutorialModePicker">
+            <button class="mode-card" id="chooseMouseMode" type="button"><strong>鼠标模式</strong><small>移动、点击和拖动</small></button>
+            <button class="mode-card" id="chooseGestureMode" type="button"><strong>手势模式</strong><small>食指触碰与双指捏合</small></button>
+          </div>
+          <div class="tutorial__progress" id="tutorialProgress" aria-label="动作识别进度"><span id="tutorialProgressBar"></span></div>
+          <p class="tutorial__status" id="tutorialStatus" aria-live="polite">等待选择输入模式</p>
+          <p class="tutorial__help" id="tutorialHelp">摄像头不可用时可随时切换回鼠标。</p>
+          <div class="tutorial__resume" id="tutorialResume" hidden>
+            <button id="resumeTutorial" class="enter-button enter-button--small" type="button">继续上次进度</button>
+            <button id="restartTutorial" class="link-button" type="button">重新开始</button>
+          </div>
+          <div class="tutorial__actions">
+            <button id="tutorialBack" class="link-button" type="button">返回</button>
+            <button id="tutorialRetry" class="link-button" type="button">重试</button>
+            <button id="switchToMouse" class="link-button" type="button" hidden>切换鼠标</button>
+            <button id="skipTutorial" class="link-button" type="button">跳过教程</button>
+            <button id="startTutorial" class="enter-button enter-button--small" type="button" hidden>继续</button>
+          </div>
         </div>
       </section>
 
@@ -74,6 +91,6 @@
       <div class="veil" id="veil" aria-hidden="true"></div>
     </main>
     <script src="https://unpkg.com/handsfree@8.5.1/build/lib/handsfree.js"></script>
-    <script src="app.js?v=assignment-1"></script>
+    <script src="app.js?v=gesture-tutorial-1"></script>
   </body>
 </html>
