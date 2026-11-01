@@ -5,6 +5,8 @@
   const ctx = canvas.getContext("2d");
   const EmotionSystem = window.SquishEmotion;
   if (!EmotionSystem) throw new Error("Emotion system failed to load");
+  const BehaviorSystem = window.SquishBehavior;
+  if (!BehaviorSystem) throw new Error("Behavior system failed to load");
   const invitation = document.querySelector("#invitation");
   const enterButton = document.querySelector("#enterButton");
   const soundButton = document.querySelector("#soundButton");
@@ -57,6 +59,7 @@
     curiosity: document.querySelector("#debugCuriosity"),
     energy: document.querySelector("#debugEnergy"),
     stress: document.querySelector("#debugStress"),
+    behavior: document.querySelector("#debugBehavior"),
     lastInteraction: document.querySelector("#debugLastInteraction"),
   };
 
@@ -74,6 +77,7 @@
     dpr: 1,
     center: { x: 0, y: 0, vx: 0, vy: 0 },
     pointer: { x: 0, y: 0, down: false, id: null, startedAt: 0 },
+    worldPointer: BehaviorSystem.createPointerState(),
     hover: { x: 0, y: 0, time: performance.now(), speed: 0, baby: null, initialized: false },
     pressure: 0,
     pressureVelocity: 0,
@@ -401,6 +405,8 @@
 
   function stopCamera(message = "摄像头手势已关闭") {
     state.camera.requestToken += 1;
+    if (state.camera.touchBaby?.behavior) BehaviorSystem.beginRecover(state.camera.touchBaby.behavior, performance.now());
+    if (state.worldPointer.inputMode === "camera") BehaviorSystem.deactivatePointer(state.worldPointer);
     cancelCameraGesture();
     if (state.camera.startupTimer) window.clearTimeout(state.camera.startupTimer);
     hideCameraPreview();
@@ -608,6 +614,17 @@
       if (camera.absentFrames >= 8) camera.bubbleArmedAt = 0;
     }
     camera.cursorAlpha = mix(camera.cursorAlpha, present ? 1 : 0, present ? 0.3 : 0.16);
+    if (present && now >= camera.suspendedUntil) {
+      BehaviorSystem.updatePointer(state.worldPointer, {
+        x: camera.fingerBX,
+        y: camera.fingerBY,
+        isActive: true,
+        inputMode: "camera",
+        now,
+      }, Math.max(1 / 120, (now - (state.worldPointer.lastUpdateAt || now - 33)) / 1000), 0.62);
+    } else if (camera.absentFrames >= 6 && state.worldPointer.inputMode === "camera") {
+      BehaviorSystem.deactivatePointer(state.worldPointer);
+    }
 
     if (state.tutorial.active && state.tutorial.mode === "gesture") {
       const tutorial = state.tutorial;
@@ -736,6 +753,7 @@
         camera.touchBaby = touchedBaby;
         hint.textContent = "指尖碰到了它——它软软地让开了";
       } else {
+        if (camera.touchBaby?.behavior) BehaviorSystem.beginRecover(camera.touchBaby.behavior, now);
         camera.touchBaby = null;
         const radius = baseRadius();
         const inTentacles =
@@ -765,6 +783,7 @@
     } else if (!present || pinching) {
       camera.indexPrevX = null;
       camera.indexPrevY = null;
+      if (camera.touchBaby?.behavior) BehaviorSystem.beginRecover(camera.touchBaby.behavior, now);
       camera.touchBaby = null;
     }
 
@@ -1138,6 +1157,7 @@
     });
     debugFields.personality.textContent = personalityLabels[snapshot.personality] || snapshot.personality;
     debugFields.emotion.textContent = emotionLabels[snapshot.emotion] || snapshot.emotion;
+    if (debugFields.behavior) debugFields.behavior.textContent = baby.behavior?.state || "wander";
   }
 
   function showEmotionDebug(open) {
@@ -1189,7 +1209,10 @@
 
   function pointerPosition(event) {
     const rect = canvas.getBoundingClientRect();
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    return {
+      x: (event.clientX - rect.left) * (state.width / Math.max(1, rect.width)),
+      y: (event.clientY - rect.top) * (state.height / Math.max(1, rect.height)),
+    };
   }
 
   function findTouchableBaby(x, y, reach = 1) {
@@ -1262,6 +1285,9 @@
     if (state.camera.active) cancelCameraGesture();
     state.camera.suspendedUntil = performance.now() + 1400;
     const point = pointerPosition(event);
+    BehaviorSystem.updatePointer(state.worldPointer, {
+      x: point.x, y: point.y, isActive: true, inputMode: "mouse", now: performance.now(),
+    }, 1 / 60, 1);
     recordActivity();
     const baby = findTouchableBaby(point.x, point.y, 1.1);
     const radius = baseRadius();
@@ -1325,6 +1351,15 @@
     const point = pointerPosition(event);
     const now = performance.now();
     const hoverDelta = Math.max(8, now - state.hover.time);
+    if (!state.camera.enabled || now < state.camera.suspendedUntil) {
+      BehaviorSystem.updatePointer(state.worldPointer, {
+        x: point.x,
+        y: point.y,
+        isActive: true,
+        inputMode: "mouse",
+        now,
+      }, hoverDelta / 1000, 0.72);
+    }
     const hoverSpeed = Math.hypot(point.x - state.hover.x, point.y - state.hover.y) / hoverDelta * 16.67;
     const approachedBaby = !state.pointer.down ? findTouchableBaby(point.x, point.y, 1.4) : null;
     if (!state.tutorial.active && state.hover.initialized && approachedBaby && state.hover.baby !== approachedBaby && hoverSpeed > 12) {
@@ -1394,6 +1429,7 @@
       if (baby.personality === "playful") baby.spin = 0.9;
       baby.squashVelocity -= 0.16 + baby.squash * 0.16;
       baby.releaseGlow = 1;
+      if (baby.behavior) BehaviorSystem.beginRecover(baby.behavior, now);
       state.ripples.push({
         x: baby.x,
         y: baby.y,
@@ -1502,6 +1538,7 @@
       personality,
       now: performance.now(),
     });
+    baby.behavior = BehaviorSystem.createProfile({ personality, size, random: Math.random });
     state.babies.push(baby);
     babyCount.textContent = String(state.babies.length).padStart(2, "0");
   }
@@ -1643,6 +1680,17 @@
     state.ripples.forEach((ripple) => { ripple.age += dt; });
     state.ripples = state.ripples.filter((ripple) => ripple.age < (ripple.duration || 3.4));
 
+    const followSlots = new Set(
+      state.worldPointer.isActive
+        ? state.babies
+          .filter((baby) => baby.detached && baby.age >= baby.birthDuration)
+          .sort((a, b) => Math.hypot(a.x - state.worldPointer.position.x, a.y - state.worldPointer.position.y)
+            - Math.hypot(b.x - state.worldPointer.position.x, b.y - state.worldPointer.position.y))
+          .slice(0, 3)
+          .map((baby) => baby.emotionData.id)
+        : [],
+    );
+
     state.babies.forEach((baby) => {
       baby.age += dt;
       const babyInteracting = (state.pointer.down && state.activeBaby === baby) || state.camera.touchBaby === baby;
@@ -1702,15 +1750,54 @@
             completeTutorialStep("SPAWN");
           }
         }
+        const decision = BehaviorSystem.decide(baby.behavior, {
+          personality: baby.personality,
+          emotion: baby.expression,
+          trust: baby.emotionData.stats.trust,
+          stress: baby.emotionData.stats.stress,
+          fleeProbability: EmotionSystem.shyFleeProbability(baby.emotionData),
+          pointer: state.worldPointer,
+          baby,
+          now,
+          directInteraction: babyInteracting,
+          allowFollow: followSlots.has(baby.emotionData.id),
+        });
+        if (decision.changed) {
+          if (decision.state === BehaviorSystem.STATES.FLEE) {
+            EmotionSystem.setEmotion(baby.emotionData, EmotionSystem.EMOTIONS.SHY, now, 1200, true);
+          } else if (decision.state === BehaviorSystem.STATES.REACT && decision.fastApproach) {
+            EmotionSystem.setEmotion(baby.emotionData, EmotionSystem.EMOTIONS.SURPRISED, now, 900, true);
+          } else if ([BehaviorSystem.STATES.FOLLOW, BehaviorSystem.STATES.ORBIT].includes(decision.state) && baby.personality === "playful") {
+            EmotionSystem.setEmotion(baby.emotionData, EmotionSystem.EMOTIONS.HAPPY, now, 1000);
+          } else if (decision.state === BehaviorSystem.STATES.FOLLOW && baby.personality === "shy") {
+            EmotionSystem.setEmotion(baby.emotionData, EmotionSystem.EMOTIONS.SHY, now, 850);
+          }
+        }
         baby.turnTimer -= dt;
         if (baby.turnTimer <= 0) {
           baby.wanderAngle += (Math.random() - 0.5) * 1.25;
           baby.turnTimer = 1.8 + Math.random() * 3.4;
         }
         const swim = (baby.personality === "playful" ? 5.2 : baby.personality === "shy" ? 3.3 : 2.7) * restMotion;
-        baby.vx = mix(baby.vx, Math.cos(baby.wanderAngle) * swim, 1 - Math.pow(0.46, dt));
-        baby.vy = mix(baby.vy, Math.sin(baby.wanderAngle) * swim - 1.2, 1 - Math.pow(0.46, dt));
-        baby.spin = mix(baby.spin, baby.personality === "playful" && baby.releaseGlow > 0.1 ? 0.3 : 0, 1 - Math.pow(0.1, dt));
+        if (decision.state === BehaviorSystem.STATES.WANDER) {
+          baby.vx = mix(baby.vx, Math.cos(baby.wanderAngle) * swim, 1 - Math.pow(0.46, dt));
+          baby.vy = mix(baby.vy, Math.sin(baby.wanderAngle) * swim - 1.2, 1 - Math.pow(0.46, dt));
+        } else if (![BehaviorSystem.STATES.REACT, BehaviorSystem.STATES.SLEEP].includes(decision.state)) {
+          const steering = BehaviorSystem.steering(baby.behavior, baby, state.worldPointer);
+          const separation = BehaviorSystem.separation(baby, state.babies);
+          baby.vx += (steering.x + separation.x) * dt;
+          baby.vy += (steering.y + separation.y) * dt;
+          const limited = BehaviorSystem.limit({ x: baby.vx, y: baby.vy }, baby.behavior.maxSpeed * restMotion);
+          baby.vx = limited.x;
+          baby.vy = limited.y;
+        }
+        if ([BehaviorSystem.STATES.RECOVER, BehaviorSystem.STATES.REACT, BehaviorSystem.STATES.SLEEP].includes(decision.state)) {
+          const damping = decision.state === BehaviorSystem.STATES.SLEEP ? 0.08 : 0.32;
+          baby.vx *= Math.pow(damping, dt);
+          baby.vy *= Math.pow(damping, dt);
+        }
+        const orbitSpin = decision.state === BehaviorSystem.STATES.ORBIT ? baby.behavior.orbitDirection * 0.34 : 0;
+        baby.spin = mix(baby.spin, orbitSpin, 1 - Math.pow(0.1, dt));
       }
       if (!birthing && state.activeBaby !== baby) {
         baby.x += (baby.vx + Math.sin(baby.phase * 0.8) * 2.2) * dt;
@@ -2646,6 +2733,9 @@
   canvas.addEventListener("pointermove", pointerMove);
   canvas.addEventListener("pointerup", releasePointer);
   canvas.addEventListener("pointercancel", releasePointer);
+  canvas.addEventListener("pointerleave", () => {
+    if (!state.pointer.down && state.worldPointer.inputMode === "mouse") BehaviorSystem.deactivatePointer(state.worldPointer);
+  });
   window.addEventListener("resize", resize);
   ["pointermove", "pointerdown", "keydown"].forEach((eventName) => window.addEventListener(eventName, recordActivity, { passive: true }));
 

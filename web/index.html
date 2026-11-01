@@ -7,7 +7,7 @@
     <meta name="description" content="SQUISH — A Soft Jellyfish Interaction Experience. 触摸、挤压并拉出柔软的数字水母。" />
     <title>水母之森 — SQUISH</title>
     <link rel="stylesheet" href="https://unpkg.com/handsfree@8.5.1/build/lib/assets/handsfree.css" />
-    <link rel="stylesheet" href="styles.css?v=emotion-memory-1" />
+    <link rel="stylesheet" href="styles.css?v=follow-flee-1" />
   </head>
   <body>
     <main class="artwork" aria-label="《水母之森》柔软水母交互体验">
@@ -42,6 +42,7 @@
           <div><dt>Jellyfish ID</dt><dd id="debugId">—</dd></div>
           <div><dt>Personality</dt><dd id="debugPersonality">—</dd></div>
           <div><dt>Current Emotion</dt><dd id="debugEmotion">—</dd></div>
+          <div><dt>Behavior</dt><dd id="debugBehavior">Wander</dd></div>
           <div><dt>Happiness</dt><dd id="debugHappiness">0</dd></div>
           <div><dt>Trust</dt><dd id="debugTrust">0</dd></div>
           <div><dt>Curiosity</dt><dd id="debugCuriosity">0</dd></div>
@@ -122,7 +123,8 @@
       <div class="veil" id="veil" aria-hidden="true"></div>
     </main>
     <script src="https://unpkg.com/handsfree@8.5.1/build/lib/handsfree.js"></script>
-    <script src="emotion-system.js?v=emotion-memory-1"></script>
-    <script src="app.js?v=emotion-memory-1"></script>
+    <script src="emotion-system.js?v=follow-flee-1"></script>
+    <script src="behavior-system.js?v=follow-flee-1"></script>
+    <script src="app.js?v=follow-flee-1"></script>
   </body>
 </html>
