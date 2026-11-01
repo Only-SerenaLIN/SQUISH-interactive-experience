@@ -147,9 +147,12 @@ SQUISH-interactive-experience/
 │   └── save-system.js         # Versioned save and collection data
 ├── tests/                     # Browser-independent JavaScript tests
 ├── docs/                      # README screenshots and diagrams
+├── archive/python-prototype/  # Historical desktop prototype; not required to run SQUISH
 ├── PROCESS.md                 # Design process, user trial and AI-use record
 └── CREDITS.md                 # Libraries, references and media credits
 ```
+
+The root `archive/` folder contains an earlier Python/Pygame exploration for development-history purposes only. The submitted experience is entirely inside `web/`; do not install the archived Python dependencies to assess the browser project.
 
 ## Known limitations
 

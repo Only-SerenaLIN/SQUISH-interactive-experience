@@ -44,7 +44,7 @@ The ambient deep-sea sound and interaction feedback are synthesized at runtime w
 
 The interface uses system fonts and does not redistribute a commercial font.
 
-The repository contains some earlier prototype screenshots and generated visual experiments in `docs/` and `web/assets/`. They document development history and are not required by the final Canvas experience.
+Earlier Python/Pygame source, dependencies, tests, screenshots, and generated visual experiments are preserved in [`archive/python-prototype/`](archive/python-prototype/). They document development history and are not required by the final Canvas experience. Additional unused browser-art experiments may remain in `web/assets/`, but the final scene is drawn procedurally.
 
 ## References supplied during development
 
