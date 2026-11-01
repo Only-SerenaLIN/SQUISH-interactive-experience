@@ -2407,6 +2407,90 @@
     });
   }
 
+  function drawBabyPattern(size, pattern, alpha, phase) {
+    if (!pattern) return;
+    const shimmer = reduceMotion ? 0 : Math.sin(phase * 1.3) * 0.06;
+    ctx.save();
+    ctx.translate(0, -size * 0.42);
+    ctx.scale(1, 0.68);
+    ctx.globalCompositeOperation = "screen";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = Math.max(0.7, size * 0.04);
+    ctx.strokeStyle = `rgba(248,252,255,${(0.68 + shimmer) * alpha})`;
+    ctx.fillStyle = `rgba(255,241,252,${0.1 * alpha})`;
+    ctx.shadowBlur = size * 0.25;
+    ctx.shadowColor = `rgba(255,224,249,${0.66 * alpha})`;
+
+    if (pattern === "petal") {
+      [
+        [-size * 0.15, 0, size * 0.18, size * 0.085, 0],
+        [size * 0.15, 0, size * 0.18, size * 0.085, 0],
+        [0, -size * 0.09, size * 0.09, size * 0.14, 0],
+        [0, size * 0.09, size * 0.09, size * 0.14, 0],
+      ].forEach(([x, y, radiusX, radiusY, rotation]) => {
+        ctx.beginPath();
+        ctx.ellipse(x, y, radiusX, radiusY, rotation, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+      });
+      ctx.beginPath();
+      ctx.arc(0, 0, size * 0.045, 0, TAU);
+      ctx.fillStyle = `rgba(255,255,255,${0.48 * alpha})`;
+      ctx.fill();
+    } else if (pattern === "stardust") {
+      const star = (x, y, radius) => {
+        ctx.beginPath();
+        ctx.moveTo(x, y - radius);
+        ctx.lineTo(x + radius * 0.25, y - radius * 0.24);
+        ctx.lineTo(x + radius, y);
+        ctx.lineTo(x + radius * 0.25, y + radius * 0.24);
+        ctx.lineTo(x, y + radius);
+        ctx.lineTo(x - radius * 0.25, y + radius * 0.24);
+        ctx.lineTo(x - radius, y);
+        ctx.lineTo(x - radius * 0.25, y - radius * 0.24);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      };
+      star(-size * 0.08, 0, size * 0.15);
+      star(size * 0.2, -size * 0.035, size * 0.065);
+      ctx.beginPath();
+      ctx.arc(-size * 0.27, size * 0.035, size * 0.025, 0, TAU);
+      ctx.arc(size * 0.32, size * 0.04, size * 0.02, 0, TAU);
+      ctx.fillStyle = `rgba(255,255,255,${0.58 * alpha})`;
+      ctx.fill();
+    } else if (pattern === "moon") {
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.3, size * 0.06);
+      ctx.quadraticCurveTo(0, -size * 0.28, size * 0.31, size * 0.015);
+      ctx.quadraticCurveTo(0, -size * 0.1, -size * 0.3, size * 0.06);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(size * 0.34, -size * 0.035, size * 0.026, 0, TAU);
+      ctx.arc(-size * 0.35, -size * 0.01, size * 0.018, 0, TAU);
+      ctx.fillStyle = `rgba(255,255,255,${0.55 * alpha})`;
+      ctx.fill();
+    } else {
+      for (let row = -1; row <= 1; row += 1) {
+        ctx.beginPath();
+        ctx.moveTo(-size * 0.34, row * size * 0.08);
+        ctx.bezierCurveTo(
+          -size * 0.17,
+          row * size * 0.08 - size * 0.07,
+          size * 0.17,
+          row * size * 0.08 + size * 0.07,
+          size * 0.34,
+          row * size * 0.08,
+        );
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   function drawJellyfishBody(
     x,
     y,
@@ -2420,6 +2504,7 @@
     rotation = 0,
     tentacleGrowth = 1,
     faceExpression = null,
+    pattern = null,
   ) {
     const c = palette[hue % palette.length];
     ctx.save();
@@ -2469,6 +2554,8 @@
     }
 
     ctx.restore();
+
+    drawBabyPattern(size, pattern, alpha, phase);
 
     const faceMap = { happy: 0, playful: 1, gentle: 2, surprised: 3, shy: 4, dizzy: 5, sleepy: 6, sleeping: 7, neutral: 8 };
     const expression = faceExpression && faceMap[faceExpression] !== undefined ? faceMap[faceExpression] : 8;
@@ -2655,6 +2742,7 @@
         rotation,
         tentacleGrowth,
         baby.expression,
+        baby.pattern,
       );
       if (state.selectedBaby === baby && baby.nickname) {
         ctx.save();
