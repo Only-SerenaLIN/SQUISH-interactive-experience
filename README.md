@@ -164,16 +164,15 @@ SQUISH-interactive-experience/
 
 Development decisions, AI assistance, and iteration notes belong in [`PROCESS.md`](PROCESS.md). Libraries and references belong in [`CREDITS.md`](CREDITS.md).
 
-**Required before final submission:** ask at least one other person to try the experience, record what they attempted or found confusing, and describe one design change or reasoned decision in `PROCESS.md`. Do not invent this observation; it must come from a real trial.
+The recorded user trial, original evidence photograph, resulting background-control improvement, and the decision to defer multiplayer are documented in [`PROCESS.md`](PROCESS.md).
 
 The Git history contains separate commits for the soft-body prototype, gesture input, emotions and memory, follow/flee behavior, social interaction, collection and saves, visual redesign, pattern rendering, and generative audio.
 
 ## Visual evidence to add before submission
 
-The repository already includes the main experience screenshot, collection screenshot, and interaction-loop diagram above. Two optional additions would make the submission easier to assess:
+The repository already includes the main experience screenshot, collection screenshot, interaction-loop diagram, and original user-trial photograph. One optional addition would make the submission easier to assess:
 
 1. **An 8–12 second screen recording** showing one squish, rebound, baby birth, and the ambient sound. Save it as `docs/squish-demo.mp4` and link it here or in the repository description.
-2. **A privacy-safe gesture image** showing only a hand silhouette or cropped tracking view—no face, room details, or another person's recording. Save it as `docs/camera-gesture-guide.png`.
 
 ## Repository
 

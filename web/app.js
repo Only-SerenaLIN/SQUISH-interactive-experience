@@ -502,7 +502,7 @@
     const active = state.camera.backgroundMode || state.camera.backgroundRequested;
     backgroundButton.setAttribute("aria-pressed", String(active));
     backgroundButton.setAttribute("aria-label", active ? "Use deep-sea background" : "Use camera as background");
-    backgroundCopy.textContent = active ? "Live View" : "Deep Sea";
+    backgroundCopy.textContent = active ? "BG · Live Camera" : "BG · Deep Sea";
   }
 
   function applyBackgroundMode(active) {

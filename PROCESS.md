@@ -1,283 +1,173 @@
-# SQUISH! — Process Journal
+# SQUISH — Process Journal
 
-> This file separates completed work from planned work. The user-trial section is intentionally blank because no user test has been conducted yet.
+## 1. Starting idea
 
-## 1. Concept
+SQUISH began as an exploration of why soft squeeze toys feel comforting and whether that sensation could become a digital interaction. The first concept, *Softness Without Touch*, asked how a screen could suggest pressure, stretch, delayed movement, and elastic recovery even though the player cannot physically touch the material.
 
-SQUISH! turns the live camera into an augmented-reality stress toy and shared visual composition. A glossy 3D jelly appears between two detected palms: bringing the palms together flattens it, opposite rubbing motion rolls it round, and releasing pressure leaves a ripple and musical chord for the next participant.
+The final project is a browser-based interactive artwork. A player meets a translucent mother jellyfish in a quiet deep-sea environment and can touch, locally squash, and stretch its bell using a mouse, touch screen, or camera-tracked hand. Pulling the bell far enough nurtures a baby jellyfish that separates and begins to swim independently.
 
-### One-sentence pitch
+### Intended user
 
-Hold a translucent 3D jelly between your on-screen hands, reshape it, and leave a ripple for the next person.
+The experience is for one person using a desktop browser who wants a short, calm, playful break. It is deliberately not score-driven and is not presented as a medical or therapeutic product.
 
-### Target audience
-
-- Students taking short breaks while working at a computer
-- Exhibition visitors who should understand the interaction without a tutorial
-- People curious about playful, low-stakes camera interaction
-
-This is a calming creative prototype, not a medical or therapeutic product.
-
-## 2. Design goals
-
-1. **Immediate legibility:** the blob should visibly follow the user's hand within a fraction of a second.
-2. **Satisfying motion:** compression should feel elastic, with overshoot and rebound rather than a rigid resize.
-3. **Calm personality:** translucency, slow elastic motion, persistent waves, and gentle chords should communicate an instrument rather than a game.
-4. **Graceful failure:** camera problems should never prevent someone from trying the core experience.
-5. **Manageable scope:** one polished interaction is more important than many unfinished features.
-
-## 3. Core interaction loop
+### Core loop
 
 ```text
-show hand(s) → system estimates openness or palm gap → toy deforms → status confirms input
-     ↑                                                   ↓
-     └──────────── user changes hand after feedback ─────┘
+player touches or pulls
+          ↓
+the contacted area deforms
+          ↓
+motion, expression, sound, and text confirm the result
+          ↓
+the player releases, tries another pressure, or plays with a baby
 ```
 
-With two hands, the program measures horizontal palm distance for pressure and opposite vertical movement for rolling. A spring animation eases the jelly toward the target while the ball's position follows the smoothed midpoint between the palms. The highest pressure in a squeeze determines the released wave's amplitude, ring count, line weight, and chord register. The wave remains where it was created and overlaps contributions from collaborators A, B, and C. Earlier modes retain the one-hand openness experiment.
+The most important design goal was making the relationship between input and response readable. Local deformation is therefore more important than adding many separate game systems.
 
-## 4. Visual direction
+## 2. Design development
 
-- Mirrored live-camera background with cyan, violet, and pink collaborator colours
-- Layered alpha surfaces create a translucent jelly body with internal light points
-- A projected rotating sphere mesh communicates 3D volume beneath the translucent surface
-- Palm markers and a connecting line expose the tracking result
-- A pressure meter exposes the otherwise invisible gesture value
-- Wavy elliptical contours persist and overlap instead of rewarding a high score
+### Soft material and visual direction
 
-## 5. Implemented feature scope
+Early versions used a circular gel object surrounded by rings and fingerprint-like marks. The scene gradually changed into a deep-sea world because a jellyfish could unify the translucent material, slow breathing motion, soft tentacles, and autonomous floating.
 
-### Must-have — completed
+The final visual direction keeps:
 
-- [x] Pygame window and responsive layout
-- [x] OpenCV webcam capture
-- [x] MediaPipe single-hand landmarks
-- [x] Hand openness estimate
-- [x] Smoothed gesture signal
-- [x] Spring-based deformation and rebound
-- [x] On-screen input/status feedback
-- [x] Keyboard and mouse fallback
-- [x] Camera pause/retry control
-- [x] Camera-free automated tests for core maths
-- [x] Four selectable tactile responses using the same input loop
-- [x] Progressive cracks, shell burst, soft core, and automatic repair
-- [x] Two-hand horizontal squeeze with distinct deformation feedback
-- [x] `Shift + Space` camera-free demonstration of two-hand mode
-- [x] Supermarket ramen pack with pressure wrinkles, burst state, and noodle debris
-- [x] Procedurally generated crinkle/pop audio, mute control, and silent fallback
-- [x] Squeeze-then-pull two-hand packet opening with a camera-free keyboard equivalent
-- [x] Pre-burst warning, shake/flash feedback, changing flavours, random contents, and pop counter
-- [x] Default Camera Gel augmented-reality co-creation mode
-- [x] Mirrored live camera as the visual background
-- [x] Ball anchored to the midpoint between two detected palms
-- [x] Translucent deforming jelly with internal glow and floating light points
-- [x] Light, medium, and deep pressure-to-wave mappings
-- [x] Three procedurally generated chord registers that can overlap
-- [x] Three-person sequential handoff and persistent eight-wave canvas
+- a pink-purple translucent mother bell;
+- small eyes and changing expressions;
+- a horizontal flower-like mark on the mother's crown;
+- soft tentacles and restrained glow;
+- a dark blue sea with limited decorative particles;
+- baby jellyfish that share the same visual family while varying in colour and expression.
 
-### Optional — not implemented
+Strong spinning rings and hard light trails were removed because they made the scene feel layered and visually tiring instead of soft and cohesive.
 
-- [ ] Colour selection
-- [ ] User-adjustable sound volume
+### Interaction changes
 
-These remain optional so that testing and refinement can focus on the main gesture.
+The birth interaction went through several revisions. A baby originally appeared separately or followed a bright connecting line. This felt artificial. The final motion stretches a local piece of the mother's bell, releases it with a small pop, briefly presents the new baby upside down facing the mother, then turns it upright and grows its tentacles. Pull strength also affects baby size.
 
-## 6. Technical decisions
+Mouse and camera input were later converted into the same world-coordinate pointer state. This allows both modes to use the same deformation and baby behavior rather than maintaining two different interaction systems. Camera permission is optional; mouse and touch remain available when tracking fails.
+
+## 3. Important code and design decisions
 
 | Decision | Reason | Trade-off |
 |---|---|---|
-| MediaPipe Hands | Provides landmarks without training a model | Extreme angles and low light can reduce accuracy |
-| Distance-based openness | Simple enough to explain and tune | Less robust than a trained gesture classifier |
-| Exponential signal smoothing | Reduces landmark jitter | Adds a small amount of lag |
-| Spring animation | Creates a soft rebound from a single number | Needs careful tuning to avoid excessive wobble |
-| Lazy camera imports/fallback | Keeps the artwork usable when camera access fails | Camera errors are shown as status text rather than a setup wizard |
-| Camera-as-background compositing | Places the digital material in the same space as the user's hands | The live image can make text contrast less predictable, so interface panels use translucent white backing |
-| Generated sound in memory | Adds tactile feedback without borrowed assets or missing files | It is deliberately short and synthetic rather than realistic |
-| Sequential co-creation | Works with one camera and keeps each contribution visible | Participants take turns rather than appearing simultaneously |
-| Three equal pressure qualities | Makes different gestures expressive without rewarding force | Thresholds may need tuning for different hands |
+| Spring-based local bell contour | A contact point can dent and stretch without scaling the whole character | More tuning than a simple CSS transform |
+| One unified pointer state | Mouse, touch, and camera gestures produce consistent behavior | Camera coordinates need smoothing and mirroring |
+| Procedural Web Audio | Soft feedback works without shipping borrowed audio files | Sound is synthetic and varies by browser |
+| Generated deep-sea ambience | The atmosphere can continue indefinitely without an external music asset | It starts only after browser user activation |
+| LocalStorage save with backup | Refreshing does not erase babies or discoveries | Saves remain tied to one browser unless exported |
+| Personality and memory per baby | The same player action can produce different reactions | More state must be validated and saved |
+| Camera background as an optional toggle | Players can place the jellyfish in their own environment without blocking the deep-sea artwork | Live video can reduce contrast and requires permission |
+| No networked multiplayer in this submission | Keeps the project reproducible, private, and stable for assessment | Multiple people cannot interact from separate devices simultaneously |
 
-### Privacy note
+## 4. Iteration summary
 
-Camera frames are mirrored and displayed live, then processed locally in memory for hand tracking. They are not recorded, uploaded, or saved by this project. Repository screenshots use the camera-free fallback so no participant image becomes a public asset.
+### Soft-body prototype
 
-## 7. Development log
+- Built the mother jellyfish from a deformable contour.
+- Added local press, drag direction, delayed body response, and spring recovery.
+- Preserved facial features and allowed interaction to change expressions.
 
-### Prototype 0.1 — implemented
+### Birth and autonomous babies
 
-- Created a Python package managed with `uv`.
-- Isolated gesture calculation and spring motion so they can be tested without a camera.
-- Added live camera tracking with clear state messages.
-- Drew the character procedurally in Pygame, avoiding external artwork dependencies.
-- Added manual controls so the interaction can always be demonstrated.
-- Added beginner-facing setup and troubleshooting guidance.
+- Changed birth from a separate appearance into a visible separation from the mother.
+- Added the upside-down newborn pose, quick turn, tentacle growth, size variation, and a soft pop.
+- Added independent floating, blinking, touch response, and spacing between babies.
 
-### Prototype 0.2 — implemented after visual-reference discussion
+### Gesture input and failure handling
 
-- Reframed the original purple blob as a small tactile collection without changing the core loop.
-- Added a glossy green apple with slower, calmer rebound.
-- Added a crispy peach whose shell visibly cracks in three stages before bursting.
-- Added a soft inner core and an automatic repair state when the user releases.
-- Added number-key selection and distinct stiffness/damping for each variety.
-- Kept all visuals procedural; no imagery was copied from the reference post.
+- Added optional hand tracking through Handsfree.js.
+- Used thumb–index pinching for squish and birth, one finger for gentle contact, and a fist gesture for one bubble.
+- Smoothed landmarks and separated pinch-start and pinch-end thresholds to reduce accidental release.
+- Kept mouse interaction fully functional when camera permission or the tracking library is unavailable.
 
-### Prototype 0.3 — two-hand interaction
+### Emotion, behavior, and social systems
 
-- Increased MediaPipe tracking from one to two hands.
-- Mapped the normalised distance between palm centres to side pressure.
-- Made horizontal pressure visibly narrow and raise the toy instead of reusing the one-hand flattening animation.
-- Added a dedicated status message, meter label, on-screen instruction, keyboard fallback, screenshot, and automated mapping test.
+- Gave each baby a Calm, Shy, or Playful personality.
+- Added emotion values, temporary expressions, trust, stress, energy, and short-term interaction memory.
+- Added follow, flee, orbit, sleep, separation steering, and player-interaction priority.
+- Added occasional greeting, gentle bump, synchronized floating, shy retreat, and playful orbit between babies.
 
-### Prototype 0.4 — supermarket ramen and sound
+### Collection and save
 
-- Added a fourth toy shaped like a supermarket instant-noodle packet.
-- Connected increasing pressure to visible wrapper wrinkles and three short crinkle sounds.
-- Added a higher burst threshold that tears the packet open, reveals a drawn noodle cake, launches crumbs, and plays a pop/crunch sound.
-- Generated all audio from code at launch instead of adding a downloaded recording.
-- Added `M` mute control and visible `sound unavailable` feedback so audio-device failure never blocks the experience.
+- Assigned every baby an ID, nickname, colour, top pattern, personality, memory, and birth time.
+- Matched the pattern drawn on a baby with its collection record.
+- Added autosave, backup recovery, import/export, confirmation for destructive actions, and a collection archive.
 
-### Prototype 0.5 — anticipation and surprise
+### Interface and sound
 
-- Changed the two-hand ramen interaction from an automatic pressure threshold into a short sequence: squeeze until the seam is armed, then pull both hands apart to tear it open.
-- Added explicit `PULL HANDS APART!` feedback and a `Shift + Space` equivalent so the sequence is demonstrable without a camera.
-- Added increasingly nervous expressions, screen shake, a flash, and a brief reward label to make the moment of rupture easier to anticipate and read.
-- Added rotating fictional supermarket flavours and weighted random contents: normal noodles remain common, while double noodles, seasoning, an empty packet, a golden noodle, and a Cyber Apple cameo are surprises.
-- Added a small `PACKS POPPED` counter and a replacement packet that slides onto the shelf after release. This encourages repetition without introducing scoring or a win/lose state.
-- Added an automated test for the pull-apart detector. Visual states were checked in camera-free mode; live participant testing is still outstanding.
+- Simplified the interface into an English deep-sea presentation.
+- Replaced the long action-gated tutorial with a short guide because the camera tutorial felt slow and overly complicated.
+- Added generated ambient music and mute support.
+- Added Deep Sea and Live Camera background modes.
 
-### Prototype 0.6 — Breathe & Ripple co-creation
+## 5. User trial
 
-- Reframed the primary experience around a translucent jelly instrument rather than object destruction.
-- Added a repeating inhale, comfortable hold, and exhale prompt; timing variation never produces a failure state.
-- Mapped the strongest pressure in each squeeze to light, medium, or deep wave geometry and to a generated chord register.
-- Kept the eight most recent waves visible so three sequential collaborators can build one shared composition.
-- Added `N` handoff, collaborator colours, a shared-wave count, keyboard fallback, and a clear-canvas reset.
-- Retained the four earlier toys as visible development experiments while making Ripple Jelly the launch default.
-- **0.6.1 material polish:** replaced the misty oval jelly with a rounder hydrogel-ball treatment after reviewing a user-supplied material reference. A saturated rim, transparent centre, sharp offset highlights, lower refraction colour, and a soft contact shadow make the squeeze response read more clearly. The reference image itself is not included or copied into the program.
-- Added automated tests for pressure classification and breathing phase timing.
+### Trial record
 
-### Prototype 0.7 — 3D roll and flatten
+- **Date:** 1 November 2026
+- **Participant code:** P01
+- **Method:** The participant tried the browser experience while the student observed.
+- **Evidence:** [Original user-trial photograph (HEIC, 2.9 MB)](docs/user-trial-01.HEIC)
+- **Privacy:** The student explicitly chose to include the original photograph in the public repository. No camera frame is captured or saved by the SQUISH program itself.
 
-- Rebuilt the jelly presentation as a software-projected 3D volume. A sparse front-facing sphere mesh rotates beneath the translucent material, so the ball communicates depth without adding an OpenGL dependency.
-- Added a second two-hand relationship: horizontal palm distance flattens the ball, while opposite vertical palm movement is recognised as rolling it round.
-- Reduced false rolling triggers by largely ignoring opposite horizontal motion, since that motion belongs to the flatten gesture.
-- Added short-lived shape memory: a flattened ball relaxes only slowly, while a deliberate rolling gesture restores its roundness quickly.
-- Added visible `FLATTENING` and `ROLLING ROUND` feedback plus a form-roundness percentage.
-- Added `G` as the camera-free roll-round control and kept `Space` as the flatten/release control.
-- Added an automated comparison proving that opposite palm motion scores highly while shared camera drift does not. Live participant testing is still outstanding.
+### Observation and feedback
 
-### Prototype 0.8 — Camera Gel AR view
+The participant wanted the jellyfish to appear over the live camera image and suggested that multiple people should be able to interact with it. The first request revealed a discoverability problem: a camera-background mode already existed, but the short labels **Deep Sea** and **Live View** did not clearly communicate that they were two background choices.
 
-- Removed the breathing timer, breathing progress bar, phase instructions, and automatic breathing-scale animation after the project direction changed.
-- Replaced the decorative background with the mirrored live camera feed, covered by a light contrast veil and readable interface panels.
-- Added smoothed palm-midpoint anchoring so the jelly appears between the participant's hands instead of remaining fixed at screen centre.
-- Added palm target markers and a connecting line so tracking errors are immediately visible.
-- Stored the creation position with every released ripple, allowing waves to remain where they were made while the hands and ball move elsewhere.
-- Kept a camera-free background and the `Space`/`G` controls so denied permission or an unavailable camera does not block assessment.
-- No live frames or participant images are written to disk; generated documentation screenshots use only fallback mode.
+The multiplayer suggestion was understood in two possible ways:
 
-### Prototype 0.9 — responsive gesture and diamond splash
+1. several people standing in front of one camera; or
+2. several remote players interacting from different devices.
 
-- Widened the two-palm pressure range so useful deformation begins earlier and maximum pressure is reachable without overlapping the hands.
-- Increased camera signal, roll-signal, palm-position, and spring response rates to reduce the delayed feeling reported during hands-on use.
-- Requested a one-frame camera buffer where the OpenCV backend supports it, reducing the chance that an old frame is processed after the hands have moved.
-- Added a latched maximum-pressure event at 91%: the ball disappears into a deep ripple, generated chord, soft flash, water droplets, and thirty rotating faceted fragments.
-- Drew every diamond procedurally with four outer points, two coloured facets, a white edge, and a small cross-glint. No image asset was added.
-- Required pressure to return near zero before the ball reforms and the effect can trigger again, preventing an accidental continuous particle stream.
-- Added a test assertion that a practical close-palm pose now produces more than 90% pressure. The exact live-camera threshold still needs participant testing.
+The current hand-tracking library and interaction model are designed around one tracked participant. Adding reliable multi-person or networked synchronization would substantially increase the technical and privacy scope of this assignment.
 
-### Prototype 0.10 — physical compression and delayed burst
+### Change made from the trial
 
-- Reversed the earlier pancake deformation after observing that it contradicted the visible hand force: palms approaching from the left and right must reduce horizontal width, not increase it.
-- Modelled the gel as an approximately incompressible ellipsoid. Horizontal scale decreases with pressure while both perpendicular axes expand by the inverse square root, keeping `x × y × z` volume approximately constant.
-- Replaced the squeezed ellipse with a pressure-dependent superellipse, producing flatter left/right contact surfaces and fuller top/bottom bulges.
-- Routed one-hand, two-hand, mouse, and keyboard pressure through the same deformation formula; input source no longer changes the material's physical response.
-- Replaced the immediate 91% burst with a sustained threshold: pressure must remain at or above 93% for about 1.25 seconds.
-- Added a pink crystallisation progress strip, percentage status, halo, and increasing micro-tremor. Progress retreats when pressure drops and fully resets on release.
-- Hid the central tutorial card after two palms are detected so the vertically bulging high-pressure form remains unobstructed.
-- Added automated tests for approximate volume conservation and for charge accumulation/rollback. Live threshold timing still requires user testing.
+The background control was renamed from **Deep Sea / Live View** to **BG · Deep Sea / BG · Live Camera**. This small interface change makes the existing camera-background feature visible without adding another tutorial panel.
 
-### Prototype 0.11 — force-direction deformation
+Networked or simultaneous multi-person interaction was not added for this submission. The decision keeps the main squish interaction stable, preserves camera privacy, and follows the assignment advice that one polished interaction is stronger than several unfinished features. Multi-person input remains a future direction.
 
-- Replaced the fixed horizontal squeeze assumption with a live, undirected force axis measured between the two palm centres. The direct two-dimensional gap now controls pressure, so vertical and diagonal poses are not penalised.
-- Applied that axis to the outer superellipse, internal projected sphere mesh, refraction layers, inclusions, rim, and charge halo. Side pressure makes a tall form, top/bottom pressure makes a wide form, and diagonal pressure rotates the same volume-preserving response.
-- Smoothed the axis modulo 180 degrees, because swapping hand order must not make the ball suddenly rotate by a half-turn.
-- Reinterpreted rolling as opposite palm motion perpendicular to the current force axis. Opposite motion along the axis remains a squeeze/release rather than accidentally becoming a roll.
-- Added clear `SIDE`, `TOP/BOTTOM`, and `DIAGONAL COMPRESSION` feedback plus privacy-safe camera-free demonstrations for all three directions.
-- Added automated checks for direction classification and for rejecting radial squeeze motion as rolling. Exact live-camera angle stability still requires the honest user trial below.
+## 6. Handling mistakes and interruptions
 
-### AI collaboration record
+- Camera permission can be denied without blocking mouse or touch.
+- Lost hand tracking pauses the current camera gesture rather than completing it accidentally.
+- An incomplete stretch rebounds without creating a duplicate baby.
+- Population limits prevent uncontrolled object growth.
+- Invalid imported saves are rejected, and a damaged local save offers backup recovery.
+- Audio can be muted, and visual feedback remains sufficient when sound is unavailable.
+- The game saves when the page becomes hidden and returns autonomous behavior to a safe state.
 
-OpenAI Codex was used to scaffold the Python project, implement and test the camera/fallback loop, propose visual feedback, and draft documentation. A suggestion that was **kept** was separating the gesture maths from the Pygame drawing code, because it makes the input-to-response logic testable without a webcam. An early suggestion to add only simple colour choices was **changed** after the student supplied tactile references: later variants change rebound, fracture, ripple geometry, and sound rather than decoration alone. A first proposal to omit audio was later **rejected** after the student requested sound; the revised design generates sounds in memory and preserves a silent fallback. A points-based game direction was **rejected** in favour of equal-status pressure qualities and a shared generative canvas, because the student wanted a calmer co-creative experience.
+## 7. Testing
 
-The student must review this account, edit it into their own voice, and ensure it matches the final work before submission.
+The project includes 35 browser-independent tests covering:
 
-### Known limitations before user testing
+- emotion and memory independence;
+- stat limits and expression priority;
+- mouse/camera pointer normalization;
+- follow, flee, orbit, recovery, and separation steering;
+- social pairing, interruption, cooldowns, and missing partners;
+- save validation, backup recovery, import/export, and discovery history.
 
-- Hand openness is heuristic and may vary with hand angle, lighting, and distance.
-- Two-hand pressure uses direct palm-centre distance and rolling uses motion perpendicular to the smoothed palm axis. Overlap, low frame rate, fast hand crossing, or a hand leaving the frame can still confuse identity tracking.
-- The delayed splash requires 93% pressure to be held for about 1.25 seconds; perceived difficulty will still vary with camera framing and palm angle.
-- Sound depends on the computer providing an output device; visual feedback remains complete without it.
-- Live camera contrast varies by room; translucent white panels preserve the controls, but very bright backlighting can still reduce hand-tracking quality.
-- Co-creation is sequential on one device, not networked or simultaneous.
-- Camera access must be granted to the app that launches the Python process.
-- The visual design has been checked programmatically and by the developer, not evaluated by external users.
-- The brittle shell and ramen burst are playful simulations, not physically realistic.
+The main browser flow was also checked manually: squish, rebound, edge birth, baby interaction, background switching, camera denial fallback, collection display, and save restoration after refresh.
 
-## 8. User trial — not conducted yet
+## 8. AI collaboration
 
-**Status:** No participant session has been conducted. Do not replace this statement with invented evidence.
+OpenAI ChatGPT and Codex were used to discuss interaction ideas, implement and refactor HTML/CSS/JavaScript, diagnose gesture behavior, create automated tests, and draft documentation. The student directed the visual and interaction revisions through repeated critique and supplied reference images.
 
-### Suggested lightweight procedure
+One AI suggestion that was **kept** was separating emotion, behavior, social, and save logic into testable modules. This made the autonomous systems easier to verify without a camera.
 
-1. Ask one participant to start the program using only the README.
-2. Do not explain the gesture for the first 20 seconds.
-3. Ask them to make one full squish and release.
-4. If the camera fails, observe whether they discover the fallback.
-5. Ask three short questions: “What did you think your hand controlled?”, “What felt satisfying or confusing?”, and “What would you change first?”
-6. Record observations, not assumptions.
+One direction that was **changed** was the initial tutorial state machine. A six-step gesture tutorial was implemented, but the student found it slow and too complicated. It was replaced with a concise written guide and optional controls.
 
-### Trial record template
+One direction that was **rejected** was expanding the final submission into a home-building or economy game. It distracted from the relationship between touch, deformation, feedback, and recovery that the assignment is assessing.
 
-- Date:
-- Participant code (no real name needed):
-- Device / lighting conditions:
-- Was camera permission already granted?:
-- Could the participant start the program without help?:
-- Could the participant discover the main gesture?:
-- Could the participant recover if tracking failed?:
-- Direct observation notes:
-- Participant comments (quote only with permission):
-- Most important issue:
-- Change proposed from the evidence:
+The student should review this account in their own voice before final submission and confirm that the photograph is appropriate to share publicly.
 
-### Results
+## 9. Known limitations and future work
 
-_Intentionally left blank until a real trial is completed._
-
-### Required iteration commit after the trial
-
-After recording the observation, make one justified change (or clearly explain why the evidence supports keeping the design) and commit it separately, for example: `fix: make crispy shell reset clearer after user trial`. This commit does not exist yet.
-
-## 9. Assignment submission checklist
-
-- [x] Working source and procedural assets are included.
-- [x] Exact `uv` setup and run commands are documented.
-- [x] Camera denial/unavailability has a keyboard and mouse fallback.
-- [x] README includes screenshots, intended audience, interaction, and limitations.
-- [x] AI assistance, kept/changed suggestions, and credits are documented.
-- [x] Development history contains multiple meaningful commits.
-- [ ] At least one other person has tried the experience.
-- [ ] Observation and one resulting decision are recorded above.
-- [ ] The post-trial change/decision is committed and pushed.
-- [ ] The public GitHub repository opens while signed out.
-- [ ] The repository URL is submitted to Canvas before 23:59 HKT on 1 November 2026.
-
-## 10. Reflection prompts for submission
-
-After the real trial, answer these in your own voice:
-
-- Which visual detail most helped the interaction feel “squishy”?
-- Where did the participant's mental model differ from the program?
-- What did you simplify, and why did that improve the project?
-- What would you test next if you had one more week?
-
+- Hand tracking depends on lighting, framing, device speed, and the CDN-hosted model.
+- The camera system is designed for one participant and does not identify multiple people.
+- There is no networked multiplayer or shared remote sea.
+- Saves use browser localStorage and require export/import to move between devices.
+- HEIC trial evidence may need to be downloaded on browsers that do not preview the format.
+- The interface is optimized for desktop presentation rather than small phones.
