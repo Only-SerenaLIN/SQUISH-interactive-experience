@@ -162,6 +162,7 @@
     bubbles: [],
     dust: [],
     audio: null,
+    ambient: null,
     tutorial: {
       active: false,
       step: "WELCOME",
@@ -301,6 +302,128 @@
     return state.audio;
   }
 
+  function createOceanNoise(audio, destination) {
+    const duration = 4;
+    const buffer = audio.createBuffer(1, audio.sampleRate * duration, audio.sampleRate);
+    const samples = buffer.getChannelData(0);
+    let drift = 0;
+    for (let index = 0; index < samples.length; index += 1) {
+      drift = drift * 0.985 + (Math.random() * 2 - 1) * 0.015;
+      samples[index] = drift;
+    }
+    const source = audio.createBufferSource();
+    const filter = audio.createBiquadFilter();
+    const gain = audio.createGain();
+    const swell = audio.createOscillator();
+    const swellDepth = audio.createGain();
+    source.buffer = buffer;
+    source.loop = true;
+    filter.type = "bandpass";
+    filter.frequency.value = 320;
+    filter.Q.value = 0.55;
+    gain.gain.value = 0.055;
+    swell.type = "sine";
+    swell.frequency.value = 0.045;
+    swellDepth.gain.value = 0.025;
+    swell.connect(swellDepth).connect(gain.gain);
+    source.connect(filter).connect(gain).connect(destination);
+    source.start();
+    swell.start();
+    return { source, filter, gain, swell };
+  }
+
+  function ensureAmbientMusic() {
+    if (state.ambient) return state.ambient;
+    const audio = initAudio();
+    if (!audio) return null;
+    const master = audio.createGain();
+    const warmth = audio.createBiquadFilter();
+    const shimmer = audio.createBiquadFilter();
+    master.gain.value = 0.0001;
+    warmth.type = "lowpass";
+    warmth.frequency.value = 720;
+    warmth.Q.value = 0.7;
+    shimmer.type = "highshelf";
+    shimmer.frequency.value = 1600;
+    shimmer.gain.value = -8;
+    master.connect(warmth).connect(shimmer).connect(audio.destination);
+
+    const chords = [
+      [55, 82.41, 123.47],
+      [49, 73.42, 110],
+      [43.65, 65.41, 98],
+      [49, 73.42, 116.54],
+    ];
+    const voices = chords[0].map((frequency, index) => {
+      const oscillator = audio.createOscillator();
+      const gain = audio.createGain();
+      const lfo = audio.createOscillator();
+      const lfoDepth = audio.createGain();
+      oscillator.type = index === 0 ? "sine" : "triangle";
+      oscillator.frequency.value = frequency;
+      oscillator.detune.value = index === 1 ? -4 : index === 2 ? 5 : 0;
+      gain.gain.value = [0.52, 0.12, 0.045][index];
+      lfo.type = "sine";
+      lfo.frequency.value = [0.031, 0.023, 0.017][index];
+      lfoDepth.gain.value = [0.11, 0.035, 0.014][index];
+      lfo.connect(lfoDepth).connect(gain.gain);
+      oscillator.connect(gain).connect(master);
+      oscillator.start();
+      lfo.start();
+      return { oscillator, gain, lfo };
+    });
+
+    const highVoice = audio.createOscillator();
+    const highGain = audio.createGain();
+    const highLfo = audio.createOscillator();
+    const highLfoDepth = audio.createGain();
+    highVoice.type = "sine";
+    highVoice.frequency.value = 246.94;
+    highGain.gain.value = 0.018;
+    highLfo.frequency.value = 0.012;
+    highLfoDepth.gain.value = 0.012;
+    highLfo.connect(highLfoDepth).connect(highGain.gain);
+    highVoice.connect(highGain).connect(master);
+    highVoice.start();
+    highLfo.start();
+
+    const ocean = createOceanNoise(audio, master);
+    const ambient = { master, voices, highVoice, highGain, highLfo, ocean, chords, chordIndex: 0, timer: null };
+    const changeChord = () => {
+      if (!state.ambient) return;
+      ambient.chordIndex = (ambient.chordIndex + 1) % ambient.chords.length;
+      const now = audio.currentTime;
+      const next = ambient.chords[ambient.chordIndex];
+      ambient.voices.forEach((voice, index) => {
+        voice.oscillator.frequency.cancelScheduledValues(now);
+        voice.oscillator.frequency.setValueAtTime(Math.max(1, voice.oscillator.frequency.value), now);
+        voice.oscillator.frequency.exponentialRampToValueAtTime(next[index], now + 7.5);
+      });
+      const upperNotes = [246.94, 220, 196, 233.08];
+      ambient.highVoice.frequency.cancelScheduledValues(now);
+      ambient.highVoice.frequency.setValueAtTime(Math.max(1, ambient.highVoice.frequency.value), now);
+      ambient.highVoice.frequency.exponentialRampToValueAtTime(upperNotes[ambient.chordIndex], now + 9);
+    };
+    ambient.timer = window.setInterval(changeChord, 15000);
+    state.ambient = ambient;
+    return ambient;
+  }
+
+  function setAmbientMusicEnabled(enabled, fast = false) {
+    if (enabled && !state.entered) return;
+    soundButton.dataset.ambient = enabled ? "playing" : "paused";
+    soundButton.title = enabled ? "Ambient music and interaction sounds are on" : "Audio is muted";
+    const ambient = enabled ? ensureAmbientMusic() : state.ambient;
+    if (!ambient || !state.audio) return;
+    const audio = state.audio;
+    if (enabled && audio.state === "suspended") audio.resume();
+    const now = audio.currentTime;
+    const gain = ambient.master.gain;
+    gain.cancelScheduledValues(now);
+    gain.setValueAtTime(Math.max(0.0001, gain.value), now);
+    gain.linearRampToValueAtTime(enabled ? 0.022 : 0.0001, now + (fast ? 0.08 : enabled ? 3.2 : 1.4));
+  }
+
   function tone(strength, angle) {
     if (!state.soundOn) return;
     const audio = initAudio();
@@ -363,6 +486,8 @@
   function updateSoundButton() {
     soundButton.setAttribute("aria-pressed", String(state.soundOn));
     soundButton.setAttribute("aria-label", state.soundOn ? "Mute sound" : "Turn sound on");
+    if (!state.entered) soundButton.dataset.ambient = state.soundOn ? "ready" : "paused";
+    soundButton.title = state.soundOn ? "Ambient music and interaction sounds are on" : "Audio is muted";
   }
 
   function updateCameraButton(label = "Mouse") {
@@ -1594,7 +1719,7 @@
   function enter() {
     state.entered = true;
     invitation.classList.add("is-gone");
-    initAudio();
+    if (state.soundOn) setAmbientMusicEnabled(true);
     canvas.focus({ preventScroll: true });
     recordActivity();
     if (localStorage.getItem("tutorialCompleted") === "true") return;
@@ -3209,7 +3334,7 @@
   enterButton.addEventListener("click", enter);
   soundButton.addEventListener("click", () => {
     state.soundOn = !state.soundOn;
-    if (state.soundOn) initAudio();
+    setAmbientMusicEnabled(state.soundOn);
     updateSoundButton();
     scheduleSave("Sound setting saved", 240);
   });
@@ -3361,6 +3486,7 @@
   window.addEventListener("keydown", (event) => {
     if (event.key.toLowerCase() === "m") {
       state.soundOn = !state.soundOn;
+      setAmbientMusicEnabled(state.soundOn);
       updateSoundButton();
       scheduleSave("Sound setting saved", 240);
     }
@@ -3401,8 +3527,11 @@
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
+      setAmbientMusicEnabled(false, true);
       writeSave("Saved in background");
       if (state.camera.enabled) stopCamera("");
+    } else if (state.entered && state.soundOn) {
+      setAmbientMusicEnabled(true);
     }
   });
   window.addEventListener("beforeunload", () => {
