@@ -1,49 +1,83 @@
 # Credits and Attribution
 
-## Jellyfish Grove browser game (2026-10-29)
-
-- Creative direction and visual references: Serena Lin.
-- Stage 1 implementation: original HTML, CSS and Canvas 2D code in this repository.
-- The supplied “Luminous Abyss / 浮光之域” concept screenshot was used as a visual reference only and is not redistributed in the repository.
-- No external image, audio, font, tracking library or runtime dependency is required by the new browser game.
-
 ## Project authorship
 
-Project concept and direction: **student author — add your name here before submission**.
+**SQUISH — A Soft Jellyfish Interaction Experience**
 
-The first working prototype was developed with assistance from OpenAI Codex. Before submitting, the student should review the code, run it, make at least one personally directed change, and describe the collaboration according to the course's AI-use policy.
+- Concept, creative direction, interaction design, visual decisions, testing, and final project review: **LIN Ziqing**
+- HTML, CSS, Canvas 2D, JavaScript systems, documentation, and automated tests: developed by LIN Ziqing with assistance from OpenAI ChatGPT and Codex
+- Repository: <https://github.com/Only-SerenaLIN/SQUISH-interactive-experience>
 
-Suggested disclosure (edit to match what actually happened):
+LIN Ziqing directed the project through repeated visual and interaction revisions, supplied reference material, evaluated prototypes, requested changes, and is responsible for the submitted work.
 
-> I used OpenAI Codex to help structure the Python project, draft the first implementation, and explain setup and testing. I directed the concept and requirements, reviewed the generated code, ran the prototype, and remain responsible for the final design and submission.
+## Open-source software
 
-Do not use this wording if it does not accurately describe the final process.
+### Handsfree.js
 
-## Open-source libraries
+The optional camera-gesture mode uses [Handsfree.js 8.5.1](https://handsfreejs.netlify.app/) by Oz Ramos, distributed under the [Apache License 2.0](https://github.com/MIDIBlocks/handsfree/blob/master/LICENSE).
 
-- [Python](https://www.python.org/) — programming language; Python Software Foundation License.
-- [Pygame](https://www.pygame.org/) — window, drawing, and input; GNU LGPL v2.1.
-- [OpenCV](https://opencv.org/) — webcam capture and image conversion; Apache 2.0 License.
-- [MediaPipe](https://ai.google.dev/edge/mediapipe/solutions/guide) — hand landmark tracking; Apache 2.0 License.
-- [Handsfree.js 8.5.1](https://handsfreejs.netlify.app/) — browser hand-tracking wrapper and pinch-state events; Apache 2.0 License.
-- [uv](https://docs.astral.sh/uv/) — Python project and dependency manager; Apache 2.0 / MIT License.
-- [pytest](https://pytest.org/) — development tests; MIT License.
+The browser loads the Handsfree.js stylesheet, script, and model assets from the unpkg CDN:
 
-Library versions used for a particular submission are recorded in `uv.lock` after `uv sync`.
+```text
+https://unpkg.com/handsfree@8.5.1/
+```
 
-## Visual and media assets
+Handsfree.js provides browser hand landmarks and pinch-state data. SQUISH converts those results into its own smoothed pointer, squish, nurture, touch, and bubble interactions. The main experience remains usable with mouse or touch when this library, its models, or camera permission are unavailable.
 
-All artwork shapes, character graphics, projected 3D jelly geometry, directional physical deformation curves, translucent material layers, pressure waves, faceted diamond fragments, water droplets, hand-tracking guides, supermarket elements, particles, interface elements, and short sound effects are generated procedurally by the project code. There are no downloaded images, fonts, sounds, prerecorded camera clips, or third-party visual artwork; Handsfree.js and its model/runtime assets are loaded only to provide optional browser hand tracking.
+### Browser platform APIs
 
-## Interaction references
+The project uses standard browser technologies without a build framework:
 
-- A user-supplied Xiaohongshu post titled “捏一下赛博青苹果来哄自己开心” inspired the green-apple theme and the request for more tactile variation. The short link could not be fetched in the development environment, so no imagery, code, audio, or text was copied from it: <https://xhslink.cn/o/6Nkve3BQzjj>
-- CBNData's article on crispy squishies was consulted for general context about progressive breaking and immediate sensory feedback: <https://www.cbndata.com/information/295843>
-- User-supplied screenshots of gesture-controlled music, breathing-oriented generative artwork, and coloured hydrogel stress balls informed earlier exploration, musical feedback, collaborative pressure waves, and the glossy material treatment. The breathing interface was later removed. No imagery, interface, text, music, or code was copied from those screenshots.
+- HTML5 and CSS
+- Canvas 2D API for the jellyfish world and visual effects
+- Web Audio API for generated ambience and interaction sounds
+- MediaDevices / `getUserMedia()` for optional live camera input
+- LocalStorage and File APIs for saving, backup recovery, and JSON import/export
 
-These are interaction references, not source assets.
+These browser APIs are platform features rather than bundled third-party media or source libraries.
 
-## Data and privacy
+## Visual and audio material
 
-No training dataset was created or included. Live webcam frames are mirrored on screen and processed locally in memory; they are not recorded, uploaded, or saved by the project.
+The final deep-sea scene, mother jellyfish, baby jellyfish, facial expressions, top patterns, tentacles, bubbles, particles, highlights, deformation, and collection thumbnails are drawn procedurally by the project code.
 
+The ambient deep-sea sound and interaction feedback are synthesized at runtime with oscillators, filtered noise, and gain envelopes through the Web Audio API. No downloaded song or prerecorded sound effect is included.
+
+The interface uses system fonts and does not redistribute a commercial font.
+
+The repository contains some earlier prototype screenshots and generated visual experiments in `docs/` and `web/assets/`. They document development history and are not required by the final Canvas experience.
+
+## References supplied during development
+
+The following materials informed the project's general visual and interaction direction:
+
+- User-supplied photographs of translucent blue, purple, and pink jellyfish
+- A user-supplied drawing describing the orientation of a newborn jellyfish during separation
+- User-supplied screenshots and annotations exploring flower-like crown patterns, facial placement, and jellyfish proportions
+- Handsfree.js installation documentation: <https://handsfreejs.netlify.app/#installing>
+
+These references were used for observation and discussion. Their photographs and artwork were not copied into the final Canvas rendering or redistributed as game assets.
+
+## User-trial evidence
+
+The original user-trial photograph is stored at [`docs/user-trial-01.HEIC`](docs/user-trial-01.HEIC). It was supplied by LIN Ziqing and added to the public repository at the author's explicit request. The author is responsible for confirming that the participant shown has agreed to public sharing.
+
+The SQUISH application itself does not record, upload, or save live camera frames.
+
+## AI-use disclosure
+
+OpenAI ChatGPT and Codex were used to:
+
+- discuss and refine interaction concepts;
+- draft and revise HTML, CSS, and JavaScript;
+- diagnose gesture-recognition and animation behavior;
+- help organize emotion, behavior, social, and save modules;
+- create and run automated tests;
+- help draft the README and process documentation.
+
+The student supplied the project direction and references, reviewed each iteration, requested substantial changes, tested the experience, and chose which suggestions to keep, change, or reject. Specific examples and the user-trial response are documented in [`PROCESS.md`](PROCESS.md).
+
+No generative AI service is called by the finished SQUISH webpage at runtime.
+
+## Privacy
+
+Live camera frames are mirrored and processed locally in the browser for optional hand tracking or display as a background. The program does not transmit or save those frames. Camera access can be denied or disabled without preventing mouse and touch interaction.
