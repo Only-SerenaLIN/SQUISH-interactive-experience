@@ -9,6 +9,8 @@
   if (!BehaviorSystem) throw new Error("Behavior system failed to load");
   const SocialSystem = window.SquishSocial;
   if (!SocialSystem) throw new Error("Social system failed to load");
+  const SaveSystem = window.SquishSave;
+  if (!SaveSystem) throw new Error("Save system failed to load");
   const invitation = document.querySelector("#invitation");
   const enterButton = document.querySelector("#enterButton");
   const soundButton = document.querySelector("#soundButton");
@@ -48,6 +50,42 @@
   const hint = document.querySelector("#hint");
   const babyCount = document.querySelector("#babyCount");
   const debugButton = document.querySelector("#debugButton");
+  const collectionButton = document.querySelector("#collectionButton");
+  const collectionPanel = document.querySelector("#collectionPanel");
+  const closeCollection = document.querySelector("#closeCollection");
+  const continueGame = document.querySelector("#continueGame");
+  const collectionGrid = document.querySelector("#collectionGrid");
+  const collectionOwned = document.querySelector("#collectionOwned");
+  const collectionDiscovered = document.querySelector("#collectionDiscovered");
+  const collectionSummary = document.querySelector("#collectionSummary");
+  const collectionEmpty = document.querySelector("#collectionEmpty");
+  const collectionDetailData = document.querySelector("#collectionDetailData");
+  const detailAvatar = document.querySelector("#detailAvatar");
+  const detailId = document.querySelector("#detailId");
+  const detailColor = document.querySelector("#detailColor");
+  const detailPattern = document.querySelector("#detailPattern");
+  const detailPersonality = document.querySelector("#detailPersonality");
+  const detailEmotion = document.querySelector("#detailEmotion");
+  const detailBornAt = document.querySelector("#detailBornAt");
+  const detailFavorite = document.querySelector("#detailFavorite");
+  const nicknameInput = document.querySelector("#nicknameInput");
+  const saveNickname = document.querySelector("#saveNickname");
+  const saveStatus = document.querySelector("#saveStatus");
+  const newGameButton = document.querySelector("#newGame");
+  const exportSaveButton = document.querySelector("#exportSave");
+  const importSaveButton = document.querySelector("#importSave");
+  const importSaveFile = document.querySelector("#importSaveFile");
+  const resetSaveButton = document.querySelector("#resetSave");
+  const saveConfirm = document.querySelector("#saveConfirm");
+  const saveConfirmTitle = document.querySelector("#saveConfirmTitle");
+  const saveConfirmText = document.querySelector("#saveConfirmText");
+  const cancelSaveAction = document.querySelector("#cancelSaveAction");
+  const confirmSaveAction = document.querySelector("#confirmSaveAction");
+  const saveRecovery = document.querySelector("#saveRecovery");
+  const saveRecoveryMessage = document.querySelector("#saveRecoveryMessage");
+  const retrySave = document.querySelector("#retrySave");
+  const restoreBackup = document.querySelector("#restoreBackup");
+  const createFreshSave = document.querySelector("#createFreshSave");
   const emotionDebug = document.querySelector("#emotionDebug");
   const closeDebug = document.querySelector("#closeDebug");
   const debugEmpty = document.querySelector("#debugEmpty");
@@ -103,6 +141,9 @@
     selectedBaby: null,
     debugOpen: false,
     debugLastUpdate: 0,
+    collectionOpen: false,
+    collectionSelectedId: null,
+    saveRecoveryRequired: false,
     tentaclePlay: { amount: 0, x: 0, y: 0, direction: 0 },
     entered: false,
     soundOn: true,
@@ -211,6 +252,17 @@
     [111, 232, 216],
     [255, 210, 164],
   ];
+  const patternGlyphs = { ripple: "≈", petal: "✤", stardust: "✦", moon: "☾" };
+  const favoriteInteractions = { calm: "轻触与同步漂浮", shy: "温柔靠近", playful: "挤压与绕圈" };
+  const collectionCatalog = Array.from({ length: 12 }, (_, index) => ({
+    colorIndex: index % palette.length,
+    pattern: SaveSystem.PATTERNS[index % SaveSystem.PATTERNS.length],
+    personality: SaveSystem.PERSONALITIES[index % SaveSystem.PERSONALITIES.length],
+  }));
+  let currentSave = SaveSystem.createDefault();
+  let pendingSaveTimer = null;
+  let pendingConfirmAction = null;
+  let recoveryBackup = null;
 
   const vortexPalette = [
     [104, 221, 214],
@@ -534,8 +586,12 @@
   }
 
   function toggleCamera() {
-    if (state.camera.enabled || state.camera.starting) stopCamera();
+    const nextMode = state.camera.enabled || state.camera.starting ? "mouse" : "gesture";
+    state.tutorial.mode = nextMode;
+    localStorage.setItem("preferredInputMode", nextMode);
+    if (nextMode === "mouse") stopCamera();
     else startCamera();
+    scheduleSave("输入模式已保存", 260);
   }
 
   function landmarkDistance(a, b) {
@@ -553,6 +609,7 @@
 
   function processCameraGesture(now) {
     const camera = state.camera;
+    if (state.collectionOpen || saveConfirm.classList.contains("is-open") || saveRecovery.classList.contains("is-open")) return;
     if (!camera.enabled || !camera.handsfree || now - camera.lastFrameAt < 30) return;
     camera.lastFrameAt = now;
     const hands = camera.hands || camera.handsfree.data?.hands;
@@ -961,6 +1018,7 @@
   function saveTutorialProgress() {
     localStorage.setItem("tutorialCurrentStep", state.tutorial.step);
     localStorage.setItem("preferredInputMode", state.tutorial.mode);
+    scheduleSave("教程进度已保存", 500);
   }
 
   function showTutorial(open) {
@@ -1081,6 +1139,7 @@
     localStorage.setItem("tutorialCurrentStep", "COMPLETE");
     showTutorial(false);
     hint.textContent = skipped ? "操作说明已关闭，随时可以重新查看" : "说明看完了——现在自由地和它们相处吧";
+    scheduleSave("教程完成状态已保存", 120);
   }
 
   function tutorialAllows(kind) {
@@ -1207,6 +1266,7 @@
     }
     if (result.woke) hint.textContent = "它慢慢睁开眼，被你轻轻唤醒了";
     selectBaby(baby);
+    if (result.applied) scheduleSave("互动记忆已保存", 900);
     return result;
   }
 
@@ -1245,8 +1305,290 @@
       }
       if (["end", "interrupt"].includes(event.kind)) {
         participants.forEach((baby) => BehaviorSystem.beginRecover(baby.behavior, now, event.kind === "interrupt" ? 1000 : 720));
+        if (event.kind === "end") scheduleSave("社交记忆已保存", 700);
       }
     });
+  }
+
+  function serializeBaby(baby) {
+    return {
+      id: baby.emotionData.id,
+      nickname: baby.nickname,
+      colorIndex: baby.hue,
+      pattern: baby.pattern,
+      personality: baby.personality,
+      bornAt: baby.bornAt,
+      size: baby.size,
+      strength: baby.strength,
+      emotion: baby.emotionData.emotion.current,
+      stats: { ...baby.emotionData.stats },
+      memory: { ...baby.emotionData.memory },
+      socialMemory: {
+        ...baby.social.memory,
+        familiarity: { ...baby.social.memory.familiarity },
+      },
+    };
+  }
+
+  function buildSaveSnapshot() {
+    return {
+      version: SaveSystem.VERSION,
+      savedAt: new Date().toISOString(),
+      world: { count: state.count, babies: state.babies.map(serializeBaby) },
+      collection: {
+        colors: [...currentSave.collection.colors],
+        patterns: [...currentSave.collection.patterns],
+        personalities: [...currentSave.collection.personalities],
+        combinations: [...currentSave.collection.combinations],
+      },
+      settings: {
+        soundOn: state.soundOn,
+        preferredInputMode: state.tutorial.mode || localStorage.getItem("preferredInputMode") || "mouse",
+        tutorialCompleted: localStorage.getItem("tutorialCompleted") === "true",
+        tutorialCurrentStep: localStorage.getItem("tutorialCurrentStep") || state.tutorial.step || "INPUT_SELECTION",
+      },
+    };
+  }
+
+  function writeSave(reason = "自动存档") {
+    if (state.saveRecoveryRequired) return false;
+    if (pendingSaveTimer) window.clearTimeout(pendingSaveTimer);
+    pendingSaveTimer = null;
+    try {
+      currentSave = SaveSystem.write(localStorage, buildSaveSnapshot());
+      if (saveStatus) saveStatus.textContent = `${reason} · ${new Date(currentSave.savedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;
+      return true;
+    } catch (error) {
+      if (saveStatus) saveStatus.textContent = "存档失败；当前体验仍可继续";
+      return false;
+    }
+  }
+
+  function scheduleSave(reason = "自动存档", delay = 420) {
+    if (pendingSaveTimer) window.clearTimeout(pendingSaveTimer);
+    pendingSaveTimer = window.setTimeout(() => writeSave(reason), delay);
+  }
+
+  function registerBabyDiscovery(baby) {
+    const changed = SaveSystem.registerDiscovery(currentSave.collection, {
+      colorIndex: baby.hue,
+      pattern: baby.pattern,
+      personality: baby.personality,
+    });
+    if (changed) scheduleSave("新外观已收录", 120);
+    return changed;
+  }
+
+  function restoreBaby(record, index) {
+    const angle = -Math.PI * 0.9 + index * 1.67;
+    const baby = {
+      x: clamp(state.center.x + Math.cos(angle) * Math.min(state.width * 0.31, 210), 48, state.width - 48),
+      y: clamp(state.center.y + Math.sin(angle) * Math.min(state.height * 0.27, 160), 58, state.height - 58),
+      vx: Math.cos(angle + Math.PI / 2) * 2.4,
+      vy: -1.5,
+      size: record.size,
+      strength: record.strength,
+      hue: record.colorIndex,
+      pattern: record.pattern,
+      nickname: record.nickname,
+      bornAt: record.bornAt,
+      phase: index * 0.91 + 0.2,
+      age: 3,
+      birthAngle: -Math.PI / 2,
+      birthDuration: 1,
+      birthTravel: 30,
+      detached: true,
+      birthSquash: 0,
+      squash: 0,
+      squashVelocity: 0,
+      touchAngle: 0,
+      releaseGlow: 0,
+      cameraTouch: 0,
+      personality: record.personality,
+      expression: record.emotion,
+      turnTimer: 1.5 + index * 0.37,
+      wanderAngle: angle + Math.PI / 2,
+      spin: 0,
+      holdStartedAt: 0,
+      maxSquash: 0,
+    };
+    const now = performance.now();
+    baby.emotionData = EmotionSystem.createProfile({ id: record.id, personality: record.personality, now });
+    Object.assign(baby.emotionData.stats, record.stats);
+    Object.assign(baby.emotionData.memory, record.memory, { lastInteractionAt: now });
+    EmotionSystem.setEmotion(
+      baby.emotionData,
+      record.emotion,
+      now,
+      record.emotion === EmotionSystem.EMOTIONS.SLEEPING ? Infinity : 1800,
+      true,
+    );
+    baby.behavior = BehaviorSystem.createProfile({ personality: baby.personality, size: baby.size, random: Math.random });
+    baby.behavior.state = BehaviorSystem.STATES.WANDER;
+    baby.social = SocialSystem.createProfile();
+    Object.assign(baby.social.memory, record.socialMemory, { familiarity: { ...record.socialMemory.familiarity } });
+    baby.social.lastSocialType = record.socialMemory.lastType || "none";
+    return baby;
+  }
+
+  function applyLoadedSave(save, { persist = false } = {}) {
+    currentSave = SaveSystem.normalize(save);
+    state.babies.length = 0;
+    state.count = currentSave.world.count;
+    state.selectedBaby = null;
+    state.collectionSelectedId = null;
+    currentSave.world.babies.forEach((record, index) => state.babies.push(restoreBaby(record, index)));
+    state.soundOn = currentSave.settings.soundOn;
+    state.tutorial.mode = currentSave.settings.preferredInputMode;
+    localStorage.setItem("preferredInputMode", currentSave.settings.preferredInputMode);
+    localStorage.setItem("tutorialCompleted", String(currentSave.settings.tutorialCompleted));
+    localStorage.setItem("tutorialCurrentStep", currentSave.settings.tutorialCurrentStep);
+    babyCount.textContent = String(state.babies.length).padStart(2, "0");
+    updateSoundButton();
+    if (persist) currentSave = SaveSystem.write(localStorage, currentSave);
+  }
+
+  function initializeSave() {
+    const loaded = SaveSystem.load(localStorage);
+    if (loaded.status === "new") {
+      loaded.data.settings.soundOn = state.soundOn;
+      loaded.data.settings.preferredInputMode = state.tutorial.mode;
+      loaded.data.settings.tutorialCompleted = localStorage.getItem("tutorialCompleted") === "true";
+      loaded.data.settings.tutorialCurrentStep = localStorage.getItem("tutorialCurrentStep") || "INPUT_SELECTION";
+      applyLoadedSave(loaded.data, { persist: true });
+    } else if (loaded.status === "ok") {
+      applyLoadedSave(loaded.data);
+    } else {
+      recoveryBackup = loaded.backup;
+      applyLoadedSave(loaded.data);
+      state.saveRecoveryRequired = true;
+      saveRecoveryMessage.textContent = loaded.errors.join("；") || "当前存档内容损坏。";
+      restoreBackup.disabled = !recoveryBackup;
+      saveRecovery.classList.add("is-open");
+      saveRecovery.setAttribute("aria-hidden", "false");
+    }
+  }
+
+  function avatarStyle(element, colorIndex, pattern, locked = false) {
+    const color = palette[colorIndex % palette.length];
+    element.style.setProperty("--jelly", color.join(","));
+    element.style.setProperty("--pattern-glyph", `"${patternGlyphs[pattern] || "≈"}"`);
+    element.classList.toggle("is-locked", locked);
+  }
+
+  function selectCollectionBaby(id) {
+    const baby = state.babies.find((item) => item.emotionData.id === id);
+    state.collectionSelectedId = baby?.emotionData.id || null;
+    collectionEmpty.hidden = Boolean(baby);
+    collectionDetailData.hidden = !baby;
+    if (!baby) return;
+    state.selectedBaby = baby;
+    detailId.textContent = baby.emotionData.id;
+    nicknameInput.value = baby.nickname;
+    detailColor.textContent = SaveSystem.COLOR_NAMES[baby.hue];
+    detailPattern.textContent = SaveSystem.PATTERN_NAMES[baby.pattern];
+    detailPersonality.textContent = personalityLabels[baby.personality];
+    detailEmotion.textContent = emotionLabels[baby.emotionData.emotion.current];
+    detailBornAt.textContent = new Date(baby.bornAt).toLocaleString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    detailFavorite.textContent = favoriteInteractions[baby.personality];
+    avatarStyle(detailAvatar, baby.hue, baby.pattern);
+    [...collectionGrid.querySelectorAll(".collection-card")].forEach((card) => card.classList.toggle("is-selected", card.dataset.id === id));
+  }
+
+  function createCollectionCard({ baby = null, combo, discovered = false }) {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "collection-card";
+    const locked = !baby && !discovered;
+    card.classList.toggle("is-locked", locked);
+    card.classList.toggle("is-historical", !baby && discovered);
+    const avatar = document.createElement("span");
+    avatar.className = "collection-avatar";
+    avatar.append(document.createElement("span"));
+    avatarStyle(avatar, combo.colorIndex, combo.pattern, locked);
+    const status = document.createElement("span");
+    status.className = "collection-card__status";
+    status.textContent = baby ? "OWNED" : discovered ? "DISCOVERED" : "UNKNOWN";
+    const name = document.createElement("strong");
+    name.className = "collection-card__name";
+    name.textContent = baby ? baby.nickname : locked ? "未知水母" : `${SaveSystem.COLOR_NAMES[combo.colorIndex]}水母`;
+    const meta = document.createElement("span");
+    meta.className = "collection-card__meta";
+    meta.textContent = locked ? "? · ? · ?" : `${SaveSystem.PATTERN_NAMES[combo.pattern]} · ${personalityLabels[combo.personality].split(" · ")[1]}`;
+    card.append(avatar, status, name, meta);
+    if (baby) {
+      card.dataset.id = baby.emotionData.id;
+      card.addEventListener("click", () => selectCollectionBaby(baby.emotionData.id));
+    } else card.disabled = true;
+    return card;
+  }
+
+  function renderCollection() {
+    collectionGrid.replaceChildren();
+    state.babies.forEach((baby) => collectionGrid.append(createCollectionCard({
+      baby,
+      combo: { colorIndex: baby.hue, pattern: baby.pattern, personality: baby.personality },
+      discovered: true,
+    })));
+    const ownedCombos = new Set(state.babies.map((baby) => SaveSystem.combinationKey(baby.hue, baby.pattern, baby.personality)));
+    const catalogMap = new Map(collectionCatalog.map((combo) => [SaveSystem.combinationKey(combo.colorIndex, combo.pattern, combo.personality), combo]));
+    currentSave.collection.combinations.forEach((key) => {
+      if (catalogMap.has(key)) return;
+      const [colorIndex, pattern, personality] = key.split(":");
+      catalogMap.set(key, { colorIndex: Number(colorIndex), pattern, personality });
+    });
+    catalogMap.forEach((combo, key) => {
+      if (ownedCombos.has(key)) return;
+      collectionGrid.append(createCollectionCard({ combo, discovered: currentSave.collection.combinations.includes(key) }));
+    });
+    collectionOwned.textContent = String(state.babies.length);
+    collectionDiscovered.textContent = String(currentSave.collection.combinations.length);
+    collectionSummary.textContent = `${currentSave.collection.combinations.length} 种外观已发现`;
+    if (state.collectionSelectedId && state.babies.some((baby) => baby.emotionData.id === state.collectionSelectedId)) selectCollectionBaby(state.collectionSelectedId);
+    else selectCollectionBaby(null);
+  }
+
+  function showCollection(open) {
+    state.collectionOpen = open;
+    collectionPanel.classList.toggle("is-open", open);
+    collectionPanel.setAttribute("aria-hidden", String(!open));
+    collectionButton.setAttribute("aria-expanded", String(open));
+    if (open) {
+      if (state.pointer.down) releasePointer();
+      cancelCameraGesture();
+      state.camera.touchBaby = null;
+      renderCollection();
+      showAbout(false);
+    } else canvas.focus({ preventScroll: true });
+  }
+
+  function showSaveConfirm(kind) {
+    pendingConfirmAction = kind;
+    const isNew = kind === "new";
+    saveConfirmTitle.textContent = isNew ? "确认开始新游戏？" : "确认重置全部存档？";
+    saveConfirmText.textContent = isNew
+      ? "当前水母和图鉴进度会被新的空白存档替换。"
+      : "当前存档、备份与图鉴发现记录都会被清除。此操作无法撤销。";
+    saveConfirm.classList.add("is-open");
+    saveConfirm.setAttribute("aria-hidden", "false");
+  }
+
+  function closeSaveConfirm() {
+    pendingConfirmAction = null;
+    saveConfirm.classList.remove("is-open");
+    saveConfirm.setAttribute("aria-hidden", "true");
+  }
+
+  function startFreshGame(removeBackup = false) {
+    state.saveRecoveryRequired = false;
+    if (removeBackup) localStorage.removeItem(SaveSystem.BACKUP_KEY);
+    const fresh = SaveSystem.createDefault();
+    fresh.settings.soundOn = state.soundOn;
+    fresh.settings.preferredInputMode = state.tutorial.mode;
+    applyLoadedSave(fresh, { persist: true });
+    currentSave.collection = fresh.collection;
+    renderCollection();
+    saveStatus.textContent = "新的空白存档已经创建";
   }
 
   function enter() {
@@ -1333,7 +1675,13 @@
   }
 
   function pointerDown(event) {
-    if (!state.entered || aboutPanel.classList.contains("is-open")) return;
+    if (
+      !state.entered ||
+      aboutPanel.classList.contains("is-open") ||
+      state.collectionOpen ||
+      saveConfirm.classList.contains("is-open") ||
+      saveRecovery.classList.contains("is-open")
+    ) return;
     if (state.camera.active) cancelCameraGesture();
     state.camera.suspendedUntil = performance.now() + 1400;
     const point = pointerPosition(event);
@@ -1565,6 +1913,9 @@
       size,
       strength,
       hue,
+      pattern: SaveSystem.PATTERNS[state.count % SaveSystem.PATTERNS.length],
+      nickname: `小水母 ${Math.max(1, state.count)}`,
+      bornAt: new Date().toISOString(),
       phase: state.count * 0.91 + Math.random() * 0.5,
       age: 0,
       birthAngle,
@@ -1593,6 +1944,8 @@
     baby.behavior = BehaviorSystem.createProfile({ personality, size, random: Math.random });
     baby.social = SocialSystem.createProfile();
     state.babies.push(baby);
+    registerBabyDiscovery(baby);
+    scheduleSave("新水母已经保存", 160);
     babyCount.textContent = String(state.babies.length).padStart(2, "0");
   }
 
@@ -1630,6 +1983,7 @@
     babyCount.textContent = "00";
     hint.textContent = "水流安静下来，母水母重新等待触碰";
     showAbout(false);
+    scheduleSave("当前海域已清空，图鉴记录保留", 120);
   }
 
   function updateTutorial() {
@@ -2302,6 +2656,16 @@
         tentacleGrowth,
         baby.expression,
       );
+      if (state.selectedBaby === baby && baby.nickname) {
+        ctx.save();
+        ctx.font = "9px ui-sans-serif, system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(240,247,241,0.58)";
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = "rgba(5,20,35,0.8)";
+        ctx.fillText(baby.nickname, baby.x, baby.y - baby.size * 1.35);
+        ctx.restore();
+      }
     });
   }
 
@@ -2759,22 +3123,102 @@
     state.soundOn = !state.soundOn;
     if (state.soundOn) initAudio();
     updateSoundButton();
+    scheduleSave("声音设置已保存", 240);
   });
   cameraButton.addEventListener("click", toggleCamera);
   backgroundButton.addEventListener("click", toggleBackgroundMode);
   debugButton.addEventListener("click", () => showEmotionDebug(!state.debugOpen));
   closeDebug.addEventListener("click", () => showEmotionDebug(false));
+  collectionButton.addEventListener("click", () => showCollection(true));
+  closeCollection.addEventListener("click", () => showCollection(false));
+  continueGame.addEventListener("click", () => showCollection(false));
+  saveNickname.addEventListener("click", () => {
+    const baby = state.babies.find((item) => item.emotionData.id === state.collectionSelectedId);
+    if (!baby) return;
+    baby.nickname = SaveSystem.cleanText(nicknameInput.value, baby.nickname);
+    nicknameInput.value = baby.nickname;
+    renderCollection();
+    selectCollectionBaby(baby.emotionData.id);
+    scheduleSave("昵称已保存", 100);
+  });
+  nicknameInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") saveNickname.click();
+  });
+  newGameButton.addEventListener("click", () => showSaveConfirm("new"));
+  resetSaveButton.addEventListener("click", () => showSaveConfirm("reset"));
+  cancelSaveAction.addEventListener("click", closeSaveConfirm);
+  confirmSaveAction.addEventListener("click", () => {
+    const action = pendingConfirmAction;
+    closeSaveConfirm();
+    startFreshGame(action === "reset");
+  });
+  exportSaveButton.addEventListener("click", () => {
+    writeSave("导出前已保存");
+    const blob = new Blob([SaveSystem.exportJson(buildSaveSnapshot())], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `squish-save-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    saveStatus.textContent = "存档 JSON 已导出";
+  });
+  importSaveButton.addEventListener("click", () => importSaveFile.click());
+  importSaveFile.addEventListener("change", () => {
+    const file = importSaveFile.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = SaveSystem.importJson(String(reader.result || ""));
+      if (!result.ok) {
+        saveStatus.textContent = `导入失败：${result.errors.join("；")}`;
+        return;
+      }
+      applyLoadedSave(result.data, { persist: true });
+      renderCollection();
+      saveStatus.textContent = "存档导入成功，水母已经恢复";
+    };
+    reader.onerror = () => { saveStatus.textContent = "无法读取导入文件"; };
+    reader.readAsText(file);
+    importSaveFile.value = "";
+  });
+  retrySave.addEventListener("click", () => {
+    const loaded = SaveSystem.load(localStorage);
+    if (loaded.status !== "ok") {
+      saveRecoveryMessage.textContent = "仍然无法读取当前存档，可以恢复备份或创建新存档。";
+      return;
+    }
+    state.saveRecoveryRequired = false;
+    applyLoadedSave(loaded.data);
+    saveRecovery.classList.remove("is-open");
+    saveRecovery.setAttribute("aria-hidden", "true");
+  });
+  restoreBackup.addEventListener("click", () => {
+    if (!recoveryBackup) return;
+    state.saveRecoveryRequired = false;
+    applyLoadedSave(recoveryBackup, { persist: true });
+    saveRecovery.classList.remove("is-open");
+    saveRecovery.setAttribute("aria-hidden", "true");
+    hint.textContent = "上一份安全备份已经恢复";
+  });
+  createFreshSave.addEventListener("click", () => {
+    startFreshGame(false);
+    saveRecovery.classList.remove("is-open");
+    saveRecovery.setAttribute("aria-hidden", "true");
+  });
   tutorialButton.addEventListener("click", () => beginTutorial(true));
   chooseMouseMode.addEventListener("click", () => {
     state.tutorial.mode = "mouse";
     localStorage.setItem("preferredInputMode", "mouse");
     if (state.camera.enabled || state.camera.starting) stopCamera("");
+    scheduleSave("输入偏好已保存", 250);
     setTutorialStep("APPROACH");
   });
   chooseGestureMode.addEventListener("click", () => {
     state.tutorial.mode = "gesture";
     state.tutorial.resumeStep = null;
     localStorage.setItem("preferredInputMode", "gesture");
+    scheduleSave("输入偏好已保存", 250);
     setTutorialStep("CAMERA_CHECK");
     startCamera();
   });
@@ -2797,6 +3241,7 @@
     state.tutorial.mode = "mouse";
     localStorage.setItem("preferredInputMode", "mouse");
     if (state.camera.enabled || state.camera.starting) stopCamera("");
+    scheduleSave("输入偏好已保存", 250);
     setTutorialStep(next);
   });
   skipTutorial.addEventListener("click", () => finishTutorial(true));
@@ -2829,6 +3274,7 @@
     if (event.key.toLowerCase() === "m") {
       state.soundOn = !state.soundOn;
       updateSoundButton();
+      scheduleSave("声音设置已保存", 240);
     }
     if (event.key.toLowerCase() === "c" && !event.repeat) toggleCamera();
     if (event.key.toLowerCase() === "b" && !event.repeat) toggleBackgroundMode();
@@ -2851,6 +3297,8 @@
       hint.textContent = "慢一点，它正在改变";
     }
     if (event.key === "Escape") {
+      if (saveConfirm.classList.contains("is-open")) closeSaveConfirm();
+      else if (state.collectionOpen) showCollection(false);
       showAbout(false);
       if (state.tutorial.active) tutorialHelp.textContent = "请使用“跳过教程”安全退出，当前进度会被保存。";
     }
@@ -2864,9 +3312,15 @@
   });
 
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden && state.camera.enabled) stopCamera("");
+    if (document.hidden) {
+      writeSave("后台自动存档");
+      if (state.camera.enabled) stopCamera("");
+    }
   });
-  window.addEventListener("beforeunload", () => stopCamera(""));
+  window.addEventListener("beforeunload", () => {
+    writeSave("离开前保存");
+    stopCamera("");
+  });
 
   if (new URLSearchParams(window.location.search).has("debugSocial")) {
     window.__SQUISH_SOCIAL_DEBUG__ = {
@@ -2896,5 +3350,9 @@
   updateCameraButton();
   updateBackgroundButton();
   resize();
+  initializeSave();
+  window.setInterval(() => {
+    if (state.entered && !document.hidden) writeSave("周期自动存档");
+  }, 30000);
   requestAnimationFrame(render);
 })();

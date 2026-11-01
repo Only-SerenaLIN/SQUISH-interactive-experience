@@ -7,7 +7,7 @@
     <meta name="description" content="SQUISH — A Soft Jellyfish Interaction Experience. 触摸、挤压并拉出柔软的数字水母。" />
     <title>水母之森 — SQUISH</title>
     <link rel="stylesheet" href="https://unpkg.com/handsfree@8.5.1/build/lib/assets/handsfree.css" />
-    <link rel="stylesheet" href="styles.css?v=social-2" />
+    <link rel="stylesheet" href="styles.css?v=collection-2" />
   </head>
   <body>
     <main class="artwork" aria-label="《水母之森》柔软水母交互体验">
@@ -24,6 +24,7 @@
           <button id="cameraButton" class="text-button camera-button" type="button" aria-pressed="false"><span class="status-dot" aria-hidden="true"></span><span class="camera-copy">模式·鼠标</span></button>
           <button id="soundButton" class="text-button" type="button" aria-pressed="true"><span class="status-dot" aria-hidden="true"></span><span class="button-copy">声音</span></button>
           <button id="backgroundButton" class="text-button background-button" type="button" aria-pressed="false" aria-label="切换为摄像头背景"><span class="status-dot" aria-hidden="true"></span><span class="background-copy">背景·深海</span></button>
+          <button id="collectionButton" class="text-button" type="button" aria-expanded="false" aria-controls="collectionPanel">水母图鉴</button>
           <button id="tutorialButton" class="text-button" type="button" aria-expanded="false">操作说明</button>
           <button id="debugButton" class="text-button text-button--quiet" type="button" aria-pressed="false">情绪调试</button>
           <button id="aboutButton" class="text-button text-button--quiet" type="button" aria-expanded="false" aria-controls="aboutPanel">作品说明</button>
@@ -56,6 +57,58 @@
         </dl>
       </aside>
 
+      <section class="collection" id="collectionPanel" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="collectionTitle">
+        <div class="collection__shell">
+          <header class="collection__header">
+            <div><p class="eyebrow">JELLYFISH COLLECTION</p><h2 id="collectionTitle">我的水母图鉴</h2></div>
+            <div class="collection__progress"><strong id="collectionOwned">0</strong><span>当前拥有</span><strong id="collectionDiscovered">0</strong><span>外观发现</span></div>
+            <button id="closeCollection" class="close-button collection__close" type="button">返回海中</button>
+          </header>
+          <div class="collection__body">
+            <div class="collection__library">
+              <div class="collection__filters"><span>拥有的个体与历史发现</span><span id="collectionSummary">0 / 12</span></div>
+              <div class="collection__grid" id="collectionGrid" role="list"></div>
+            </div>
+            <aside class="collection__detail" id="collectionDetail">
+              <div class="collection__empty" id="collectionEmpty"><span>✦</span><p>选择一只已经拥有的小水母<br />查看它的记忆</p></div>
+              <div id="collectionDetailData" hidden>
+                <div class="collection-avatar collection-avatar--large" id="detailAvatar"><span></span></div>
+                <p class="collection__detail-id" id="detailId">J-01</p>
+                <label class="collection__nickname">昵称<input id="nicknameInput" type="text" maxlength="24" autocomplete="off" /></label>
+                <button id="saveNickname" class="mini-button" type="button">保存昵称</button>
+                <dl class="collection__facts">
+                  <div><dt>颜色</dt><dd id="detailColor">—</dd></div>
+                  <div><dt>花纹</dt><dd id="detailPattern">—</dd></div>
+                  <div><dt>性格</dt><dd id="detailPersonality">—</dd></div>
+                  <div><dt>心情</dt><dd id="detailEmotion">—</dd></div>
+                  <div><dt>出生时间</dt><dd id="detailBornAt">—</dd></div>
+                  <div><dt>喜欢</dt><dd id="detailFavorite">—</dd></div>
+                </dl>
+              </div>
+            </aside>
+          </div>
+          <footer class="collection__savebar">
+            <span id="saveStatus" aria-live="polite">自动存档已开启</span>
+            <div>
+              <button id="continueGame" class="link-button" type="button">Continue Game</button>
+              <button id="newGame" class="link-button" type="button">New Game</button>
+              <button id="exportSave" class="link-button" type="button">Export Save</button>
+              <button id="importSave" class="link-button" type="button">Import Save</button>
+              <button id="resetSave" class="link-button link-button--danger" type="button">Reset Save</button>
+              <input id="importSaveFile" type="file" accept="application/json,.json" hidden />
+            </div>
+          </footer>
+        </div>
+      </section>
+
+      <section class="save-confirm" id="saveConfirm" aria-hidden="true" role="alertdialog" aria-modal="true" aria-labelledby="saveConfirmTitle">
+        <div><p class="eyebrow">PLEASE CONFIRM</p><h2 id="saveConfirmTitle">确认开始新游戏？</h2><p id="saveConfirmText">当前存档会被替换。</p><div><button id="cancelSaveAction" class="link-button" type="button">取消</button><button id="confirmSaveAction" class="enter-button enter-button--small" type="button">确认</button></div></div>
+      </section>
+
+      <section class="save-recovery" id="saveRecovery" aria-hidden="true" role="alertdialog" aria-modal="true" aria-labelledby="saveRecoveryTitle">
+        <div><p class="eyebrow">SAVE RECOVERY</p><h2 id="saveRecoveryTitle">存档暂时无法读取</h2><p id="saveRecoveryMessage">可以重新尝试、恢复上一份备份，或创建新的存档。</p><div><button id="retrySave" class="link-button" type="button">重试读取</button><button id="restoreBackup" class="link-button" type="button">恢复备份</button><button id="createFreshSave" class="enter-button enter-button--small" type="button">创建新存档</button></div></div>
+      </section>
+
       <section class="invitation" id="invitation" aria-labelledby="invitationTitle">
         <div class="invitation__copy">
           <p class="eyebrow">PROGRAMMING ASSIGNMENT · INTERACTIVE DEMO</p>
@@ -67,7 +120,7 @@
 
       <div class="bottomline immersive-ui" aria-live="polite">
         <p id="hint" class="hint">移动靠近 · 按住挤压 · 边缘外拉出生</p>
-        <div class="bottom-actions"><p class="memory-count"><span id="babyCount">00</span> / 12 只小水母</p><button id="resetButton" class="mini-button" type="button">重置</button></div>
+        <div class="bottom-actions"><p class="memory-count"><span id="babyCount">00</span> / 12 只小水母</p><button id="resetButton" class="mini-button" type="button">清空海域</button></div>
       </div>
 
       <section class="tutorial" id="tutorialPanel" aria-hidden="true" role="dialog" aria-modal="false" aria-labelledby="tutorialTitle">
@@ -130,6 +183,7 @@
     <script src="emotion-system.js?v=social-2"></script>
     <script src="behavior-system.js?v=social-2"></script>
     <script src="social-system.js?v=social-2"></script>
-    <script src="app.js?v=social-3"></script>
+    <script src="save-system.js?v=collection-2"></script>
+    <script src="app.js?v=collection-2"></script>
   </body>
 </html>
