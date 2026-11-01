@@ -7,6 +7,8 @@
   if (!EmotionSystem) throw new Error("Emotion system failed to load");
   const BehaviorSystem = window.SquishBehavior;
   if (!BehaviorSystem) throw new Error("Behavior system failed to load");
+  const SocialSystem = window.SquishSocial;
+  if (!SocialSystem) throw new Error("Social system failed to load");
   const invitation = document.querySelector("#invitation");
   const enterButton = document.querySelector("#enterButton");
   const soundButton = document.querySelector("#soundButton");
@@ -60,6 +62,10 @@
     energy: document.querySelector("#debugEnergy"),
     stress: document.querySelector("#debugStress"),
     behavior: document.querySelector("#debugBehavior"),
+    socialState: document.querySelector("#debugSocialState"),
+    socialPartner: document.querySelector("#debugSocialPartner"),
+    socialCooldown: document.querySelector("#debugSocialCooldown"),
+    lastSocial: document.querySelector("#debugLastSocial"),
     lastInteraction: document.querySelector("#debugLastInteraction"),
   };
 
@@ -1158,6 +1164,13 @@
     debugFields.personality.textContent = personalityLabels[snapshot.personality] || snapshot.personality;
     debugFields.emotion.textContent = emotionLabels[snapshot.emotion] || snapshot.emotion;
     if (debugFields.behavior) debugFields.behavior.textContent = baby.behavior?.state || "wander";
+    if (debugFields.socialState) debugFields.socialState.textContent = baby.social?.socialState || "idle";
+    if (debugFields.socialPartner) debugFields.socialPartner.textContent = baby.social?.socialPartnerId || "—";
+    if (debugFields.socialCooldown) {
+      const seconds = Math.max(0, ((baby.social?.socialCooldownUntil || 0) - now) / 1000);
+      debugFields.socialCooldown.textContent = `${seconds.toFixed(1)}s`;
+    }
+    if (debugFields.lastSocial) debugFields.lastSocial.textContent = baby.social?.lastSocialType || "none";
   }
 
   function showEmotionDebug(open) {
@@ -1195,6 +1208,45 @@
     if (result.woke) hint.textContent = "它慢慢睁开眼，被你轻轻唤醒了";
     selectBaby(baby);
     return result;
+  }
+
+  function babiesByIds(ids) {
+    return (ids || []).map((id) => state.babies.find((baby) => baby.emotionData?.id === id)).filter(Boolean);
+  }
+
+  function handleSocialEvents(events, now) {
+    events.forEach((event) => {
+      const participants = babiesByIds(event.ids);
+      if (event.kind === "start") {
+        participants.forEach((baby) => { baby.behavior.state = BehaviorSystem.STATES.SOCIAL; });
+        if (event.type === SocialSystem.TYPES.SHY_RETREAT) {
+          participants.forEach((baby) => EmotionSystem.setEmotion(
+            baby.emotionData,
+            baby.emotionData.id === event.leaderId ? EmotionSystem.EMOTIONS.SHY : EmotionSystem.EMOTIONS.SURPRISED,
+            now,
+            1300,
+            true,
+          ));
+        } else if (event.type === SocialSystem.TYPES.PLAYFUL_ORBIT) {
+          participants.forEach((baby) => EmotionSystem.setEmotion(
+            baby.emotionData,
+            baby.emotionData.id === event.leaderId ? EmotionSystem.EMOTIONS.HAPPY : EmotionSystem.EMOTIONS.SURPRISED,
+            now,
+            1500,
+            true,
+          ));
+        } else {
+          participants.forEach((baby) => EmotionSystem.setEmotion(baby.emotionData, EmotionSystem.EMOTIONS.HAPPY, now, 1500, true));
+        }
+      }
+      if (event.kind === "engage" && event.type === SocialSystem.TYPES.BUMP) {
+        const first = participants[0];
+        if (first) popTone(0.22, first.touchAngle || 0);
+      }
+      if (["end", "interrupt"].includes(event.kind)) {
+        participants.forEach((baby) => BehaviorSystem.beginRecover(baby.behavior, now, event.kind === "interrupt" ? 1000 : 720));
+      }
+    });
   }
 
   function enter() {
@@ -1539,6 +1591,7 @@
       now: performance.now(),
     });
     baby.behavior = BehaviorSystem.createProfile({ personality, size, random: Math.random });
+    baby.social = SocialSystem.createProfile();
     state.babies.push(baby);
     babyCount.textContent = String(state.babies.length).padStart(2, "0");
   }
@@ -1680,10 +1733,22 @@
     state.ripples.forEach((ripple) => { ripple.age += dt; });
     state.ripples = state.ripples.filter((ripple) => ripple.age < (ripple.duration || 3.4));
 
+    const directSocialIds = new Set([
+      state.activeBaby?.emotionData?.id,
+      state.camera.touchBaby?.emotionData?.id,
+    ].filter(Boolean));
+    const socialTick = SocialSystem.tick(state.babies, {
+      now,
+      dt,
+      directIds: directSocialIds,
+      random: Math.random,
+    });
+    handleSocialEvents(socialTick.events, now);
+
     const followSlots = new Set(
       state.worldPointer.isActive
         ? state.babies
-          .filter((baby) => baby.detached && baby.age >= baby.birthDuration)
+          .filter((baby) => baby.detached && baby.age >= baby.birthDuration && !baby.social?.socialPartnerId)
           .sort((a, b) => Math.hypot(a.x - state.worldPointer.position.x, a.y - state.worldPointer.position.y)
             - Math.hypot(b.x - state.worldPointer.position.x, b.y - state.worldPointer.position.y))
           .slice(0, 3)
@@ -1750,19 +1815,28 @@
             completeTutorialStep("SPAWN");
           }
         }
-        const decision = BehaviorSystem.decide(baby.behavior, {
-          personality: baby.personality,
-          emotion: baby.expression,
-          trust: baby.emotionData.stats.trust,
-          stress: baby.emotionData.stats.stress,
-          fleeProbability: EmotionSystem.shyFleeProbability(baby.emotionData),
-          pointer: state.worldPointer,
-          baby,
-          now,
-          directInteraction: babyInteracting,
-          allowFollow: followSlots.has(baby.emotionData.id),
-        });
-        if (decision.changed) {
+        const socialCommand = socialTick.commands.get(baby.emotionData.id);
+        let decision;
+        if (socialCommand) {
+          const previousState = baby.behavior.state;
+          baby.behavior.previousState = previousState;
+          baby.behavior.state = BehaviorSystem.STATES.SOCIAL;
+          decision = { state: BehaviorSystem.STATES.SOCIAL, changed: previousState !== BehaviorSystem.STATES.SOCIAL };
+        } else {
+          decision = BehaviorSystem.decide(baby.behavior, {
+            personality: baby.personality,
+            emotion: baby.expression,
+            trust: baby.emotionData.stats.trust,
+            stress: baby.emotionData.stats.stress,
+            fleeProbability: EmotionSystem.shyFleeProbability(baby.emotionData),
+            pointer: state.worldPointer,
+            baby,
+            now,
+            directInteraction: babyInteracting,
+            allowFollow: followSlots.has(baby.emotionData.id),
+          });
+        }
+        if (!socialCommand && decision.changed) {
           if (decision.state === BehaviorSystem.STATES.FLEE) {
             EmotionSystem.setEmotion(baby.emotionData, EmotionSystem.EMOTIONS.SHY, now, 1200, true);
           } else if (decision.state === BehaviorSystem.STATES.REACT && decision.fastApproach) {
@@ -1779,7 +1853,15 @@
           baby.turnTimer = 1.8 + Math.random() * 3.4;
         }
         const swim = (baby.personality === "playful" ? 5.2 : baby.personality === "shy" ? 3.3 : 2.7) * restMotion;
-        if (decision.state === BehaviorSystem.STATES.WANDER) {
+        if (decision.state === BehaviorSystem.STATES.SOCIAL && socialCommand) {
+          const separation = BehaviorSystem.separation(baby, state.babies);
+          baby.vx += (socialCommand.ax + separation.x * 0.36) * dt;
+          baby.vy += (socialCommand.ay + separation.y * 0.36) * dt;
+          const limited = BehaviorSystem.limit({ x: baby.vx, y: baby.vy }, 18 * restMotion);
+          baby.vx = limited.x;
+          baby.vy = limited.y;
+          baby.squashVelocity += (socialCommand.squash - baby.squash) * 4.6 * dt;
+        } else if (decision.state === BehaviorSystem.STATES.WANDER) {
           baby.vx = mix(baby.vx, Math.cos(baby.wanderAngle) * swim, 1 - Math.pow(0.46, dt));
           baby.vy = mix(baby.vy, Math.sin(baby.wanderAngle) * swim - 1.2, 1 - Math.pow(0.46, dt));
         } else if (![BehaviorSystem.STATES.REACT, BehaviorSystem.STATES.SLEEP].includes(decision.state)) {
@@ -1796,7 +1878,11 @@
           baby.vx *= Math.pow(damping, dt);
           baby.vy *= Math.pow(damping, dt);
         }
-        const orbitSpin = decision.state === BehaviorSystem.STATES.ORBIT ? baby.behavior.orbitDirection * 0.34 : 0;
+        const orbitSpin = decision.state === BehaviorSystem.STATES.ORBIT
+          ? baby.behavior.orbitDirection * 0.34
+          : socialCommand?.type === SocialSystem.TYPES.PLAYFUL_ORBIT && baby.emotionData.id === baby.social.leaderId
+            ? 0.28
+            : 0;
         baby.spin = mix(baby.spin, orbitSpin, 1 - Math.pow(0.1, dt));
       }
       if (!birthing && state.activeBaby !== baby) {
@@ -2747,6 +2833,9 @@
     if (event.key.toLowerCase() === "c" && !event.repeat) toggleCamera();
     if (event.key.toLowerCase() === "b" && !event.repeat) toggleBackgroundMode();
     if (event.key.toLowerCase() === "d" && !event.repeat) showEmotionDebug(!state.debugOpen);
+    if (event.key.toLowerCase() === "s" && !event.repeat && window.__SQUISH_SOCIAL_DEBUG__) {
+      window.__SQUISH_SOCIAL_DEBUG__.forceNearestPair(SocialSystem.TYPES.GREETING);
+    }
     if (event.key.toLowerCase() === "r") resetMemories();
     if (event.key === "?") beginTutorial(true);
     if (event.code === "Space" && !event.repeat && state.entered) {
@@ -2778,6 +2867,29 @@
     if (document.hidden && state.camera.enabled) stopCamera("");
   });
   window.addEventListener("beforeunload", () => stopCamera(""));
+
+  if (new URLSearchParams(window.location.search).has("debugSocial")) {
+    window.__SQUISH_SOCIAL_DEBUG__ = {
+      snapshot: () => state.babies.map((baby) => ({
+        id: baby.emotionData.id,
+        personality: baby.personality,
+        behavior: baby.behavior.state,
+        socialState: baby.social.socialState,
+        partnerId: baby.social.socialPartnerId,
+        lastSocialType: baby.social.lastSocialType,
+        cooldownUntil: baby.social.socialCooldownUntil,
+      })),
+      forceNearestPair: (type = SocialSystem.TYPES.GREETING) => {
+        const ready = state.babies.filter((baby) => baby.detached && !baby.social.socialPartnerId).slice(0, 2);
+        if (ready.length < 2) return false;
+        ready.forEach((baby) => { baby.social.socialCooldownUntil = 0; });
+        const event = SocialSystem.startPair(ready[0], ready[1], type, performance.now(), Math.random);
+        handleSocialEvents([event], performance.now());
+        selectBaby(ready[0]);
+        return true;
+      },
+    };
+  }
 
   babyCount.textContent = String(state.babies.length).padStart(2, "0");
   updateSoundButton();

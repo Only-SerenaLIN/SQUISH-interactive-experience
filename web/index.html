@@ -7,7 +7,7 @@
     <meta name="description" content="SQUISH — A Soft Jellyfish Interaction Experience. 触摸、挤压并拉出柔软的数字水母。" />
     <title>水母之森 — SQUISH</title>
     <link rel="stylesheet" href="https://unpkg.com/handsfree@8.5.1/build/lib/assets/handsfree.css" />
-    <link rel="stylesheet" href="styles.css?v=follow-flee-1" />
+    <link rel="stylesheet" href="styles.css?v=social-2" />
   </head>
   <body>
     <main class="artwork" aria-label="《水母之森》柔软水母交互体验">
@@ -43,12 +43,16 @@
           <div><dt>Personality</dt><dd id="debugPersonality">—</dd></div>
           <div><dt>Current Emotion</dt><dd id="debugEmotion">—</dd></div>
           <div><dt>Behavior</dt><dd id="debugBehavior">Wander</dd></div>
+          <div><dt>Social State</dt><dd id="debugSocialState">Idle</dd></div>
+          <div><dt>Social Partner</dt><dd id="debugSocialPartner">—</dd></div>
+          <div><dt>Social Cooldown</dt><dd id="debugSocialCooldown">0s</dd></div>
           <div><dt>Happiness</dt><dd id="debugHappiness">0</dd></div>
           <div><dt>Trust</dt><dd id="debugTrust">0</dd></div>
           <div><dt>Curiosity</dt><dd id="debugCuriosity">0</dd></div>
           <div><dt>Energy</dt><dd id="debugEnergy">0</dd></div>
           <div><dt>Stress</dt><dd id="debugStress">0</dd></div>
           <div class="emotion-debug__wide"><dt>Last Interaction</dt><dd id="debugLastInteraction">—</dd></div>
+          <div class="emotion-debug__wide"><dt>Last Social Type</dt><dd id="debugLastSocial">—</dd></div>
         </dl>
       </aside>
 
@@ -123,8 +127,9 @@
       <div class="veil" id="veil" aria-hidden="true"></div>
     </main>
     <script src="https://unpkg.com/handsfree@8.5.1/build/lib/handsfree.js"></script>
-    <script src="emotion-system.js?v=follow-flee-1"></script>
-    <script src="behavior-system.js?v=follow-flee-1"></script>
-    <script src="app.js?v=follow-flee-1"></script>
+    <script src="emotion-system.js?v=social-2"></script>
+    <script src="behavior-system.js?v=social-2"></script>
+    <script src="social-system.js?v=social-2"></script>
+    <script src="app.js?v=social-3"></script>
   </body>
 </html>

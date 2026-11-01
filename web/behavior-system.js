@@ -7,7 +7,7 @@
 
   const STATES = Object.freeze({
     WANDER: "wander", FOLLOW: "follow", FLEE: "flee", ORBIT: "orbit",
-    REACT: "react", RECOVER: "recover", SLEEP: "sleep",
+    REACT: "react", RECOVER: "recover", SLEEP: "sleep", SOCIAL: "social",
   });
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const length = (vector) => Math.hypot(vector.x, vector.y);
