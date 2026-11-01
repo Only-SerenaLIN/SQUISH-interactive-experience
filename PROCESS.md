@@ -111,6 +111,10 @@ Mouse and camera input were later converted into the same world-coordinate point
 - **Evidence:** [Original user-trial photograph (HEIC, 2.9 MB)](docs/user-trial-01.HEIC)
 - **Privacy:** The student explicitly chose to include the original photograph in the public repository. No camera frame is captured or saved by the SQUISH program itself.
 
+![Four participants trying SQUISH together and experimenting with hand gestures](docs/user-trial-01-preview.jpg)
+
+The JPG above is a compressed preview for browsers that cannot display HEIC. The original file remains available through the evidence link.
+
 ### Observation and feedback
 
 The participant wanted the jellyfish to appear over the live camera image and suggested that multiple people should be able to interact with it. The first request revealed a discoverability problem: a camera-background mode already existed, but the short labels **Deep Sea** and **Live View** did not clearly communicate that they were two background choices.

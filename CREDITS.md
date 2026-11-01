@@ -59,7 +59,7 @@ These references were used for observation and discussion. Their photographs and
 
 ## User-trial evidence
 
-The original user-trial photograph is stored at [`docs/user-trial-01.HEIC`](docs/user-trial-01.HEIC). It was supplied by LIN Ziqing and added to the public repository at the author's explicit request. The author is responsible for confirming that the participant shown has agreed to public sharing.
+The original user-trial photograph is stored at [`docs/user-trial-01.HEIC`](docs/user-trial-01.HEIC), with a browser-friendly preview at [`docs/user-trial-01-preview.jpg`](docs/user-trial-01-preview.jpg). The image was supplied by LIN Ziqing and added to the public repository at the author's explicit request. The author is responsible for confirming that the participants shown have agreed to public sharing.
 
 The SQUISH application itself does not record, upload, or save live camera frames.
 
