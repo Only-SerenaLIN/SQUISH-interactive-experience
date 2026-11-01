@@ -3,6 +3,8 @@
 
   const canvas = document.querySelector("#world");
   const ctx = canvas.getContext("2d");
+  const EmotionSystem = window.SquishEmotion;
+  if (!EmotionSystem) throw new Error("Emotion system failed to load");
   const invitation = document.querySelector("#invitation");
   const enterButton = document.querySelector("#enterButton");
   const soundButton = document.querySelector("#soundButton");
@@ -41,6 +43,22 @@
   const veil = document.querySelector("#veil");
   const hint = document.querySelector("#hint");
   const babyCount = document.querySelector("#babyCount");
+  const debugButton = document.querySelector("#debugButton");
+  const emotionDebug = document.querySelector("#emotionDebug");
+  const closeDebug = document.querySelector("#closeDebug");
+  const debugEmpty = document.querySelector("#debugEmpty");
+  const debugData = document.querySelector("#debugData");
+  const debugFields = {
+    id: document.querySelector("#debugId"),
+    personality: document.querySelector("#debugPersonality"),
+    emotion: document.querySelector("#debugEmotion"),
+    happiness: document.querySelector("#debugHappiness"),
+    trust: document.querySelector("#debugTrust"),
+    curiosity: document.querySelector("#debugCuriosity"),
+    energy: document.querySelector("#debugEnergy"),
+    stress: document.querySelector("#debugStress"),
+    lastInteraction: document.querySelector("#debugLastInteraction"),
+  };
 
   const TAU = Math.PI * 2;
   const NODES = 72;
@@ -56,6 +74,7 @@
     dpr: 1,
     center: { x: 0, y: 0, vx: 0, vy: 0 },
     pointer: { x: 0, y: 0, down: false, id: null, startedAt: 0 },
+    hover: { x: 0, y: 0, time: performance.now(), speed: 0, baby: null, initialized: false },
     pressure: 0,
     pressureVelocity: 0,
     touchAngle: -Math.PI / 2,
@@ -71,6 +90,9 @@
     motherMoodUntil: 0,
     lastActivityAt: performance.now(),
     activeBaby: null,
+    selectedBaby: null,
+    debugOpen: false,
+    debugLastUpdate: 0,
     tentaclePlay: { amount: 0, x: 0, y: 0, direction: 0 },
     entered: false,
     soundOn: true,
@@ -679,16 +701,25 @@
         touchedBaby.touchAngle = Math.atan2(fingerY - touchedBaby.y, fingerX - touchedBaby.x);
         touchedBaby.vx += deltaX * 0.24 + (distanceX / distance) * (entering ? 3.6 : 0.34);
         touchedBaby.vy += deltaY * 0.24 + (distanceY / distance) * (entering ? 3.6 : 0.34);
-        if (entering && touchedBaby.personality === "shy") {
-          touchedBaby.vx += (distanceX / distance) * 8;
-          touchedBaby.vy += (distanceY / distance) * 8;
-          touchedBaby.expression = "shy";
-        } else if (entering && touchedBaby.personality === "lively") {
+        if (entering) {
+          touchedBaby.holdStartedAt = now;
+          const interactionType = speed > 11 ? "sudden" : "touch";
+          applyBabyInteraction(touchedBaby, interactionType, {
+            now,
+            intensity: clamp(speed / 22, 0.18, 1),
+            sourceX: fingerX,
+            sourceY: fingerY,
+          });
+        } else if (now - touchedBaby.holdStartedAt > 820) {
+          applyBabyInteraction(touchedBaby, "hold", {
+            now,
+            intensity: clamp(touchedBaby.cameraTouch * 0.55, 0.35, 0.82),
+            durationMs: now - touchedBaby.holdStartedAt,
+          });
+        }
+        if (entering && touchedBaby.personality === "playful") {
           touchedBaby.vx += -distanceY / distance * 7;
           touchedBaby.vy += distanceX / distance * 7;
-          touchedBaby.expression = "happy";
-        } else if (entering) {
-          touchedBaby.expression = "gentle";
         }
         touchedBaby.releaseGlow = Math.max(touchedBaby.releaseGlow, entering ? 0.72 : 0.28);
         if (entering) {
@@ -1081,6 +1112,71 @@
     state.motherMoodUntil = performance.now() + 2200;
   }
 
+  const personalityLabels = { calm: "Calm · 温和", shy: "Shy · 害羞", playful: "Playful · 活泼" };
+  const emotionLabels = {
+    neutral: "Neutral · 普通",
+    happy: "Happy · 开心",
+    shy: "Shy · 害羞",
+    surprised: "Surprised · 惊讶",
+    dizzy: "Dizzy · 晕乎乎",
+    sleepy: "Sleepy · 困倦",
+    sleeping: "Sleeping · 睡眠",
+  };
+
+  function updateDebugPanel(force = false) {
+    if (!state.debugOpen) return;
+    const now = performance.now();
+    if (!force && now - state.debugLastUpdate < 120) return;
+    state.debugLastUpdate = now;
+    const baby = state.selectedBaby && state.babies.includes(state.selectedBaby) ? state.selectedBaby : null;
+    debugEmpty.hidden = Boolean(baby);
+    debugData.hidden = !baby;
+    if (!baby?.emotionData) return;
+    const snapshot = EmotionSystem.snapshot(baby.emotionData);
+    Object.entries(snapshot).forEach(([key, value]) => {
+      if (debugFields[key]) debugFields[key].textContent = String(value);
+    });
+    debugFields.personality.textContent = personalityLabels[snapshot.personality] || snapshot.personality;
+    debugFields.emotion.textContent = emotionLabels[snapshot.emotion] || snapshot.emotion;
+  }
+
+  function showEmotionDebug(open) {
+    state.debugOpen = open;
+    emotionDebug.classList.toggle("is-open", open);
+    emotionDebug.setAttribute("aria-hidden", String(!open));
+    debugButton.setAttribute("aria-pressed", String(open));
+    updateDebugPanel(true);
+  }
+
+  function selectBaby(baby) {
+    state.selectedBaby = baby;
+    updateDebugPanel(true);
+  }
+
+  function applyBabyInteraction(baby, type, options = {}) {
+    if (!baby?.emotionData) return { applied: false, woke: false };
+    const now = options.now ?? performance.now();
+    const result = EmotionSystem.interact(baby.emotionData, type, { ...options, now });
+    baby.expression = baby.emotionData.emotion.current;
+    if (result.applied) baby.releaseGlow = Math.max(baby.releaseGlow, type === "sudden" ? 0.88 : 0.48);
+    if (type === "sudden" && result.applied) {
+      const fleeChance = EmotionSystem.shyFleeProbability(baby.emotionData);
+      if (Math.random() < fleeChance) {
+        const sourceX = options.sourceX ?? state.pointer.x;
+        const sourceY = options.sourceY ?? state.pointer.y;
+        const dx = baby.x - sourceX;
+        const dy = baby.y - sourceY;
+        const distance = Math.max(1, Math.hypot(dx, dy));
+        const boost = baby.personality === "shy" ? 13 : 7;
+        baby.vx += (dx / distance) * boost;
+        baby.vy += (dy / distance) * boost;
+      }
+    }
+    if (result.woke) hint.textContent = "它慢慢睁开眼，被你轻轻唤醒了";
+    selectBaby(baby);
+    return result;
+  }
+
   function enter() {
     state.entered = true;
     invitation.classList.add("is-gone");
@@ -1176,6 +1272,13 @@
     if (baby && !tutorialAllows("baby")) return;
     if (baby) {
       state.activeBaby = baby;
+      selectBaby(baby);
+      baby.holdStartedAt = performance.now();
+      baby.maxSquash = 0;
+      const wasResting = ["sleepy", "sleeping"].includes(baby.emotionData.emotion.current);
+      baby.pressInteractionApplied = wasResting;
+      if (wasResting) applyBabyInteraction(baby, "touch", { now: baby.holdStartedAt, intensity: 0.18 });
+      else EmotionSystem.setEmotion(baby.emotionData, EmotionSystem.EMOTIONS.HAPPY, baby.holdStartedAt, 700, true);
       baby.touchAngle = Math.atan2(point.y - baby.y, point.x - baby.x);
       state.pointer = { x: point.x, y: point.y, down: true, id: event.pointerId, startedAt: performance.now() };
       canvas.setPointerCapture(event.pointerId);
@@ -1220,6 +1323,20 @@
 
   function pointerMove(event) {
     const point = pointerPosition(event);
+    const now = performance.now();
+    const hoverDelta = Math.max(8, now - state.hover.time);
+    const hoverSpeed = Math.hypot(point.x - state.hover.x, point.y - state.hover.y) / hoverDelta * 16.67;
+    const approachedBaby = !state.pointer.down ? findTouchableBaby(point.x, point.y, 1.4) : null;
+    if (!state.tutorial.active && state.hover.initialized && approachedBaby && state.hover.baby !== approachedBaby && hoverSpeed > 12) {
+      applyBabyInteraction(approachedBaby, "sudden", {
+        now,
+        intensity: clamp(hoverSpeed / 30, 0.35, 1),
+        sourceX: point.x,
+        sourceY: point.y,
+      });
+      hint.textContent = approachedBaby.personality === "shy" ? "它被突然靠近吓了一跳" : "突然的动作让它睁大了眼睛";
+    }
+    state.hover = { x: point.x, y: point.y, time: now, speed: hoverSpeed, baby: approachedBaby, initialized: true };
     if (state.tutorial.active && state.tutorial.mode === "mouse" && state.tutorial.step === "APPROACH") {
       const distance = Math.hypot(point.x - state.center.x, point.y - state.center.y);
       state.tutorial.progress = clamp(1 - (distance - baseRadius() * 1.15) / (baseRadius() * 1.5), 0, 1);
@@ -1259,16 +1376,24 @@
     if (!state.pointer.down) return;
     if (state.activeBaby) {
       const baby = state.activeBaby;
+      const now = performance.now();
+      const heldDuration = now - baby.holdStartedAt;
+      const interactionType = heldDuration < 340 ? "touch" : "squeeze";
+      if (!(interactionType === "touch" && baby.pressInteractionApplied)) {
+        applyBabyInteraction(baby, interactionType, {
+          now,
+          intensity: clamp(Math.max(baby.maxSquash, baby.squash), 0.12, 1),
+          durationMs: heldDuration,
+        });
+      }
       const awayAngle = baby.touchAngle + Math.PI;
       const impulse = 15 + baby.squash * 17;
-      const personalityBoost = baby.personality === "shy" ? 1.45 : baby.personality === "lively" ? 1.15 : 0.72;
+      const personalityBoost = baby.personality === "shy" ? 1.28 : baby.personality === "playful" ? 1.15 : 0.72;
       baby.vx += Math.cos(awayAngle) * impulse * personalityBoost;
       baby.vy += Math.sin(awayAngle) * impulse * personalityBoost - 6;
-      if (baby.personality === "lively") baby.spin = 0.9;
+      if (baby.personality === "playful") baby.spin = 0.9;
       baby.squashVelocity -= 0.16 + baby.squash * 0.16;
       baby.releaseGlow = 1;
-      baby.expression = baby.personality === "shy" ? "shy" : baby.personality === "lively" ? "happy" : "gentle";
-      baby.expressionUntil = performance.now() + 1800;
       state.ripples.push({
         x: baby.x,
         y: baby.y,
@@ -1342,9 +1467,9 @@
     if (directionY < -0.001) edgeLimits.push((margin - surface.y) / directionY);
     const edgeLimit = edgeLimits.length ? Math.max(size * 0.82, Math.min(...edgeLimits)) : radius * 0.48;
     const desiredTravel = clamp(state.birthPull * 0.55, size * 1.2, radius * 0.55);
-    const personalities = ["shy", "lively", "gentle"];
+    const personalities = ["shy", "playful", "calm"];
     const personality = personalities[state.count % personalities.length];
-    state.babies.push({
+    const baby = {
       x: surface.x,
       y: surface.y,
       vx: (Math.random() - 0.5) * 8,
@@ -1365,12 +1490,19 @@
       releaseGlow: 0,
       cameraTouch: 0,
       personality,
-      expression: personality === "shy" ? "shy" : personality === "lively" ? "happy" : "gentle",
-      expressionUntil: performance.now() + 2200,
+      expression: "neutral",
       turnTimer: 1.4 + Math.random() * 2.8,
       wanderAngle: -Math.PI / 2 + (Math.random() - 0.5) * 1.4,
       spin: 0,
+      holdStartedAt: 0,
+      maxSquash: 0,
+    };
+    baby.emotionData = EmotionSystem.createProfile({
+      id: `J-${String(Math.max(1, state.count)).padStart(2, "0")}`,
+      personality,
+      now: performance.now(),
     });
+    state.babies.push(baby);
     babyCount.textContent = String(state.babies.length).padStart(2, "0");
   }
 
@@ -1403,6 +1535,8 @@
     state.ripples.length = 0;
     state.babies.length = 0;
     state.bubbles.length = 0;
+    state.selectedBaby = null;
+    updateDebugPanel(true);
     babyCount.textContent = "00";
     hint.textContent = "水流安静下来，母水母重新等待触碰";
     showAbout(false);
@@ -1447,7 +1581,8 @@
   function update(dt) {
     state.elapsed += dt;
     updateTutorial();
-    document.body.classList.toggle("ui-idle", state.entered && performance.now() - state.lastActivityAt > 4800 && !state.pointer.down);
+    const now = performance.now();
+    document.body.classList.toggle("ui-idle", state.entered && now - state.lastActivityAt > 4800 && !state.pointer.down);
     state.tentaclePlay.amount *= Math.pow(0.018, dt);
     state.tentaclePlay.direction *= Math.pow(0.08, dt);
     const radius = baseRadius();
@@ -1510,7 +1645,11 @@
 
     state.babies.forEach((baby) => {
       baby.age += dt;
-      baby.phase += dt * (0.42 + baby.strength * 0.16);
+      const babyInteracting = (state.pointer.down && state.activeBaby === baby) || state.camera.touchBaby === baby;
+      EmotionSystem.update(baby.emotionData, dt, now, { interacting: babyInteracting });
+      baby.expression = baby.emotionData.emotion.current;
+      const restMotion = baby.expression === "sleeping" ? 0.12 : baby.expression === "sleepy" ? 0.48 : 1;
+      baby.phase += dt * (0.42 + baby.strength * 0.16) * restMotion;
       baby.releaseGlow *= Math.pow(0.055, dt);
       baby.cameraTouch = (baby.cameraTouch || 0) * Math.pow(0.008, dt);
       const heldTarget = state.pointer.down && state.activeBaby === baby ? clamp(0.48 + holdTime * 0.34, 0, 0.88) : 0;
@@ -1519,6 +1658,14 @@
       baby.squashVelocity *= Math.pow(0.006, dt);
       baby.squash += baby.squashVelocity * dt * 6.4;
       baby.squash = clamp(baby.squash, -0.12, 0.94);
+      baby.maxSquash = Math.max(baby.maxSquash || 0, baby.squash);
+      if (state.pointer.down && state.activeBaby === baby && now - baby.holdStartedAt > 760) {
+        applyBabyInteraction(baby, "hold", {
+          now,
+          intensity: clamp(baby.squash, 0.3, 1),
+          durationMs: now - baby.holdStartedAt,
+        });
+      }
       const birthing = baby.age < baby.birthDuration;
       if (birthing) {
         const t = clamp(baby.age / baby.birthDuration, 0, 1);
@@ -1559,13 +1706,11 @@
         if (baby.turnTimer <= 0) {
           baby.wanderAngle += (Math.random() - 0.5) * 1.25;
           baby.turnTimer = 1.8 + Math.random() * 3.4;
-          baby.expression = ["shy", "happy", "gentle", "surprised"][Math.floor(Math.random() * 4)];
-          baby.expressionUntil = performance.now() + 1200;
         }
-        const swim = baby.personality === "lively" ? 5.2 : baby.personality === "shy" ? 3.3 : 2.7;
+        const swim = (baby.personality === "playful" ? 5.2 : baby.personality === "shy" ? 3.3 : 2.7) * restMotion;
         baby.vx = mix(baby.vx, Math.cos(baby.wanderAngle) * swim, 1 - Math.pow(0.46, dt));
         baby.vy = mix(baby.vy, Math.sin(baby.wanderAngle) * swim - 1.2, 1 - Math.pow(0.46, dt));
-        baby.spin = mix(baby.spin, baby.personality === "lively" && baby.releaseGlow > 0.1 ? 0.3 : 0, 1 - Math.pow(0.1, dt));
+        baby.spin = mix(baby.spin, baby.personality === "playful" && baby.releaseGlow > 0.1 ? 0.3 : 0, 1 - Math.pow(0.1, dt));
       }
       if (!birthing && state.activeBaby !== baby) {
         baby.x += (baby.vx + Math.sin(baby.phase * 0.8) * 2.2) * dt;
@@ -1626,12 +1771,13 @@
         baby.vx += (baby.x - bubble.x) * 0.32;
         baby.vy -= 12;
         baby.releaseGlow = 1;
-        baby.expression = baby.personality === "shy" ? "shy" : "happy";
+        applyBabyInteraction(baby, "bubble", { now, intensity: 0.35 });
         state.ripples.push({ x: bubble.x, y: bubble.y, age: 0, strength: 0.12, hue: baby.hue, duration: 0.8, pop: true, radius: bubble.size });
         if (state.tutorial.active && state.tutorial.step === "BUBBLE_INTERACTION") completeTutorialStep("BUBBLE_INTERACTION");
       });
     });
     state.bubbles = state.bubbles.filter((bubble) => bubble.age < 9 && bubble.y > -bubble.size * 3);
+    updateDebugPanel();
   }
 
   function blobPoint(node, radius, offset = 0) {
@@ -1797,8 +1943,8 @@
 
     ctx.restore();
 
-    const faceMap = { happy: 0, lively: 1, gentle: 2, surprised: 3, shy: 4 };
-    const expression = faceExpression && faceMap[faceExpression] !== undefined ? faceMap[faceExpression] : hue % 5;
+    const faceMap = { happy: 0, playful: 1, gentle: 2, surprised: 3, shy: 4, dizzy: 5, sleepy: 6, sleeping: 7, neutral: 8 };
+    const expression = faceExpression && faceMap[faceExpression] !== undefined ? faceMap[faceExpression] : 8;
     const faceY = -size * 0.045;
     const eyeX = size * 0.21;
     ctx.save();
@@ -1816,6 +1962,16 @@
       ctx.beginPath();
       ctx.moveTo(side * eyeX - size * 0.065, faceY);
       ctx.quadraticCurveTo(side * eyeX, faceY + size * 0.055, side * eyeX + size * 0.065, faceY);
+      ctx.stroke();
+    };
+    const crossedEye = (side) => {
+      const x = side * eyeX;
+      const r = size * 0.055;
+      ctx.beginPath();
+      ctx.moveTo(x - r, faceY - r);
+      ctx.lineTo(x + r, faceY + r);
+      ctx.moveTo(x + r, faceY - r);
+      ctx.lineTo(x - r, faceY + r);
       ctx.stroke();
     };
     if (expression === 0) {
@@ -1843,13 +1999,41 @@
       ctx.beginPath();
       ctx.arc(0, faceY + size * 0.13, size * 0.055, 0, TAU);
       ctx.stroke();
-    } else {
+    } else if (expression === 4) {
       closedEye(-1);
       closedEye(1);
       ctx.beginPath();
       ctx.moveTo(-size * 0.12, faceY + size * 0.09);
       ctx.quadraticCurveTo(-size * 0.055, faceY + size * 0.17, 0, faceY + size * 0.105);
       ctx.quadraticCurveTo(size * 0.055, faceY + size * 0.17, size * 0.12, faceY + size * 0.09);
+      ctx.stroke();
+    } else if (expression === 5) {
+      crossedEye(-1);
+      crossedEye(1);
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.12, faceY + size * 0.14);
+      ctx.quadraticCurveTo(-size * 0.05, faceY + size * 0.08, 0, faceY + size * 0.14);
+      ctx.quadraticCurveTo(size * 0.05, faceY + size * 0.2, size * 0.12, faceY + size * 0.14);
+      ctx.stroke();
+    } else if (expression === 6) {
+      closedEye(-1);
+      dotEye(1);
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.06, faceY + size * 0.14);
+      ctx.lineTo(size * 0.06, faceY + size * 0.14);
+      ctx.stroke();
+    } else if (expression === 7) {
+      closedEye(-1);
+      closedEye(1);
+      ctx.beginPath();
+      ctx.arc(0, faceY + size * 0.14, size * 0.045, 0, TAU);
+      ctx.stroke();
+    } else {
+      dotEye(-1);
+      dotEye(1);
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.075, faceY + size * 0.13);
+      ctx.quadraticCurveTo(0, faceY + size * 0.16, size * 0.075, faceY + size * 0.13);
       ctx.stroke();
     }
     ctx.restore();
@@ -2405,6 +2589,8 @@
   });
   cameraButton.addEventListener("click", toggleCamera);
   backgroundButton.addEventListener("click", toggleBackgroundMode);
+  debugButton.addEventListener("click", () => showEmotionDebug(!state.debugOpen));
+  closeDebug.addEventListener("click", () => showEmotionDebug(false));
   tutorialButton.addEventListener("click", () => beginTutorial(true));
   chooseMouseMode.addEventListener("click", () => {
     state.tutorial.mode = "mouse";
@@ -2470,6 +2656,7 @@
     }
     if (event.key.toLowerCase() === "c" && !event.repeat) toggleCamera();
     if (event.key.toLowerCase() === "b" && !event.repeat) toggleBackgroundMode();
+    if (event.key.toLowerCase() === "d" && !event.repeat) showEmotionDebug(!state.debugOpen);
     if (event.key.toLowerCase() === "r") resetMemories();
     if (event.key === "?") beginTutorial(true);
     if (event.code === "Space" && !event.repeat && state.entered) {

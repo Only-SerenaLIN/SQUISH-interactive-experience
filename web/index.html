@@ -7,7 +7,7 @@
     <meta name="description" content="SQUISH — A Soft Jellyfish Interaction Experience. 触摸、挤压并拉出柔软的数字水母。" />
     <title>水母之森 — SQUISH</title>
     <link rel="stylesheet" href="https://unpkg.com/handsfree@8.5.1/build/lib/assets/handsfree.css" />
-    <link rel="stylesheet" href="styles.css?v=fist-bubbles-3" />
+    <link rel="stylesheet" href="styles.css?v=emotion-memory-1" />
   </head>
   <body>
     <main class="artwork" aria-label="《水母之森》柔软水母交互体验">
@@ -25,6 +25,7 @@
           <button id="soundButton" class="text-button" type="button" aria-pressed="true"><span class="status-dot" aria-hidden="true"></span><span class="button-copy">声音</span></button>
           <button id="backgroundButton" class="text-button background-button" type="button" aria-pressed="false" aria-label="切换为摄像头背景"><span class="status-dot" aria-hidden="true"></span><span class="background-copy">背景·深海</span></button>
           <button id="tutorialButton" class="text-button" type="button" aria-expanded="false">操作说明</button>
+          <button id="debugButton" class="text-button text-button--quiet" type="button" aria-pressed="false">情绪调试</button>
           <button id="aboutButton" class="text-button text-button--quiet" type="button" aria-expanded="false" aria-controls="aboutPanel">作品说明</button>
         </nav>
       </header>
@@ -33,6 +34,22 @@
         <video class="camera-preview__video" id="cameraPreview" autoplay muted playsinline aria-label="实时摄像头镜像预览"></video>
         <figcaption class="camera-preview__label"><span class="camera-preview__live" aria-hidden="true"></span>手势识别 · LIVE</figcaption>
       </figure>
+
+      <aside class="emotion-debug immersive-ui" id="emotionDebug" aria-hidden="true" aria-label="小水母情绪调试面板">
+        <div class="emotion-debug__head"><span>EMOTION MEMORY</span><button id="closeDebug" type="button" aria-label="关闭情绪调试">关闭</button></div>
+        <p class="emotion-debug__empty" id="debugEmpty">点击一只小水母查看独立状态</p>
+        <dl class="emotion-debug__data" id="debugData" hidden>
+          <div><dt>Jellyfish ID</dt><dd id="debugId">—</dd></div>
+          <div><dt>Personality</dt><dd id="debugPersonality">—</dd></div>
+          <div><dt>Current Emotion</dt><dd id="debugEmotion">—</dd></div>
+          <div><dt>Happiness</dt><dd id="debugHappiness">0</dd></div>
+          <div><dt>Trust</dt><dd id="debugTrust">0</dd></div>
+          <div><dt>Curiosity</dt><dd id="debugCuriosity">0</dd></div>
+          <div><dt>Energy</dt><dd id="debugEnergy">0</dd></div>
+          <div><dt>Stress</dt><dd id="debugStress">0</dd></div>
+          <div class="emotion-debug__wide"><dt>Last Interaction</dt><dd id="debugLastInteraction">—</dd></div>
+        </dl>
+      </aside>
 
       <section class="invitation" id="invitation" aria-labelledby="invitationTitle">
         <div class="invitation__copy">
@@ -98,13 +115,14 @@
           <p class="eyebrow">ABOUT THE WORK</p><h2>柔软，也是一种回应。</h2>
           <p>《水母之森》是一件浏览器交互作品。母水母的轮廓由 72 个弹簧节点组成，因此触碰会留在局部，而不是缩放整只角色。</p>
           <p>普通触摸只产生表情与回弹；从伞盖任意边缘向外拉动，才会诞生一只有自己性格的小水母。</p>
-          <div class="about__divider"></div><p class="about__small">鼠标拖动 · 摄像头双指捏合 · M 静音 · C 手势 · B 背景 · R 重置 · ? 教程</p>
+          <div class="about__divider"></div><p class="about__small">鼠标拖动 · 摄像头双指捏合 · M 静音 · C 手势 · B 背景 · D 情绪调试 · R 重置 · ? 教程</p>
           <p class="camera-privacy">摄像头画面只在本机浏览器内分析，不录制、不保存、不会上传。</p>
         </div>
       </aside>
       <div class="veil" id="veil" aria-hidden="true"></div>
     </main>
     <script src="https://unpkg.com/handsfree@8.5.1/build/lib/handsfree.js"></script>
-    <script src="app.js?v=single-fist-bubble-4"></script>
+    <script src="emotion-system.js?v=emotion-memory-1"></script>
+    <script src="app.js?v=emotion-memory-1"></script>
   </body>
 </html>

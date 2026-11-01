@@ -267,6 +267,35 @@ body.camera-background .camera-preview {
   animation: camera-breathe 1.7s ease-in-out infinite;
 }
 
+.emotion-debug {
+  position: fixed;
+  z-index: 24;
+  right: clamp(20px, 4vw, 58px);
+  bottom: 82px;
+  width: min(330px, calc(100vw - 40px));
+  padding: 18px;
+  border: 1px solid rgba(211, 191, 232, 0.22);
+  border-radius: 20px;
+  background: rgba(7, 28, 43, 0.78);
+  box-shadow: 0 22px 70px rgba(0, 5, 15, 0.32), inset 0 0 24px rgba(205, 149, 213, 0.035);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px) scale(0.97);
+  transition: opacity 260ms ease, transform 320ms var(--ease), visibility 260ms;
+  backdrop-filter: blur(18px) saturate(88%);
+  -webkit-backdrop-filter: blur(18px) saturate(88%);
+}
+.emotion-debug.is-open { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+.emotion-debug__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; color: rgba(239, 216, 239, 0.7); font: 8px ui-monospace, monospace; letter-spacing: 0.14em; }
+.emotion-debug__head button { padding: 3px 0; background: transparent; color: inherit; font-size: 9px; cursor: pointer; opacity: 0.7; }
+.emotion-debug__empty { margin: 8px 0 2px; color: rgba(221, 244, 243, 0.44); font-size: 10px; letter-spacing: 0.05em; }
+.emotion-debug__data { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 16px; margin: 0; }
+.emotion-debug__data[hidden] { display: none; }
+.emotion-debug__data div { min-width: 0; }
+.emotion-debug__data dt { margin-bottom: 3px; color: rgba(181, 222, 224, 0.42); font: 7px ui-monospace, monospace; letter-spacing: 0.08em; text-transform: uppercase; }
+.emotion-debug__data dd { margin: 0; overflow: hidden; color: rgba(245, 229, 242, 0.88); font: 11px ui-monospace, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.emotion-debug__wide { grid-column: 1 / -1; padding-top: 5px; border-top: 1px solid rgba(205, 229, 230, 0.08); }
+
 @keyframes camera-breathe {
   50% {
     box-shadow: 0 0 0 5px rgba(183, 239, 233, 0.08);
@@ -727,6 +756,8 @@ body.ui-idle .bottomline { transform: translateY(7px); }
     right: 13%;
     bottom: 10%;
   }
+
+  .emotion-debug { right: 14px; bottom: 76px; width: calc(100vw - 28px); }
 
   .bottomline {
     font-size: 9px;
