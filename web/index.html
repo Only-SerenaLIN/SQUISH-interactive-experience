@@ -1,44 +1,48 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#061927" />
-    <meta name="description" content="SQUISH — A Soft Jellyfish Interaction Experience. 触摸、挤压并拉出柔软的数字水母。" />
-    <title>水母之森 — SQUISH</title>
+    <meta name="description" content="SQUISH — a soft jellyfish interaction experience. Touch, stretch, and nurture a tiny glowing family." />
+    <title>SQUISH — Soft Jellyfish Experience</title>
     <link rel="stylesheet" href="https://unpkg.com/handsfree@8.5.1/build/lib/assets/handsfree.css" />
-    <link rel="stylesheet" href="styles.css?v=collection-2" />
+    <link rel="stylesheet" href="styles.css?v=english-ui-2" />
   </head>
   <body>
-    <main class="artwork" aria-label="《水母之森》柔软水母交互体验">
+    <main class="artwork" aria-label="SQUISH soft jellyfish interaction experience">
       <video class="camera-backdrop" id="cameraBackdrop" autoplay muted playsinline aria-hidden="true"></video>
       <div class="camera-backdrop__shade" aria-hidden="true"></div>
-      <canvas id="world" aria-label="可按压、拉伸并繁殖小水母的交互画布" tabindex="0"></canvas>
+      <canvas id="world" aria-label="Interactive canvas with soft, stretchable jellyfish" tabindex="0"></canvas>
 
       <header class="topbar immersive-ui">
-        <a class="identity" href="#" aria-label="水母之森">
-          <span class="identity__cn">水母之森</span>
-          <span class="identity__en">SQUISH · SOFT JELLYFISH EXPERIENCE</span>
+        <a class="identity" href="#" aria-label="SQUISH home">
+          <span class="identity__cn">SQUISH</span>
+          <span class="identity__en">SOFT JELLYFISH EXPERIENCE</span>
         </a>
-        <nav class="controls" aria-label="体验控制">
-          <button id="cameraButton" class="text-button camera-button" type="button" aria-pressed="false"><span class="status-dot" aria-hidden="true"></span><span class="camera-copy">模式·鼠标</span></button>
-          <button id="soundButton" class="text-button" type="button" aria-pressed="true"><span class="status-dot" aria-hidden="true"></span><span class="button-copy">声音</span></button>
-          <button id="backgroundButton" class="text-button background-button" type="button" aria-pressed="false" aria-label="切换为摄像头背景"><span class="status-dot" aria-hidden="true"></span><span class="background-copy">背景·深海</span></button>
-          <button id="collectionButton" class="text-button" type="button" aria-expanded="false" aria-controls="collectionPanel">水母图鉴</button>
-          <button id="tutorialButton" class="text-button" type="button" aria-expanded="false">操作说明</button>
-          <button id="debugButton" class="text-button text-button--quiet" type="button" aria-pressed="false">情绪调试</button>
-          <button id="aboutButton" class="text-button text-button--quiet" type="button" aria-expanded="false" aria-controls="aboutPanel">作品说明</button>
+        <nav class="controls" aria-label="Experience controls">
+          <div class="control-group control-group--modes">
+            <button id="cameraButton" class="text-button camera-button" type="button" aria-pressed="false"><span class="status-dot" aria-hidden="true"></span><span class="camera-copy">Mouse</span></button>
+            <button id="soundButton" class="text-button" type="button" aria-pressed="true"><span class="status-dot" aria-hidden="true"></span><span class="button-copy">Sound</span></button>
+            <button id="backgroundButton" class="text-button background-button" type="button" aria-pressed="false" aria-label="Use camera as background"><span class="status-dot" aria-hidden="true"></span><span class="background-copy">Deep Sea</span></button>
+          </div>
+          <div class="control-group control-group--pages">
+            <button id="collectionButton" class="text-button text-button--accent" type="button" aria-expanded="false" aria-controls="collectionPanel">Collection</button>
+            <button id="tutorialButton" class="text-button" type="button" aria-expanded="false">Guide</button>
+            <button id="debugButton" class="text-button text-button--quiet" type="button" aria-pressed="false">Debug</button>
+            <button id="aboutButton" class="text-button text-button--quiet" type="button" aria-expanded="false" aria-controls="aboutPanel">About</button>
+          </div>
         </nav>
       </header>
 
       <figure class="camera-preview immersive-ui" id="cameraPreviewShell" aria-hidden="true">
-        <video class="camera-preview__video" id="cameraPreview" autoplay muted playsinline aria-label="实时摄像头镜像预览"></video>
-        <figcaption class="camera-preview__label"><span class="camera-preview__live" aria-hidden="true"></span>手势识别 · LIVE</figcaption>
+        <video class="camera-preview__video" id="cameraPreview" autoplay muted playsinline aria-label="Live mirrored camera preview"></video>
+        <figcaption class="camera-preview__label"><span class="camera-preview__live" aria-hidden="true"></span>HAND TRACKING · LIVE</figcaption>
       </figure>
 
-      <aside class="emotion-debug immersive-ui" id="emotionDebug" aria-hidden="true" aria-label="小水母情绪调试面板">
-        <div class="emotion-debug__head"><span>EMOTION MEMORY</span><button id="closeDebug" type="button" aria-label="关闭情绪调试">关闭</button></div>
-        <p class="emotion-debug__empty" id="debugEmpty">点击一只小水母查看独立状态</p>
+      <aside class="emotion-debug immersive-ui" id="emotionDebug" aria-hidden="true" aria-label="Jellyfish emotion debug panel">
+        <div class="emotion-debug__head"><span>EMOTION MEMORY</span><button id="closeDebug" type="button" aria-label="Close emotion debugger">Close</button></div>
+        <p class="emotion-debug__empty" id="debugEmpty">Select a baby jellyfish to inspect its state.</p>
         <dl class="emotion-debug__data" id="debugData" hidden>
           <div><dt>Jellyfish ID</dt><dd id="debugId">—</dd></div>
           <div><dt>Personality</dt><dd id="debugPersonality">—</dd></div>
@@ -60,35 +64,35 @@
       <section class="collection" id="collectionPanel" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="collectionTitle">
         <div class="collection__shell">
           <header class="collection__header">
-            <div><p class="eyebrow">JELLYFISH COLLECTION</p><h2 id="collectionTitle">我的水母图鉴</h2></div>
-            <div class="collection__progress"><strong id="collectionOwned">0</strong><span>当前拥有</span><strong id="collectionDiscovered">0</strong><span>外观发现</span></div>
-            <button id="closeCollection" class="close-button collection__close" type="button">返回海中</button>
+            <div><p class="eyebrow">JELLYFISH ARCHIVE</p><h2 id="collectionTitle">Your Collection</h2></div>
+            <div class="collection__progress"><strong id="collectionOwned">0</strong><span>IN YOUR SEA</span><strong id="collectionDiscovered">0</strong><span>DISCOVERED</span></div>
+            <button id="closeCollection" class="close-button collection__close" type="button">Back to Sea</button>
           </header>
           <div class="collection__body">
             <div class="collection__library">
-              <div class="collection__filters"><span>拥有的个体与历史发现</span><span id="collectionSummary">0 / 12</span></div>
+              <div class="collection__filters"><span>JELLYFISH &amp; DISCOVERIES</span><span id="collectionSummary">0 / 12</span></div>
               <div class="collection__grid" id="collectionGrid" role="list"></div>
             </div>
             <aside class="collection__detail" id="collectionDetail">
-              <div class="collection__empty" id="collectionEmpty"><span>✦</span><p>选择一只已经拥有的小水母<br />查看它的记忆</p></div>
+              <div class="collection__empty" id="collectionEmpty"><span>✦</span><p>Select a jellyfish<br />to revisit its memories.</p></div>
               <div id="collectionDetailData" hidden>
                 <div class="collection-avatar collection-avatar--large" id="detailAvatar"><span></span></div>
                 <p class="collection__detail-id" id="detailId">J-01</p>
-                <label class="collection__nickname">昵称<input id="nicknameInput" type="text" maxlength="24" autocomplete="off" /></label>
-                <button id="saveNickname" class="mini-button" type="button">保存昵称</button>
+                <label class="collection__nickname">NICKNAME<input id="nicknameInput" type="text" maxlength="24" autocomplete="off" /></label>
+                <button id="saveNickname" class="mini-button" type="button">Save name</button>
                 <dl class="collection__facts">
-                  <div><dt>颜色</dt><dd id="detailColor">—</dd></div>
-                  <div><dt>花纹</dt><dd id="detailPattern">—</dd></div>
-                  <div><dt>性格</dt><dd id="detailPersonality">—</dd></div>
-                  <div><dt>心情</dt><dd id="detailEmotion">—</dd></div>
-                  <div><dt>出生时间</dt><dd id="detailBornAt">—</dd></div>
-                  <div><dt>喜欢</dt><dd id="detailFavorite">—</dd></div>
+                  <div><dt>COLOR</dt><dd id="detailColor">—</dd></div>
+                  <div><dt>PATTERN</dt><dd id="detailPattern">—</dd></div>
+                  <div><dt>PERSONALITY</dt><dd id="detailPersonality">—</dd></div>
+                  <div><dt>MOOD</dt><dd id="detailEmotion">—</dd></div>
+                  <div><dt>BORN</dt><dd id="detailBornAt">—</dd></div>
+                  <div><dt>FAVORITE</dt><dd id="detailFavorite">—</dd></div>
                 </dl>
               </div>
             </aside>
           </div>
           <footer class="collection__savebar">
-            <span id="saveStatus" aria-live="polite">自动存档已开启</span>
+            <span id="saveStatus" aria-live="polite">Autosave is on</span>
             <div>
               <button id="continueGame" class="link-button" type="button">Continue Game</button>
               <button id="newGame" class="link-button" type="button">New Game</button>
@@ -102,79 +106,79 @@
       </section>
 
       <section class="save-confirm" id="saveConfirm" aria-hidden="true" role="alertdialog" aria-modal="true" aria-labelledby="saveConfirmTitle">
-        <div><p class="eyebrow">PLEASE CONFIRM</p><h2 id="saveConfirmTitle">确认开始新游戏？</h2><p id="saveConfirmText">当前存档会被替换。</p><div><button id="cancelSaveAction" class="link-button" type="button">取消</button><button id="confirmSaveAction" class="enter-button enter-button--small" type="button">确认</button></div></div>
+        <div><p class="eyebrow">PLEASE CONFIRM</p><h2 id="saveConfirmTitle">Start a new game?</h2><p id="saveConfirmText">Your current save will be replaced.</p><div><button id="cancelSaveAction" class="link-button" type="button">Cancel</button><button id="confirmSaveAction" class="enter-button enter-button--small" type="button">Confirm</button></div></div>
       </section>
 
       <section class="save-recovery" id="saveRecovery" aria-hidden="true" role="alertdialog" aria-modal="true" aria-labelledby="saveRecoveryTitle">
-        <div><p class="eyebrow">SAVE RECOVERY</p><h2 id="saveRecoveryTitle">存档暂时无法读取</h2><p id="saveRecoveryMessage">可以重新尝试、恢复上一份备份，或创建新的存档。</p><div><button id="retrySave" class="link-button" type="button">重试读取</button><button id="restoreBackup" class="link-button" type="button">恢复备份</button><button id="createFreshSave" class="enter-button enter-button--small" type="button">创建新存档</button></div></div>
+        <div><p class="eyebrow">SAVE RECOVERY</p><h2 id="saveRecoveryTitle">We couldn't read this save</h2><p id="saveRecoveryMessage">Try again, restore the latest backup, or begin with a clean save.</p><div><button id="retrySave" class="link-button" type="button">Try again</button><button id="restoreBackup" class="link-button" type="button">Restore backup</button><button id="createFreshSave" class="enter-button enter-button--small" type="button">Create new save</button></div></div>
       </section>
 
       <section class="invitation" id="invitation" aria-labelledby="invitationTitle">
         <div class="invitation__copy">
-          <p class="eyebrow">PROGRAMMING ASSIGNMENT · INTERACTIVE DEMO</p>
-          <h1 id="invitationTitle">靠近一只<br />柔软的水母</h1>
-          <p class="invitation__note">触摸、挤压，或从伞盖任意边缘拉出新的生命。</p>
-          <button id="enterButton" class="enter-button" type="button"><span>进入水母之森</span><span class="enter-button__en">BEGIN SQUISHING</span></button>
+          <p class="eyebrow">AN INTERACTIVE DIGITAL CREATURE STUDY</p>
+          <h1 id="invitationTitle">Meet something<br /><em>soft.</em></h1>
+          <p class="invitation__note">Touch, squish, and gently pull new life from a glowing jellyfish.</p>
+          <button id="enterButton" class="enter-button" type="button"><span>Enter the deep</span><span class="enter-button__en">BEGIN SQUISHING</span></button>
         </div>
       </section>
 
       <div class="bottomline immersive-ui" aria-live="polite">
-        <p id="hint" class="hint">移动靠近 · 按住挤压 · 边缘外拉出生</p>
-        <div class="bottom-actions"><p class="memory-count"><span id="babyCount">00</span> / 12 只小水母</p><button id="resetButton" class="mini-button" type="button">清空海域</button></div>
+        <p id="hint" class="hint">Move closer · Hold to squish · Pull outward to nurture</p>
+        <div class="bottom-actions"><p class="memory-count"><span id="babyCount">00</span><small> / 12 JELLIES</small></p><button id="resetButton" class="mini-button" type="button">Clear sea</button></div>
       </div>
 
       <section class="tutorial" id="tutorialPanel" aria-hidden="true" role="dialog" aria-modal="false" aria-labelledby="tutorialTitle">
         <div class="tutorial__focus" id="tutorialFocus" aria-hidden="true"></div>
         <div class="tutorial__card">
-          <div class="tutorial__meta"><span id="tutorialKicker">INTERACTIVE TUTORIAL</span><span id="tutorialCounter">准备</span></div>
-          <h2 id="tutorialTitle">选择操作方式</h2>
-          <p class="tutorial__instruction" id="tutorialInstruction">请选择鼠标或摄像头手势模式。</p>
+          <div class="tutorial__meta"><span id="tutorialKicker">INTERACTION GUIDE</span><span id="tutorialCounter">READY</span></div>
+          <h2 id="tutorialTitle">Choose your input</h2>
+          <p class="tutorial__instruction" id="tutorialInstruction">Use a mouse or let the camera follow your hand.</p>
           <div class="tutorial__quick-guide" id="tutorialQuickGuide" hidden>
             <section>
-              <span>鼠标</span>
-              <p><b>轻触 / 挤压</b>：点按或拖动水母。</p>
-              <p><b>生小水母</b>：从伞盖边缘按住，向外拉，再松开。</p>
-              <p><b>吹气泡</b>：点击水母外的空白海水。</p>
+              <span>MOUSE</span>
+              <p><b>Touch / squish</b> — click or drag a jellyfish.</p>
+              <p><b>Nurture</b> — hold an edge, pull outward, then release.</p>
+              <p><b>Bubble</b> — click open water.</p>
             </section>
             <section>
-              <span>摄像头手势</span>
-              <p><b>逗水母</b>：用一根食指靠近它。</p>
-              <p><b>挤压 / 生小水母</b>：拇指与食指在母体上捏合；拉向边缘外，再张开。</p>
-              <p><b>释放气泡</b>：在母体外的空白海水握拳，再张开手掌。</p>
+              <span>CAMERA GESTURES</span>
+              <p><b>Play</b> — approach with one index finger.</p>
+              <p><b>Squish / nurture</b> — pinch with thumb and index finger, pull outward, then open.</p>
+              <p><b>Bubble</b> — make a fist over open water, then open your palm.</p>
             </section>
           </div>
           <div class="tutorial__demo" id="tutorialDemo" aria-hidden="true">
             <span class="tutorial__cursor-dot"></span><span class="tutorial__gesture-line"></span>
           </div>
           <div class="tutorial__mode-picker" id="tutorialModePicker">
-            <button class="mode-card" id="chooseMouseMode" type="button"><strong>鼠标模式</strong><small>移动、点击和拖动</small></button>
-            <button class="mode-card" id="chooseGestureMode" type="button"><strong>手势模式</strong><small>食指触碰与双指捏合</small></button>
+            <button class="mode-card" id="chooseMouseMode" type="button"><strong>Mouse</strong><small>Move, click, and drag</small></button>
+            <button class="mode-card" id="chooseGestureMode" type="button"><strong>Camera gestures</strong><small>Point, pinch, and open your palm</small></button>
           </div>
-          <div class="tutorial__progress" id="tutorialProgress" aria-label="动作识别进度"><span id="tutorialProgressBar"></span></div>
-          <p class="tutorial__status" id="tutorialStatus" aria-live="polite">等待选择输入模式</p>
-          <p class="tutorial__help" id="tutorialHelp">摄像头不可用时可随时切换回鼠标。</p>
+          <div class="tutorial__progress" id="tutorialProgress" aria-label="Gesture detection progress"><span id="tutorialProgressBar"></span></div>
+          <p class="tutorial__status" id="tutorialStatus" aria-live="polite">Waiting for an input mode</p>
+          <p class="tutorial__help" id="tutorialHelp">You can return to mouse input if the camera is unavailable.</p>
           <div class="tutorial__resume" id="tutorialResume" hidden>
-            <button id="resumeTutorial" class="enter-button enter-button--small" type="button">继续上次进度</button>
-            <button id="restartTutorial" class="link-button" type="button">重新开始</button>
+            <button id="resumeTutorial" class="enter-button enter-button--small" type="button">Resume</button>
+            <button id="restartTutorial" class="link-button" type="button">Start over</button>
           </div>
           <div class="tutorial__actions">
-            <button id="tutorialBack" class="link-button" type="button">返回</button>
-            <button id="tutorialRetry" class="link-button" type="button">重试</button>
-            <button id="switchToMouse" class="link-button" type="button" hidden>切换鼠标</button>
-            <button id="skipTutorial" class="link-button" type="button">跳过教程</button>
-            <button id="startTutorial" class="enter-button enter-button--small" type="button" hidden>继续</button>
+            <button id="tutorialBack" class="link-button" type="button">Back</button>
+            <button id="tutorialRetry" class="link-button" type="button">Retry</button>
+            <button id="switchToMouse" class="link-button" type="button" hidden>Use mouse</button>
+            <button id="skipTutorial" class="link-button" type="button">Skip guide</button>
+            <button id="startTutorial" class="enter-button enter-button--small" type="button" hidden>Continue</button>
           </div>
         </div>
       </section>
 
       <aside class="about" id="aboutPanel" aria-hidden="true">
-        <button id="closeAbout" class="close-button" type="button" aria-label="关闭作品说明">关闭</button>
+        <button id="closeAbout" class="close-button" type="button" aria-label="Close about panel">Close</button>
         <div class="about__inner">
-          <p class="eyebrow">ABOUT THE WORK</p><h2>柔软，也是一种回应。</h2>
-          <p>《水母之森》是一件浏览器交互作品。母水母的轮廓由 72 个弹簧节点组成，因此触碰会留在局部，而不是缩放整只角色。</p>
-          <p>普通触摸只产生表情与回弹；从伞盖任意边缘向外拉动，才会诞生一只有自己性格的小水母。</p>
-          <div class="about__divider"></div><p class="about__small">鼠标拖动 · 摄像头双指捏合 · M 静音 · C 手势 · B 背景 · D 情绪调试 · R 重置 · ? 教程</p>
-          <p class="camera-privacy">摄像头画面只在本机浏览器内分析，不录制、不保存、不会上传。</p>
+          <p class="eyebrow">ABOUT THE WORK</p><h2>Softness is a form of response.</h2>
+          <p>SQUISH is a browser-based interactive artwork. The mother jellyfish is shaped by 72 spring nodes, so every touch leaves a local impression instead of scaling the entire character.</p>
+          <p>A gentle touch creates expression and recoil. Pulling outward from any edge of the bell nurtures a baby with its own color, pattern, personality, emotions, and memories.</p>
+          <div class="about__divider"></div><p class="about__small">Drag with mouse · Pinch with camera · M sound · C camera · B background · D debug · R clear · ? guide</p>
+          <p class="camera-privacy">Camera frames are analyzed only in this browser. Nothing is recorded, stored, or uploaded.</p>
         </div>
       </aside>
       <div class="veil" id="veil" aria-hidden="true"></div>
@@ -184,6 +188,6 @@
     <script src="behavior-system.js?v=social-2"></script>
     <script src="social-system.js?v=social-2"></script>
     <script src="save-system.js?v=collection-2"></script>
-    <script src="app.js?v=baby-pattern-1"></script>
+    <script src="app.js?v=english-ui-2"></script>
   </body>
 </html>

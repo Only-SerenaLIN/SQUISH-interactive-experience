@@ -10,8 +10,8 @@
   const BACKUP_KEY = "squish.save.backup.v1";
   const PATTERNS = Object.freeze(["ripple", "petal", "stardust", "moon"]);
   const PERSONALITIES = Object.freeze(["calm", "shy", "playful"]);
-  const COLOR_NAMES = Object.freeze(["潮汐蓝", "梦境紫", "珊瑚粉", "薄荷青", "月光杏"]);
-  const PATTERN_NAMES = Object.freeze({ ripple: "水纹", petal: "花瓣", stardust: "星尘", moon: "月牙" });
+  const COLOR_NAMES = Object.freeze(["Tidal Blue", "Dream Violet", "Coral Pink", "Mint Glow", "Moonlit Apricot"]);
+  const PATTERN_NAMES = Object.freeze({ ripple: "Ripple", petal: "Petal", stardust: "Stardust", moon: "Crescent" });
   const clamp = (value, min, max) => Math.max(min, Math.min(max, Number.isFinite(Number(value)) ? Number(value) : min));
   const unique = (items) => [...new Set((items || []).filter((item) => typeof item === "string" && item.length))];
   const cleanText = (value, fallback = "") => String(value ?? fallback).replace(/[<>\u0000-\u001f]/g, "").trim().slice(0, 24) || fallback;
@@ -69,7 +69,7 @@
     const stats = baby.stats || {};
     return {
       id,
-      nickname: cleanText(baby.nickname, `小水母 ${index + 1}`),
+      nickname: cleanText(baby.nickname, `Jelly ${index + 1}`).replace(/^\u5c0f\u6c34\u6bcd\s*(\d+)$/, "Jelly $1"),
       colorIndex,
       pattern,
       personality,

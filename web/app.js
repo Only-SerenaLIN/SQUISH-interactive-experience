@@ -253,7 +253,7 @@
     [255, 210, 164],
   ];
   const patternGlyphs = { ripple: "≈", petal: "✤", stardust: "✦", moon: "☾" };
-  const favoriteInteractions = { calm: "轻触与同步漂浮", shy: "温柔靠近", playful: "挤压与绕圈" };
+  const favoriteInteractions = { calm: "Soft taps & drifting", shy: "Gentle approaches", playful: "Squishes & orbiting" };
   const collectionCatalog = Array.from({ length: 12 }, (_, index) => ({
     colorIndex: index % palette.length,
     pattern: SaveSystem.PATTERNS[index % SaveSystem.PATTERNS.length],
@@ -362,22 +362,22 @@
 
   function updateSoundButton() {
     soundButton.setAttribute("aria-pressed", String(state.soundOn));
-    soundButton.setAttribute("aria-label", state.soundOn ? "关闭声音" : "开启声音");
+    soundButton.setAttribute("aria-label", state.soundOn ? "Mute sound" : "Turn sound on");
   }
 
-  function updateCameraButton(label = "模式·鼠标") {
+  function updateCameraButton(label = "Mouse") {
     const engaged = state.camera.enabled || state.camera.starting;
     cameraButton.setAttribute("aria-pressed", String(engaged));
-    cameraButton.setAttribute("aria-label", engaged ? "关闭摄像头手势" : "开启摄像头手势");
-    cameraButton.querySelector(".camera-copy").textContent = engaged && label === "模式·鼠标" ? "模式·手势" : label;
+    cameraButton.setAttribute("aria-label", engaged ? "Turn off camera gestures" : "Turn on camera gestures");
+    cameraButton.querySelector(".camera-copy").textContent = engaged && label === "Mouse" ? "Gestures" : label;
     cameraButton.classList.toggle("is-calibrating", state.camera.starting || (state.camera.enabled && !state.camera.ready));
   }
 
   function updateBackgroundButton() {
     const active = state.camera.backgroundMode || state.camera.backgroundRequested;
     backgroundButton.setAttribute("aria-pressed", String(active));
-    backgroundButton.setAttribute("aria-label", active ? "切换为深海背景" : "切换为摄像头背景");
-    backgroundCopy.textContent = active ? "背景·镜头" : "背景·深海";
+    backgroundButton.setAttribute("aria-label", active ? "Use deep-sea background" : "Use camera as background");
+    backgroundCopy.textContent = active ? "Live View" : "Deep Sea";
   }
 
   function applyBackgroundMode(active) {
@@ -392,17 +392,17 @@
   function toggleBackgroundMode() {
     if (state.camera.backgroundMode || state.camera.backgroundRequested) {
       applyBackgroundMode(false);
-      hint.textContent = "深海重新漫回来了";
+      hint.textContent = "The deep sea drifts back in.";
       return;
     }
     if (state.camera.enabled) {
       applyBackgroundMode(true);
-      hint.textContent = "镜头成为了这片海的背景";
+      hint.textContent = "Your camera is now part of the sea.";
       return;
     }
     state.camera.backgroundRequested = true;
     updateBackgroundButton();
-    hint.textContent = "正在打开镜头背景";
+    hint.textContent = "Opening the live background…";
     startCamera();
   }
 
@@ -461,7 +461,7 @@
     else applyBackgroundMode(state.camera.backgroundMode);
   }
 
-  function stopCamera(message = "摄像头手势已关闭") {
+  function stopCamera(message = "Camera gestures are off.") {
     state.camera.requestToken += 1;
     if (state.camera.touchBaby?.behavior) BehaviorSystem.beginRecover(state.camera.touchBaby.behavior, performance.now());
     if (state.worldPointer.inputMode === "camera") BehaviorSystem.deactivatePointer(state.worldPointer);
@@ -505,14 +505,14 @@
     if (!window.Handsfree || !navigator.mediaDevices?.getUserMedia) {
       state.camera.backgroundRequested = false;
       updateBackgroundButton();
-      hint.textContent = "Handsfree.js 尚未载入，仍可用鼠标或触屏";
+      hint.textContent = "Hand tracking is unavailable. Mouse and touch still work.";
       return;
     }
     if (!state.entered) enter();
     const requestToken = ++state.camera.requestToken;
     state.camera.starting = true;
-    updateCameraButton("手势·加载中");
-    hint.textContent = "正在准备手部动作模型，首次打开会稍慢";
+    updateCameraButton("Loading…");
+    hint.textContent = "Preparing hand tracking. The first launch may take a moment.";
     try {
       const handsfree = new window.Handsfree({
         showDebug: false,
@@ -552,7 +552,7 @@
       });
       state.camera.startupTimer = window.setTimeout(() => {
         if (state.camera.requestToken !== requestToken || !state.camera.starting) return;
-        stopCamera("Handsfree.js 加载超时，请检查网络后重试");
+        stopCamera("Hand tracking timed out. Check your connection and try again.");
       }, 45000);
       handsfree.start(() => {
         if (state.camera.requestToken !== requestToken) {
@@ -568,9 +568,9 @@
           startupTimer: null,
           previewTimer: null,
         });
-        updateCameraButton("模式·手势");
+        updateCameraButton("Gestures");
         showCameraPreview(handsfree);
-        hint.textContent = "一指逗水母；双指捏母体会出生；在空白海水握拳再张开会释放气泡";
+        hint.textContent = "Point to play · Pinch to nurture · Make a fist, then open it for a bubble";
       });
     } catch (error) {
       if (state.camera.requestToken !== requestToken) return;
@@ -581,7 +581,7 @@
       state.camera.backgroundRequested = false;
       updateBackgroundButton();
       const blocked = error?.name === "NotAllowedError" || error?.name === "SecurityError";
-      hint.textContent = blocked ? "没有获得摄像头权限，仍可用鼠标或触屏" : "Handsfree.js 启动失败，仍可用鼠标或触屏";
+      hint.textContent = blocked ? "Camera access was not granted. Mouse and touch still work." : "Hand tracking could not start. Mouse and touch still work.";
     }
   }
 
@@ -591,7 +591,7 @@
     localStorage.setItem("preferredInputMode", nextMode);
     if (nextMode === "mouse") stopCamera();
     else startCamera();
-    scheduleSave("输入模式已保存", 260);
+    scheduleSave("Input mode saved", 260);
   }
 
   function landmarkDistance(a, b) {
@@ -720,7 +720,7 @@
           tutorial.stableFrames = Math.max(0, tutorial.stableFrames - 1);
         }
       } else if (!present && tutorial.step !== "CAMERA_CHECK") {
-        tutorialStatus.textContent = "手部识别暂时丢失，当前动作已暂停";
+        tutorialStatus.textContent = "Hand tracking paused until your hand returns.";
       }
 
       if (present && tutorial.step === "BUBBLE_INTERACTION" && pinching && camera.pinchFrames === 2 && camera.rearm) {
@@ -741,7 +741,7 @@
       const inOpenWater = palmDistance > baseRadius() * 1.48;
       if (!camera.bubbleArmedAt && inOpenWater && camera.fistFrames >= 4) {
         camera.bubbleArmedAt = now;
-        hint.textContent = "气泡已经聚在拳心——现在慢慢张开手掌";
+        hint.textContent = "A bubble is gathering in your fist — slowly open your palm.";
       }
       if (camera.bubbleArmedAt && camera.openPalmFrames >= 2) {
         createPalmBubble(camera.palmX, camera.palmY);
@@ -750,7 +750,7 @@
         camera.suspendedUntil = now + 220;
       } else if (camera.bubbleArmedAt && now - camera.bubbleArmedAt > 2200) {
         camera.bubbleArmedAt = 0;
-        hint.textContent = "在空白海水重新握拳，再完整张开手掌";
+        hint.textContent = "Make a fist over open water, then open your whole hand.";
       }
     }
 
@@ -814,7 +814,7 @@
           if (state.tutorial.active && state.tutorial.step === "BABY_INTERACTION") completeTutorialStep("BABY_INTERACTION");
         }
         camera.touchBaby = touchedBaby;
-        hint.textContent = "指尖碰到了它——它软软地让开了";
+        hint.textContent = "Your fingertip found it — the soft body gives way.";
       } else {
         if (camera.touchBaby?.behavior) BehaviorSystem.beginRecover(camera.touchBaby.behavior, now);
         camera.touchBaby = null;
@@ -838,7 +838,7 @@
           );
           state.tentaclePlay.amount = Math.max(state.tentaclePlay.amount, clamp(0.56 + speed / 10, 0.56, 1.18));
           playingTentacles = true;
-          hint.textContent = "食指拨过触须——它们顺着水流摆开了";
+          hint.textContent = "Your finger brushes the tentacles; they follow the current.";
         }
       }
       camera.indexPrevX = fingerX;
@@ -886,18 +886,18 @@
           state.birthPull = 0;
           canvas.classList.add("is-touching");
           hint.textContent = state.interactionMode === "birth"
-            ? "边缘已抓住——保持捏合，沿外侧方向拉"
-            : "已经抓住；滑到伞盖任意边缘后向外拉";
+            ? "Edge held — keep pinching and pull outward."
+            : "Pinch held — move to any edge, then pull outward.";
         } else if (camera.openFrames >= 2) {
           hint.textContent = cameraTouchBaby
-            ? "指尖碰到了它——它软软地让开了"
+            ? "Your fingertip found it — the soft body gives way."
             : playingTentacles
-              ? "食指拨过触须——它们顺着水流摆开了"
-              : "食指逗小水母或拨触须；双指移到母体再捏合";
+              ? "Your finger brushes the tentacles; they follow the current."
+              : "Point to play with babies or tentacles; pinch the mother to squish.";
         } else if (pinching && distance > baseRadius() * 1.34) {
           hint.textContent = camera.bubbleArmedAt
-            ? "拳心已经聚起气泡——张开整只手掌来释放"
-            : "在空白海水握拳再张开，可以释放一串气泡";
+            ? "A bubble is ready — open your whole palm to release it."
+            : "Make a fist over open water, then open it to release a bubble.";
         }
       } else {
         const amplification = 1.55;
@@ -921,7 +921,7 @@
           state.pointer.startX = state.pointer.x;
           state.pointer.startY = state.pointer.y;
           state.birthPull = 0;
-          hint.textContent = "边缘已抓住——继续向外拉";
+          hint.textContent = "Edge held — keep pulling outward.";
         }
         if (state.interactionMode === "birth") {
           const pullX = state.pointer.x - state.pointer.startX;
@@ -939,16 +939,16 @@
           const readyDistance = baseRadius() * 0.2;
           hint.textContent = state.interactionMode === "birth"
             ? state.birthPull >= readyDistance
-              ? "可以松开了——新的小水母已经准备好"
-              : "边缘已抓住——保持捏合并继续向外拉"
-            : "保持捏合；滑到任意边缘后向外拉可以出生";
+              ? "Ready — open your fingers to welcome the new jelly."
+              : "Edge held — keep pinching and pull farther outward."
+            : "Keep pinching; move to any edge and pull outward to nurture.";
         }
       }
     } else if (camera.active && camera.absentFrames >= 8) {
       camera.active = false;
       releasePointer();
     } else if (!present && camera.absentFrames >= 6) {
-      hint.textContent = "把整只手完整地放进镜头";
+      hint.textContent = "Place your whole hand inside the camera frame.";
     }
   }
 
@@ -974,40 +974,40 @@
 
   const TUTORIAL_COPY = {
     APPROACH: {
-      title: "靠近水母",
-      mouse: "移动鼠标，慢慢靠近母水母。",
-      gesture: "伸出一根食指，慢慢靠近母水母。",
-      help: "让指针进入水母周围的粉紫色感知圈。",
+      title: "Approach the jellyfish",
+      mouse: "Move the cursor slowly toward the mother jellyfish.",
+      gesture: "Hold up one index finger and slowly approach the mother.",
+      help: "Move into the soft pink sensing area around the jellyfish.",
     },
     TOUCH: {
-      title: "轻触伞盖",
-      mouse: "在伞盖中央轻点一次，然后松开。",
-      gesture: "用食指轻触伞盖中央，保持片刻。",
-      help: "请触碰粉紫色伞盖，不要触碰触手。",
+      title: "Touch the bell",
+      mouse: "Click the center of the bell once, then release.",
+      gesture: "Touch the center of the bell with your index finger for a moment.",
+      help: "Touch the pink bell rather than the tentacles.",
     },
     SQUISH: {
-      title: "果冻挤压",
-      mouse: "按住伞盖并拖动，保持半秒后松开。",
-      gesture: "拇指与食指捏住伞盖，保持后张开。",
-      help: "看到局部凹陷后再松开；轻点不足以完成。",
+      title: "Make it squish",
+      mouse: "Hold the bell, drag, and release after half a second.",
+      gesture: "Pinch the bell with thumb and index finger, hold, then open.",
+      help: "Wait for a visible dent before releasing. A quick tap is not enough.",
     },
     SPAWN: {
-      title: "孕育小水母",
-      mouse: "捏住伞盖顶部，向上拉到提示出现后松开。",
-      gesture: "在伞盖顶部双指捏合，向上拉，再张开手指。",
-      help: "本关只识别顶部向上的拉动；等待小水母完全分离。",
+      title: "Nurture a baby",
+      mouse: "Hold the top of the bell, pull upward, then release when prompted.",
+      gesture: "Pinch the top of the bell, pull upward, then open your fingers.",
+      help: "For this step, pull upward from the top and wait for full separation.",
     },
     BABY_INTERACTION: {
-      title: "和小水母玩耍",
-      mouse: "移动并点击刚出生的小水母。",
-      gesture: "用食指轻轻靠近刚出生的小水母。",
-      help: "靠近小水母的伞盖，触发它的性格反应。",
+      title: "Play with the baby",
+      mouse: "Move toward and click the newborn jellyfish.",
+      gesture: "Gently approach the newborn with your index finger.",
+      help: "Approach its bell to reveal its personality.",
     },
     BUBBLE_INTERACTION: {
-      title: "气泡互动",
-      mouse: "在小水母下方的空白海水点击，吹出气泡。",
-      gesture: "在小水母下方的空白处握拳，再张开手掌释放气泡。",
-      help: "先稳定握拳，再完整张开；气泡会向上漂向小水母。",
+      title: "Release a bubble",
+      mouse: "Click open water below a baby to release a bubble.",
+      gesture: "Make a fist below a baby, then open your palm to release a bubble.",
+      help: "Hold a stable fist, then open fully. The bubble will float upward.",
     },
   };
 
@@ -1018,7 +1018,7 @@
   function saveTutorialProgress() {
     localStorage.setItem("tutorialCurrentStep", state.tutorial.step);
     localStorage.setItem("preferredInputMode", state.tutorial.mode);
-    scheduleSave("教程进度已保存", 500);
+    scheduleSave("Guide progress saved", 500);
   }
 
   function showTutorial(open) {
@@ -1053,42 +1053,42 @@
     startTutorial.hidden = !quickGuide && !["CAMERA_CHECK", "COMPLETE"].includes(step);
     tutorialProgressBar.style.width = `${Math.round(tutorial.progress * 100)}%`;
     tutorialKicker.textContent = stepNumber > 0 ? "INTERACTIVE GESTURE TUTORIAL" : "SQUISH · FIRST ENCOUNTER";
-    tutorialCounter.textContent = stepNumber > 0 ? `${stepNumber} / 6` : step === "COMPLETE" ? "完成" : "准备";
+    tutorialCounter.textContent = stepNumber > 0 ? `${stepNumber} / 6` : step === "COMPLETE" ? "COMPLETE" : "READY";
 
     if (quickGuide) {
       tutorialKicker.textContent = "SQUISH · QUICK GUIDE";
-      tutorialCounter.textContent = "简明说明";
-      tutorialTitle.textContent = "三种动作，就够了";
-      startTutorial.textContent = "知道了，开始体验";
+      tutorialCounter.textContent = "QUICK START";
+      tutorialTitle.textContent = "Three gestures. That's all.";
+      startTutorial.textContent = "Got it — let's begin";
       startTutorial.disabled = false;
     } else if (step === "WELCOME") {
-      tutorialTitle.textContent = "继续认识它？";
-      tutorialInstruction.textContent = "检测到尚未完成的教学进度。";
-      tutorialStatus.textContent = `上次停在第 ${Math.max(1, tutorialStepNumber(localStorage.getItem("tutorialCurrentStep")))} 步`;
-      tutorialHelp.textContent = "可以继续，也可以清空教学生成的小水母后重新开始。";
+      tutorialTitle.textContent = "Continue where you left off?";
+      tutorialInstruction.textContent = "We found an unfinished guide session.";
+      tutorialStatus.textContent = `Last visited step ${Math.max(1, tutorialStepNumber(localStorage.getItem("tutorialCurrentStep")))}`;
+      tutorialHelp.textContent = "Resume, or restart and remove the jellyfish created during the guide.";
     } else if (step === "INPUT_SELECTION") {
-      tutorialTitle.textContent = "选择操作方式";
-      tutorialInstruction.textContent = "教程会根据输入方式显示不同动作提示。";
-      tutorialStatus.textContent = "请选择鼠标或摄像头手势模式";
-      tutorialHelp.textContent = "摄像头模式只在本机分析画面；失败时可切换鼠标。";
+      tutorialTitle.textContent = "Choose your input";
+      tutorialInstruction.textContent = "The guide adapts its prompts to your input method.";
+      tutorialStatus.textContent = "Choose mouse or camera gestures";
+      tutorialHelp.textContent = "Camera analysis stays on this device. You can switch to mouse at any time.";
     } else if (step === "CAMERA_CHECK") {
-      tutorialTitle.textContent = "摄像头与手部检测";
-      tutorialInstruction.textContent = state.camera.ready ? "请把一只手完整放入镜头。" : "正在请求权限并载入手部模型。";
-      tutorialStatus.textContent = state.camera.ready ? "等待稳定识别手部关键点" : state.camera.starting ? "模型加载中…" : "摄像头尚未就绪";
-      tutorialHelp.textContent = "保持手掌正对镜头、光线均匀；无法识别可切换鼠标。";
-      startTutorial.textContent = "检测完成，继续";
+      tutorialTitle.textContent = "Camera check";
+      tutorialInstruction.textContent = state.camera.ready ? "Place one whole hand inside the frame." : "Requesting access and loading hand tracking.";
+      tutorialStatus.textContent = state.camera.ready ? "Waiting for stable hand landmarks" : state.camera.starting ? "Loading model…" : "Camera is not ready";
+      tutorialHelp.textContent = "Face your palm toward the camera in even light, or switch to mouse.";
+      startTutorial.textContent = "Camera ready — continue";
       startTutorial.disabled = tutorial.progress < 1;
     } else if (copy) {
       tutorialTitle.textContent = copy.title;
       tutorialInstruction.textContent = copy[tutorial.mode];
-      tutorialStatus.textContent = tutorial.success ? "识别成功 · 即将进入下一步" : `动作识别 ${Math.round(tutorial.progress * 100)}%`;
-      tutorialHelp.textContent = tutorial.success ? "动作已经确认，水母会带你进入下一步。" : tutorial.helpLevel ? `还没有识别成功：${copy.help}` : copy.help;
+      tutorialStatus.textContent = tutorial.success ? "Gesture recognized · Next step" : `Recognition ${Math.round(tutorial.progress * 100)}%`;
+      tutorialHelp.textContent = tutorial.success ? "Gesture confirmed. Follow the jellyfish to the next step." : tutorial.helpLevel ? `Not recognized yet: ${copy.help}` : copy.help;
     } else if (step === "COMPLETE") {
-      tutorialTitle.textContent = "你已经学会了";
-      tutorialInstruction.textContent = "现在可以自由触摸、挤压、孕育水母和吹出气泡。";
-      tutorialStatus.textContent = "六项真实互动均已完成";
-      tutorialHelp.textContent = "之后可以从顶部“重新学习操作”再次进入教程。";
-      startTutorial.textContent = "进入自由互动";
+      tutorialTitle.textContent = "You're ready";
+      tutorialInstruction.textContent = "Touch, squish, nurture jellyfish, and release bubbles freely.";
+      tutorialStatus.textContent = "All six interactions complete";
+      tutorialHelp.textContent = "Open Guide in the top bar whenever you want a refresher.";
+      startTutorial.textContent = "Enter free play";
       startTutorial.disabled = false;
     }
   }
@@ -1138,8 +1138,8 @@
     localStorage.setItem("tutorialCompleted", "true");
     localStorage.setItem("tutorialCurrentStep", "COMPLETE");
     showTutorial(false);
-    hint.textContent = skipped ? "操作说明已关闭，随时可以重新查看" : "说明看完了——现在自由地和它们相处吧";
-    scheduleSave("教程完成状态已保存", 120);
+    hint.textContent = skipped ? "Guide closed — reopen it whenever you need." : "Guide complete — the sea is yours to explore.";
+    scheduleSave("Guide completion saved", 120);
   }
 
   function tutorialAllows(kind) {
@@ -1196,15 +1196,15 @@
     state.motherMoodUntil = performance.now() + 2200;
   }
 
-  const personalityLabels = { calm: "Calm · 温和", shy: "Shy · 害羞", playful: "Playful · 活泼" };
+  const personalityLabels = { calm: "Calm", shy: "Shy", playful: "Playful" };
   const emotionLabels = {
-    neutral: "Neutral · 普通",
-    happy: "Happy · 开心",
-    shy: "Shy · 害羞",
-    surprised: "Surprised · 惊讶",
-    dizzy: "Dizzy · 晕乎乎",
-    sleepy: "Sleepy · 困倦",
-    sleeping: "Sleeping · 睡眠",
+    neutral: "Neutral",
+    happy: "Happy",
+    shy: "Shy",
+    surprised: "Surprised",
+    dizzy: "Dizzy",
+    sleepy: "Sleepy",
+    sleeping: "Sleeping",
   };
 
   function updateDebugPanel(force = false) {
@@ -1264,9 +1264,9 @@
         baby.vy += (dy / distance) * boost;
       }
     }
-    if (result.woke) hint.textContent = "它慢慢睁开眼，被你轻轻唤醒了";
+    if (result.woke) hint.textContent = "It slowly opens its eyes — gently awakened.";
     selectBaby(baby);
-    if (result.applied) scheduleSave("互动记忆已保存", 900);
+    if (result.applied) scheduleSave("Interaction memory saved", 900);
     return result;
   }
 
@@ -1305,7 +1305,7 @@
       }
       if (["end", "interrupt"].includes(event.kind)) {
         participants.forEach((baby) => BehaviorSystem.beginRecover(baby.behavior, now, event.kind === "interrupt" ? 1000 : 720));
-        if (event.kind === "end") scheduleSave("社交记忆已保存", 700);
+        if (event.kind === "end") scheduleSave("Social memory saved", 700);
       }
     });
   }
@@ -1350,21 +1350,21 @@
     };
   }
 
-  function writeSave(reason = "自动存档") {
+  function writeSave(reason = "Autosaved") {
     if (state.saveRecoveryRequired) return false;
     if (pendingSaveTimer) window.clearTimeout(pendingSaveTimer);
     pendingSaveTimer = null;
     try {
       currentSave = SaveSystem.write(localStorage, buildSaveSnapshot());
-      if (saveStatus) saveStatus.textContent = `${reason} · ${new Date(currentSave.savedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;
+      if (saveStatus) saveStatus.textContent = `${reason} · ${new Date(currentSave.savedAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`;
       return true;
     } catch (error) {
-      if (saveStatus) saveStatus.textContent = "存档失败；当前体验仍可继续";
+      if (saveStatus) saveStatus.textContent = "Save failed — you can keep playing";
       return false;
     }
   }
 
-  function scheduleSave(reason = "自动存档", delay = 420) {
+  function scheduleSave(reason = "Autosaved", delay = 420) {
     if (pendingSaveTimer) window.clearTimeout(pendingSaveTimer);
     pendingSaveTimer = window.setTimeout(() => writeSave(reason), delay);
   }
@@ -1375,7 +1375,7 @@
       pattern: baby.pattern,
       personality: baby.personality,
     });
-    if (changed) scheduleSave("新外观已收录", 120);
+    if (changed) scheduleSave("New look added to the archive", 120);
     return changed;
   }
 
@@ -1462,7 +1462,7 @@
       recoveryBackup = loaded.backup;
       applyLoadedSave(loaded.data);
       state.saveRecoveryRequired = true;
-      saveRecoveryMessage.textContent = loaded.errors.join("；") || "当前存档内容损坏。";
+      saveRecoveryMessage.textContent = loaded.errors.join("; ") || "The current save is damaged.";
       restoreBackup.disabled = !recoveryBackup;
       saveRecovery.classList.add("is-open");
       saveRecovery.setAttribute("aria-hidden", "false");
@@ -1489,7 +1489,7 @@
     detailPattern.textContent = SaveSystem.PATTERN_NAMES[baby.pattern];
     detailPersonality.textContent = personalityLabels[baby.personality];
     detailEmotion.textContent = emotionLabels[baby.emotionData.emotion.current];
-    detailBornAt.textContent = new Date(baby.bornAt).toLocaleString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    detailBornAt.textContent = new Date(baby.bornAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
     detailFavorite.textContent = favoriteInteractions[baby.personality];
     avatarStyle(detailAvatar, baby.hue, baby.pattern);
     [...collectionGrid.querySelectorAll(".collection-card")].forEach((card) => card.classList.toggle("is-selected", card.dataset.id === id));
@@ -1511,10 +1511,10 @@
     status.textContent = baby ? "OWNED" : discovered ? "DISCOVERED" : "UNKNOWN";
     const name = document.createElement("strong");
     name.className = "collection-card__name";
-    name.textContent = baby ? baby.nickname : locked ? "未知水母" : `${SaveSystem.COLOR_NAMES[combo.colorIndex]}水母`;
+    name.textContent = baby ? baby.nickname : locked ? "Unknown jelly" : `${SaveSystem.COLOR_NAMES[combo.colorIndex]} Jelly`;
     const meta = document.createElement("span");
     meta.className = "collection-card__meta";
-    meta.textContent = locked ? "? · ? · ?" : `${SaveSystem.PATTERN_NAMES[combo.pattern]} · ${personalityLabels[combo.personality].split(" · ")[1]}`;
+    meta.textContent = locked ? "? · ? · ?" : `${SaveSystem.PATTERN_NAMES[combo.pattern]} · ${personalityLabels[combo.personality]}`;
     card.append(avatar, status, name, meta);
     if (baby) {
       card.dataset.id = baby.emotionData.id;
@@ -1543,7 +1543,7 @@
     });
     collectionOwned.textContent = String(state.babies.length);
     collectionDiscovered.textContent = String(currentSave.collection.combinations.length);
-    collectionSummary.textContent = `${currentSave.collection.combinations.length} 种外观已发现`;
+    collectionSummary.textContent = `${currentSave.collection.combinations.length} looks discovered`;
     if (state.collectionSelectedId && state.babies.some((baby) => baby.emotionData.id === state.collectionSelectedId)) selectCollectionBaby(state.collectionSelectedId);
     else selectCollectionBaby(null);
   }
@@ -1565,10 +1565,10 @@
   function showSaveConfirm(kind) {
     pendingConfirmAction = kind;
     const isNew = kind === "new";
-    saveConfirmTitle.textContent = isNew ? "确认开始新游戏？" : "确认重置全部存档？";
+    saveConfirmTitle.textContent = isNew ? "Start a new game?" : "Reset all save data?";
     saveConfirmText.textContent = isNew
-      ? "当前水母和图鉴进度会被新的空白存档替换。"
-      : "当前存档、备份与图鉴发现记录都会被清除。此操作无法撤销。";
+      ? "Your jellyfish and collection progress will be replaced with a clean save."
+      : "This clears the current save, backup, and every discovery. This cannot be undone.";
     saveConfirm.classList.add("is-open");
     saveConfirm.setAttribute("aria-hidden", "false");
   }
@@ -1588,7 +1588,7 @@
     applyLoadedSave(fresh, { persist: true });
     currentSave.collection = fresh.collection;
     renderCollection();
-    saveStatus.textContent = "新的空白存档已经创建";
+    saveStatus.textContent = "A new save is ready";
   }
 
   function enter() {
@@ -1640,13 +1640,13 @@
     if (state.bubbles.length > 18) state.bubbles.shift();
     if (!quiet) {
       popTone(0.12, -Math.PI / 2);
-      hint.textContent = "一枚气泡正向小水母漂去";
+      hint.textContent = "A bubble drifts toward the baby jellyfish.";
     }
   }
 
   function createPalmBubble(x, y) {
     createBubble(x, y, "gesture");
-    hint.textContent = "啵——张开的手掌释放出一枚气泡";
+    hint.textContent = "Pop — your open palm releases one bubble.";
   }
 
   function ensureTutorialBaby() {
@@ -1709,7 +1709,7 @@
       state.pointer = { x: point.x, y: point.y, down: true, id: event.pointerId, startedAt: performance.now() };
       canvas.setPointerCapture(event.pointerId);
       canvas.classList.add("is-touching");
-      hint.textContent = "它软软地凹下去了";
+      hint.textContent = "Its soft bell gives way beneath your touch.";
       initAudio();
       return;
     }
@@ -1727,7 +1727,7 @@
           state.pointer.down = false;
           state.pointer.id = null;
           state.tutorial.helpLevel = 1;
-          tutorialStatus.textContent = "请从伞盖最顶部开始";
+          tutorialStatus.textContent = "Begin at the very top of the bell.";
           renderTutorialPanel();
           return;
         }
@@ -1743,7 +1743,7 @@
     state.birthPull = 0;
     canvas.setPointerCapture(event.pointerId);
     canvas.classList.add("is-touching");
-    hint.textContent = state.interactionMode === "birth" ? "捏住伞盖边缘，沿外侧方向慢慢拉" : "慢一点，它正在局部改变";
+    hint.textContent = state.interactionMode === "birth" ? "Hold the edge and pull slowly outward." : "Move slowly — its body is changing locally.";
     initAudio();
   }
 
@@ -1769,7 +1769,7 @@
         sourceX: point.x,
         sourceY: point.y,
       });
-      hint.textContent = approachedBaby.personality === "shy" ? "它被突然靠近吓了一跳" : "突然的动作让它睁大了眼睛";
+      hint.textContent = approachedBaby.personality === "shy" ? "The sudden approach startles this shy jelly." : "The sudden movement makes it open its eyes wide.";
     }
     state.hover = { x: point.x, y: point.y, time: now, speed: hoverSpeed, baby: approachedBaby, initialized: true };
     if (state.tutorial.active && state.tutorial.mode === "mouse" && state.tutorial.step === "APPROACH") {
@@ -1795,7 +1795,7 @@
         state.tutorial.progress = clamp(state.birthPull / (baseRadius() * 0.3), 0, 1);
         renderTutorialPanel();
       }
-      hint.textContent = state.birthPull > baseRadius() * 0.3 ? "可以松开了——新的生命准备好了" : "保持向外拉，让果冻慢慢隆起";
+      hint.textContent = state.birthPull > baseRadius() * 0.3 ? "Release now — a new life is ready." : "Keep pulling outward and let the soft body rise.";
     } else {
       state.touchAngle = Math.atan2(point.y - state.center.y, point.x - state.center.x);
       if (state.tutorial.active && state.tutorial.step === "SQUISH") {
@@ -1842,10 +1842,10 @@
       state.activeBaby = null;
       canvas.classList.remove("is-touching");
       tone(0.22 + baby.squash * 0.35, baby.touchAngle);
-      hint.textContent = "它弹了一下，慢慢游走了";
+      hint.textContent = "It bounces once, then slowly swims away.";
       if (state.tutorial.active && state.tutorial.step === "BABY_INTERACTION") completeTutorialStep("BABY_INTERACTION");
       window.setTimeout(() => {
-        if (!state.pointer.down) hint.textContent = "轻轻碰一碰漂游的小水母";
+        if (!state.pointer.down) hint.textContent = "Gently touch a drifting baby jellyfish.";
       }, 1800);
       return;
     }
@@ -1876,14 +1876,14 @@
     }
     tone(strength, state.touchAngle);
     hint.textContent = shouldBirth
-      ? "啵——一只小水母正从伞盖边缘脱离"
+      ? "Pop — a baby jellyfish separates from the bell."
       : state.babies.length >= 12 && state.interactionMode === "birth"
-        ? "水母之森已经住满 12 只小生命"
-        : "软软地弹回来了；普通触摸不会繁殖";
+        ? "This sea is home to all 12 baby jellyfish."
+        : "The bell softly springs back. A simple touch will not nurture a baby.";
     state.birthPull = 0;
     state.interactionMode = "squish";
     window.setTimeout(() => {
-      if (!state.pointer.down) hint.textContent = "触摸小水母，或从母水母任意边缘向外拉";
+      if (!state.pointer.down) hint.textContent = "Touch a baby, or pull outward from any edge of the mother.";
     }, 2600);
   }
 
@@ -1914,7 +1914,7 @@
       strength,
       hue,
       pattern: SaveSystem.PATTERNS[state.count % SaveSystem.PATTERNS.length],
-      nickname: `小水母 ${Math.max(1, state.count)}`,
+      nickname: `Jelly ${Math.max(1, state.count)}`,
       bornAt: new Date().toISOString(),
       phase: state.count * 0.91 + Math.random() * 0.5,
       age: 0,
@@ -1945,7 +1945,7 @@
     baby.social = SocialSystem.createProfile();
     state.babies.push(baby);
     registerBabyDiscovery(baby);
-    scheduleSave("新水母已经保存", 160);
+    scheduleSave("New jellyfish saved", 160);
     babyCount.textContent = String(state.babies.length).padStart(2, "0");
   }
 
@@ -1981,9 +1981,9 @@
     state.selectedBaby = null;
     updateDebugPanel(true);
     babyCount.textContent = "00";
-    hint.textContent = "水流安静下来，母水母重新等待触碰";
+    hint.textContent = "The current settles. The mother waits for another touch.";
     showAbout(false);
-    scheduleSave("当前海域已清空，图鉴记录保留", 120);
+    scheduleSave("Sea cleared — discoveries kept", 120);
   }
 
   function updateTutorial() {
@@ -1996,7 +1996,7 @@
     }
     if (tutorial.step === "CAMERA_CHECK") {
       if (!state.camera.starting && !state.camera.enabled && now - tutorial.startedAt > 3500) {
-        tutorialHelp.textContent = "摄像头未能启动。请允许权限，或点击“切换鼠标”。";
+        tutorialHelp.textContent = "The camera could not start. Allow access or choose Use mouse.";
         switchToMouse.hidden = false;
       }
     }
@@ -2164,7 +2164,7 @@
             radius: baby.size,
           });
           popTone(baby.strength, baby.birthAngle);
-          hint.textContent = "啵——它翻过身了";
+          hint.textContent = "Pop — it turns itself upright.";
           if (state.tutorial.active && state.tutorial.step === "SPAWN" && state.tutorial.spawnedBaby === baby) {
             completeTutorialStep("SPAWN");
           }
@@ -3211,7 +3211,7 @@
     state.soundOn = !state.soundOn;
     if (state.soundOn) initAudio();
     updateSoundButton();
-    scheduleSave("声音设置已保存", 240);
+    scheduleSave("Sound setting saved", 240);
   });
   cameraButton.addEventListener("click", toggleCamera);
   backgroundButton.addEventListener("click", toggleBackgroundMode);
@@ -3227,7 +3227,7 @@
     nicknameInput.value = baby.nickname;
     renderCollection();
     selectCollectionBaby(baby.emotionData.id);
-    scheduleSave("昵称已保存", 100);
+    scheduleSave("Nickname saved", 100);
   });
   nicknameInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") saveNickname.click();
@@ -3241,7 +3241,7 @@
     startFreshGame(action === "reset");
   });
   exportSaveButton.addEventListener("click", () => {
-    writeSave("导出前已保存");
+    writeSave("Saved before export");
     const blob = new Blob([SaveSystem.exportJson(buildSaveSnapshot())], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -3249,7 +3249,7 @@
     link.download = `squish-save-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
-    saveStatus.textContent = "存档 JSON 已导出";
+    saveStatus.textContent = "Save JSON exported";
   });
   importSaveButton.addEventListener("click", () => importSaveFile.click());
   importSaveFile.addEventListener("change", () => {
@@ -3259,21 +3259,21 @@
     reader.onload = () => {
       const result = SaveSystem.importJson(String(reader.result || ""));
       if (!result.ok) {
-        saveStatus.textContent = `导入失败：${result.errors.join("；")}`;
+        saveStatus.textContent = `Import failed: ${result.errors.join("; ")}`;
         return;
       }
       applyLoadedSave(result.data, { persist: true });
       renderCollection();
-      saveStatus.textContent = "存档导入成功，水母已经恢复";
+      saveStatus.textContent = "Save imported — your jellyfish are back";
     };
-    reader.onerror = () => { saveStatus.textContent = "无法读取导入文件"; };
+    reader.onerror = () => { saveStatus.textContent = "The selected file could not be read"; };
     reader.readAsText(file);
     importSaveFile.value = "";
   });
   retrySave.addEventListener("click", () => {
     const loaded = SaveSystem.load(localStorage);
     if (loaded.status !== "ok") {
-      saveRecoveryMessage.textContent = "仍然无法读取当前存档，可以恢复备份或创建新存档。";
+      saveRecoveryMessage.textContent = "This save still cannot be read. Restore a backup or create a new save.";
       return;
     }
     state.saveRecoveryRequired = false;
@@ -3287,7 +3287,7 @@
     applyLoadedSave(recoveryBackup, { persist: true });
     saveRecovery.classList.remove("is-open");
     saveRecovery.setAttribute("aria-hidden", "true");
-    hint.textContent = "上一份安全备份已经恢复";
+    hint.textContent = "The latest safe backup has been restored.";
   });
   createFreshSave.addEventListener("click", () => {
     startFreshGame(false);
@@ -3299,14 +3299,14 @@
     state.tutorial.mode = "mouse";
     localStorage.setItem("preferredInputMode", "mouse");
     if (state.camera.enabled || state.camera.starting) stopCamera("");
-    scheduleSave("输入偏好已保存", 250);
+    scheduleSave("Input preference saved", 250);
     setTutorialStep("APPROACH");
   });
   chooseGestureMode.addEventListener("click", () => {
     state.tutorial.mode = "gesture";
     state.tutorial.resumeStep = null;
     localStorage.setItem("preferredInputMode", "gesture");
-    scheduleSave("输入偏好已保存", 250);
+    scheduleSave("Input preference saved", 250);
     setTutorialStep("CAMERA_CHECK");
     startCamera();
   });
@@ -3329,7 +3329,7 @@
     state.tutorial.mode = "mouse";
     localStorage.setItem("preferredInputMode", "mouse");
     if (state.camera.enabled || state.camera.starting) stopCamera("");
-    scheduleSave("输入偏好已保存", 250);
+    scheduleSave("Input preference saved", 250);
     setTutorialStep(next);
   });
   skipTutorial.addEventListener("click", () => finishTutorial(true));
@@ -3362,7 +3362,7 @@
     if (event.key.toLowerCase() === "m") {
       state.soundOn = !state.soundOn;
       updateSoundButton();
-      scheduleSave("声音设置已保存", 240);
+      scheduleSave("Sound setting saved", 240);
     }
     if (event.key.toLowerCase() === "c" && !event.repeat) toggleCamera();
     if (event.key.toLowerCase() === "b" && !event.repeat) toggleBackgroundMode();
@@ -3382,13 +3382,13 @@
       state.pointer.startedAt = performance.now();
       state.touchAngle = -Math.PI / 2;
       state.interactionMode = "squish";
-      hint.textContent = "慢一点，它正在改变";
+      hint.textContent = "Move slowly — its soft body is changing.";
     }
     if (event.key === "Escape") {
       if (saveConfirm.classList.contains("is-open")) closeSaveConfirm();
       else if (state.collectionOpen) showCollection(false);
       showAbout(false);
-      if (state.tutorial.active) tutorialHelp.textContent = "请使用“跳过教程”安全退出，当前进度会被保存。";
+      if (state.tutorial.active) tutorialHelp.textContent = "Use Skip guide to exit safely. Your progress will be saved.";
     }
   });
 
@@ -3401,12 +3401,12 @@
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
-      writeSave("后台自动存档");
+      writeSave("Saved in background");
       if (state.camera.enabled) stopCamera("");
     }
   });
   window.addEventListener("beforeunload", () => {
-    writeSave("离开前保存");
+    writeSave("Saved before leaving");
     stopCamera("");
   });
 
@@ -3440,7 +3440,7 @@
   resize();
   initializeSave();
   window.setInterval(() => {
-    if (state.entered && !document.hidden) writeSave("周期自动存档");
+    if (state.entered && !document.hidden) writeSave("Periodic autosave");
   }, 30000);
   requestAnimationFrame(render);
 })();
