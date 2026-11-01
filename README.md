@@ -1,277 +1,182 @@
-# Jellyfish Grove（水母之森）
+# SQUISH
 
-一个浏览器里的温柔深海生态缸。巨大的母水母位于世界顶部，发光触须向下生长为整座栖息地的中央树干；小水母会自由漫游、轮流休息和玩耍，把产生的浮光缓慢送回母体。玩家用浮光让贝壳、滑梯和新的小水母逐步生长出来。
+### A Soft Jellyfish Interaction Experience
 
-这是按照 `JELLYFISH_GROVE_PLAN.md` 完成的第一阶段核心版本。它使用原生 HTML、CSS 和 Canvas，不需要安装第三方前端依赖。
+**Assignment 3 — An Interactive Experience**
 
-## 一分钟启动
+Individual project · Creative Computing · 2026
 
-```bash
-cd web
-python3 -m http.server 4173
-```
+![SQUISH main experience: a glowing mother jellyfish surrounded by baby jellyfish](docs/squish-main-experience.png)
 
-然后在浏览器打开 <http://127.0.0.1:4173/>。直接双击 `index.html` 也能显示页面，但建议使用本地服务器，以确保 ES Module 正常加载。
+## Overview
 
-## 第一阶段怎么玩
+SQUISH is a small browser-based interactive artwork about touching something that cannot physically be touched. The player meets a translucent mother jellyfish in a quiet deep-sea environment and can press, stretch, and gently pull its soft bell. The body deforms locally, lags behind the pointer, changes expression, and springs back with sound.
 
-- 初始有 35 点浮光和一只蓝水母；浮光会随时间自动增加。
-- 初始母体采用粉紫珍珠伞盖、顶部四瓣花纹、豆豆眼、五条口腕与两侧发光珠。先抓住中央触须向下拉，达到提示后松开，触须会长成与母体连在一起的基础平台和生命主干。
-- 花费 30 点建造贝壳休息台，解锁粉色害羞水母。
-- 花费 150 点建造水母滑梯，解锁金色活泼水母。
-- 在母水母**伞盖顶部**按住并垂直向上轻轻拉出；达到柔性分离距离后松开，才消耗 50 点浮光并诞生一只新水母。出生与触手无关，拉得不够会缩回母体且不会扣除浮光。母体会在已经解锁的品种间轮换孕育。
-- 贝壳一次只接待一只水母，完整表现进入、躺下闭眼、醒来离开；滑梯一次只接待一只水母，个体会自主滑行并经历拉伸、落地压扁和弹起。
-- 拖动画面探索向下延伸的连续纵向世界；滚轮平移，`Ctrl/⌘ + 滚轮` 或工具按钮缩放。
-- 点击小水母会触发凹陷、回弹和性格反应；拖动它到栖息地可安排游玩。
-- 进度每 5 秒保存到浏览器，本次也包含最多四小时的离线浮光收益。
+Pulling outward from the bell can nurture a baby jellyfish. Each baby receives its own color, pattern, personality, emotions, short-term memories, and autonomous behavior. The experience is designed for anyone who wants a short, calm, playful interaction rather than a score-driven game.
 
-## 浏览器项目结构
+## Intended experience
 
-- `web/index.html`：游戏界面与 HUD
-- `web/styles.css`：玻璃质感界面与响应式布局
-- `web/config.js`：经济数值、品种和栖息地配置
-- `web/app.js`：生态状态机、绘制、输入、存档和声音
-- `web/assets/mother-bell-v1.png`、`mother-tentacle-v1.png`、`mother-bead-strand-v1.png`：母水母分层透明资产；伞盖采用局部切片形变，触手与珠串用较慢的弹簧惯性跟随
-- `web/assets/mother-jelly-v1.png`：母水母完整备用图，在分层素材未加载时自动回退
-- `web/assets/baby-jelly-v1.png`、`baby-jelly-sleep-v1.png`：依据角色设定图生成的透明幼体角色资产
-- `web/assets/shell-habitat-v1.png`、`jelly-slide-v1.png`：依据设施设定图生成的透明栖息地资产
-- `JELLYFISH_GROVE_PLAN.md`：阶段清单和后续范围
+- **For:** a single player using a desktop browser.
+- **Action:** touch, squish, stretch, or pinch a digital jellyfish.
+- **Response:** the body deforms, rebounds, changes emotion, or produces a baby.
+- **Feedback:** animation, facial expression, written prompts, interaction sounds, and generative deep-sea music explain what happened.
+- **Next action:** try another pressure, play with a baby, release a bubble, open the collection, or clear the current sea.
 
-原有 Python 摄像头作品仍保留在 `src/`、`tests/` 和 `run_squish.py` 中，本次没有删除；网页入口已更新为新的水母之森第一阶段。
-
----
-
-## Legacy SQUISH prototype
-
-Public repository: <https://github.com/Only-SerenaLIN/SQUISH-interactive-experience>
-
-## 浏览器作品：《不可触摸的柔软》
-
-项目现在包含一个独立的浏览器水母缸。用本地静态服务器打开 `web/index.html`，无需安装 Python。上层捏动粉色母水母，拉出不同品种的幼体；下潜到连成一体的珊瑚乐园，看小水母轮流在贝壳、滑梯和月光拱门玩耍。它们散发的微光像海中萤火虫，缓缓飘回母体；微光可以培育栖息地、增加缸中容量。
-
-**鼠标／触屏：** 拖动母体并松开生出幼体，触碰幼体会回弹；双指拖动画面下潜，双指张合缩放地图，也可用「母水母 · 上层／栖息地 · 下潜」按钮导航。点击栖息地底部的培育按钮升级。首次进入会显示手势教程，「存档」可立即保存、导出或导入进度；平时每 4 秒自动存档。
-
-**可选摄像头：** 单手拇指与食指捏合后拖出幼体，或夹住幼体移动；伸出食指逗弄它们及母体触须。双手同时入镜可缩放、平移地图。开启摄像头时可在深海背景与实时画面之间自由切换。Handsfree.js 8.5.1 和手部模型需要联网加载；视频只在浏览器本地处理，不录制、不保存、不上传。实际识别效果受光线与摄像头角度影响。
-
-- `web/index.html`：网页作品入口
-- `web/assets/connected-reef.png`：一体化珊瑚乐园插画
-- `WEB_ART_DIRECTION.md`：完整艺术设计与交互规格
-- 网页快捷键：`Space` 按压、`C` 摄像头、`M` 静音、`R` 清除触碰记忆
-
-网页版本与下方的 Python 摄像头版本彼此独立，不会改变原有演示的运行方式。
-
-**SQUISH!** is a webcam-based augmented-reality co-creation experience built around a glossy, translucent 3D hydrogel ball. The mirrored live camera becomes the background and the ball follows the midpoint between two detected palms. Bring the palms together from any angle to compress it along the palm-to-palm line, rub them in opposite directions across that line to roll it round again, and release pressure to create a visual ripple and generated musical chord.
-
-The default **Ripple Jelly** mode is the focused Assignment 3 experience. Earlier Cyber Apple, Soft Blob, Crispy Peach, and Ramen Pack studies remain available as development experiments. If the camera is unavailable, the complete main interaction still works with the keyboard or mouse.
-
-![Camera Gel during a squeeze in privacy-safe fallback mode](docs/ripple-jelly-squeeze.png)
-
-The gel is treated as approximately incompressible. Pressure shortens the live force axis while displaced volume expands perpendicular to it and into the implied depth axis; a pressure-dependent superellipse creates flatter contact patches against the palms. The outline, projected 3D mesh, refraction, and rim all follow this axis. One-hand, two-hand, mouse, and keyboard input feed the same deformation model.
-
-| Side compression | Top/bottom compression | Diagonal compression |
-|---|---|---|
-| ![Gel narrowed by side pressure](docs/squeeze-horizontal.png) | ![Gel flattened by top and bottom pressure](docs/squeeze-vertical.png) | ![Gel compressed on a diagonal axis](docs/squeeze-diagonal.png) |
-
-Three collaborators produce different coloured layers. Light, medium, and deep pressure create equal-status wave qualities rather than a score hierarchy.
-
-![Camera Gel after releasing a shared wave](docs/ripple-jelly-release.png)
-
-The documentation screenshots use the camera-free fallback background so no person's image is committed to the public repository. During normal use, this background is replaced by the mirrored live camera feed; frames are never saved or uploaded.
-
-![3D jelly flattened by pressure](docs/3d-jelly-flatten.png)
-
-![3D jelly rolled back into a sphere](docs/3d-jelly-roll-round.png)
-
-The gel does not burst immediately at maximum pressure. Pressure must remain above 93% for about 1.25 seconds while a pink crystallisation bar fills. Dropping the pressure makes that progress retreat; a full release resets it. Only a completed hold produces water droplets and rotating translucent diamond fragments.
-
-![Delayed crystallisation before the burst](docs/crystallising-delay.png)
-
-![Maximum-pressure diamond splash](docs/diamond-splash.png)
-
-This is a calming interactive artwork, not a medical or therapeutic product.
+![Diagram showing the SQUISH input, response, feedback, and next-action loop](docs/interaction-loop.svg)
 
 ## Main interaction
 
-```text
-palm-to-palm axis + approach → directional squash → release → ripple and chord
-              ↑                                           ↓
-              └── tangential opposite rubbing → roll round again ─────┘
-```
+The mother jellyfish is drawn from a soft spring-based contour rather than being scaled as one rigid image. This makes the contact point visibly dent and stretch in the direction of the player's movement.
 
-- **Light pressure:** thin ripples and a bright, airy chord
-- **Medium pressure:** layered connecting waves and a warm chord
-- **Deep pressure:** broad slow waves and a low resonant chord
-- Press `N` to hand the experience to collaborator A, B, or C; recent waves overlap on one shared composition
-- White palm markers and a connecting line confirm where the system sees the hands; the ball follows their midpoint.
+| Input | Program response | Feedback to the player |
+|---|---|---|
+| Move the pointer or index finger closer | Nearby babies follow, orbit, or flee according to personality and trust | Smooth movement and changing expressions |
+| Click or pinch the bell | The touched area compresses while the rest of the body follows with delay | Local dent, face reaction, soft jelly sound |
+| Hold an edge and pull outward | The bell stretches toward the pointer | Increasing stretch, changing prompt, elastic tension |
+| Release after crossing the threshold | A baby separates, turns upright, grows tentacles, and begins to swim | “Pop” motion, sound, glow, updated count and collection |
+| Touch a baby jellyfish | Its emotion and memory values change | Squash, rebound, blush, surprise, sleep/wake, or playful movement |
+| Click open water / make a fist then open it | One bubble is released | The bubble rises and can meet a baby jellyfish |
 
-## Earlier tactile studies
+Mouse, touch, and camera tracking share the same world-coordinate input model. Direct player interaction takes priority over autonomous follow, flee, or social behavior.
 
-![SQUISH preview](docs/preview.png)
+## Features
 
-Two-hand mode changes the deformation direction: the toy narrows horizontally and bulges upward as both hands move together.
+- Local soft-body deformation with elastic rebound
+- Mouse, touch, and optional camera-hand input
+- Baby jellyfish born from any edge of the mother's bell
+- Four top patterns that match the collection archive
+- Calm, Shy, and Playful personalities
+- Emotion, trust, energy, stress, and short-term memory
+- Follow, flee, orbit, sleep, and autonomous social interactions
+- Procedurally generated deep-sea ambience and interaction sounds
+- Bubble interaction
+- English quick guide and responsive interface
+- Versioned autosave, backup recovery, JSON import/export, and collection archive
+- Camera-free fallback when permission or tracking is unavailable
 
-![Cyber Apple in two-hand side-squeeze mode](docs/two-hand-preview.png)
+## Run locally
 
-The crispy variety has staged feedback: fine cracks appear under pressure, the shell bursts to reveal a soft core, and releasing the toy regrows its shell.
-
-![Crispy Peach after the shell breaks](docs/crispy-preview.png)
-
-The supermarket ramen pack adds an audio-visual payoff: light squeezes crinkle the wrapper, then a strong two-hand squeeze arms the seam. Pulling the hands apart tears it open with a generated pop sound and a random surprise. Possible results include double noodles, a seasoning storm, an empty bag, a golden noodle, and a rare Cyber Apple cameo. No downloaded sound file is needed.
-
-![Ramen pack under pressure](docs/ramen-preview.png)
-
-![Ramen pack after it pops](docs/ramen-burst-preview.png)
-
-The enhanced supermarket interaction adds anticipation before the burst and a different result after it.
-
-![Ramen pack armed and waiting for a pull-apart gesture](docs/ramen-tear-preview.png)
-
-![Random double-noodle surprise](docs/ramen-surprise-preview.png)
-
-## 中文三步启动
-
-1. 在 Codex 中选择 **Open Folder**，打开这个 `SQUISH` 文件夹，再打开内置终端。
-2. 第一次运行 `uv sync`，等待依赖安装完成。
-3. 运行 `uv run python run_squish.py`。看到摄像头权限提示时选择允许；两手从左右、上下或斜向靠近，球会沿两手连线被压短并向受力轴的垂直方向鼓起。沿受力轴的切线方向反向搓动可把球搓圆，松手释放波纹和音乐。
-
-如果暂时不想开摄像头，运行 `uv run python run_squish.py --no-camera`，按住空格键捏扁、松开生成波纹，按住 `G` 把球搓圆。按 `N` 交给下一位共创者，按 `C` 暂停或重试摄像头，按 `H` 隐藏说明，按 `Esc` 退出。遇到问题时直接看下面的 **Troubleshooting**，不会因为摄像头不可用而无法完成演示。
-
-## What the prototype includes
-
-- Live one-hand and two-hand tracking with OpenCV and MediaPipe
-- Mirrored live-camera background with a 3D ball anchored between the detected palms
-- Hand-open / hand-closed estimation, normalised for hand size
-- Direct two-palm distance mapped to pressure at any hand angle
-- Live palm-to-palm force-axis tracking with smoothed side, top/bottom, and diagonal deformation
-- Tangential opposing-palm motion detection that separates rolling from camera drift and radial squeezing
-- A software-rendered 3D **Ripple Jelly** with rotating projected surface lines, coloured rim, transmitted light, specular highlights, volume-preserving directional compression, flat contact patches, and roll-to-round recovery
-- A 1.25-second near-maximum-pressure hold before the one-shot water splash, with visible crystallisation progress, rollback on lost pressure, rotating faceted diamonds, and reform-on-release feedback
-- A persistent eight-layer co-creation canvas for three sequential collaborators
-- Three pressure qualities mapped to distinct wave geometry and generated ambient chords
-- Four earlier tactile studies: **Cyber Apple**, **Soft Blob**, **Crispy Peach**, and **Ramen Pack**
-- Per-toy spring deformation, staged cracking, wrapper crinkles, fragments, visible rebound, and automatic repair
-- Procedurally generated crinkle and pop sounds, with mute and audio-unavailable feedback
-- Squeeze-then-pull two-hand packet opening, pre-burst warning, screen shake, flash, random contents, changing flavours, and a session pop counter
-- A squish meter, tracking status, expressive faces, and celebratory particles
-- Automatic keyboard/mouse fallback
-- Resizable Pygame window
-- Camera frames are displayed and processed locally in memory but are never recorded, uploaded, or saved
-
-## Quick start with `uv`
-
-### 1. Open the project in Codex
-
-Open this `SQUISH` folder as your project. In Codex, use **Open Folder** and choose the folder containing this README. Then open the built-in terminal.
-
-### 2. Install everything
-
-Run this once from the `SQUISH` folder:
+No package installation or build step is required.
 
 ```bash
-uv sync
+git clone https://github.com/Only-SerenaLIN/SQUISH-interactive-experience.git
+cd SQUISH-interactive-experience/web
+python3 -m http.server 4173
 ```
 
-`uv` creates an isolated `.venv` and installs Python 3.12 plus the tested OpenCV 4.x / MediaPipe 0.10.21 combination, Pygame, and the test tools. You do not need to activate the environment manually.
+Open <http://127.0.0.1:4173/> in a desktop browser.
 
-If `uv` is not installed, install it from [docs.astral.sh/uv](https://docs.astral.sh/uv/) or run `brew install uv` on macOS.
+Opening `web/index.html` directly may display the artwork, but a local server is recommended for consistent camera permission, script loading, and save behavior.
 
-### 3. Start SQUISH!
+### Browser requirements
 
-```bash
-uv run python run_squish.py
-```
+- A current version of Chrome, Edge, or Safari
+- JavaScript and Web Audio enabled
+- Camera permission only for Camera Gestures or Live View
+- An internet connection for the optional Handsfree.js library loaded from unpkg
 
-The first camera launch on macOS may show a privacy prompt. Choose **Allow**. If no prompt appears and the camera stays unavailable, enable camera access for Codex (or Terminal) in **System Settings → Privacy & Security → Camera**, then restart the app.
-
-To test without a camera:
-
-```bash
-uv run python run_squish.py --no-camera
-```
+Mouse and touch interaction continue to work when the camera is denied, unavailable, or the tracking library cannot load.
 
 ## Controls
 
-| Input | Result |
+| Control | Action |
 |---|---|
-| Open hand | Release, rebound, and leave a wave in Ripple Jelly mode |
-| Closed fist | Build pressure while deforming the jelly |
-| Two palms moving together/apart from any angle | Compress along the line between the palms, then release; on Ramen Pack, squeeze until prompted and pull apart to tear |
-| Two palms rubbing in opposite directions across their connecting line | Rotate and roll Ripple Jelly back into a sphere |
-| Hold `Space` or left mouse | Manual top/bottom compression |
-| Hold `G` | Manual roll-round gesture for Ripple Jelly |
-| Hold, then release `Shift + Space` | Manual side compression; tears an armed Ramen Pack |
-| Arrow keys | Gradually adjust squish |
-| `1`, `2`, `3`, `4`, `5` | Select Cyber Apple, Soft Blob, Crispy Peach, Ramen Pack, or Ripple Jelly |
-| `Tab` | Move to the next toy |
-| `N` | Pass Ripple Jelly to the next collaborator |
-| `M` | Mute/unmute sound |
-| `C` | Pause or restart camera |
-| `H` | Hide/show instructions |
-| `R` | Reset the current toy; clears the shared Ripple Jelly canvas |
-| `Esc` or `Q` | Quit |
+| Move pointer | Approach and influence nearby jellyfish |
+| Click / press | Touch or locally squish a jellyfish |
+| Hold and drag | Stretch the bell |
+| Pull outward from an edge, then release | Nurture a baby jellyfish |
+| Click open water | Release a bubble |
+| `C` | Toggle camera gestures |
+| `B` | Toggle deep-sea / live-camera background |
+| `M` | Toggle ambient music and interaction sounds |
+| `D` | Toggle the emotion debug panel |
+| `R` | Clear the current sea while keeping discoveries |
+| `?` | Open the interaction guide |
 
-Keyboard and mouse input temporarily take priority over the camera, so you can demonstrate both modes during one run.
+Camera mode uses one index finger for light interaction, a thumb–index pinch for squishing and nurturing, and a fist-to-open-palm gesture for releasing one bubble.
 
-## Troubleshooting
+## Collection and save system
 
-**The camera status says “unavailable.”** The app is still usable. Try `C`, check macOS camera permission, close other camera apps, or run `uv run python run_squish.py --camera-index 1` if you have a second camera.
+![SQUISH collection showing owned jellyfish, patterns, personalities, and save controls](docs/squish-collection.png)
 
-**The hand signal feels jumpy.** Keep one hand visible, face the palm toward the camera, use even lighting, and keep your wrist and fingertips inside the frame. The prototype smooths the reading but intentionally stays responsive.
+Each baby has a unique ID, nickname, color, top pattern, personality, emotion values, memory, and birth time. The collection distinguishes between jellyfish currently in the sea and appearances discovered in the past.
 
-**The ball does not reach the diamond splash.** Keep both palms facing the camera and bring their centres to roughly one hand-width apart. When `HOLD STEADY` appears, maintain the pressure until crystallisation reaches 100%. Moving below 93% makes the progress retreat, so an unstable or angled pose may need adjustment.
+The browser automatically saves births, nickname changes, discoveries, settings, tutorial progress, and important memories. The Collection panel also provides **New Game**, **Export Save**, **Import Save**, and **Reset Save**. Destructive actions require confirmation. A damaged save opens recovery choices instead of crashing the experience.
 
-**The wrong gesture is detected.** For one-hand mode, start with a clearly open palm, then make a clear fist. With two hands, keep both palm centres visible and move them together along their connecting line. To roll round, hold the gap fairly steady while moving both palms in opposite directions perpendicular to that line. Overlap or a hand leaving the frame can confuse tracking. That limitation is documented honestly in `PROCESS.md`.
+## Handling mistakes and interruptions
 
-**A package fails to install.** Confirm that `uv run python --version` reports Python 3.11 or 3.12. The project intentionally excludes Python 3.13 because MediaPipe wheel support varies by platform.
+- **Camera permission denied:** mouse and touch remain active.
+- **Hand tracking lost:** the current gesture pauses instead of completing accidentally.
+- **Tracking library unavailable:** a clear message appears and the main interaction remains playable.
+- **Repeated or incomplete pull:** the bell rebounds without creating duplicate babies.
+- **Maximum population reached:** no extra baby is created and the player receives feedback.
+- **Damaged save or invalid import:** retry, restore a backup, or create a new save.
+- **Audio unavailable or muted:** all visual feedback remains functional.
+- **Page hidden:** ambience fades out and the game saves in the background.
 
-**There is no sound.** Press `M` and check the control panel for `sound ON`. If it says `sound unavailable`, the computer did not provide an audio output device; the complete visual interaction still works.
+## Testing
 
-## Check that the code works
+Run the browser-independent JavaScript tests from the repository root:
 
 ```bash
-uv run pytest
+node --test tests/*.test.js
 ```
 
-These tests cover the one-hand gesture score, angle-independent two-hand distance mapping, direction labels, tangent-versus-radial roll detection, volume-preserving deformation, delayed burst charging and rollback, deliberate pull-apart detection, pressure bands, range mapping, invalid input, and spring movement without needing a webcam or display.
+The current suite contains **35 tests** covering emotion and memory, unified pointer behavior, follow/flee steering, social pairing and interruption, save validation, backup recovery, import/export, and discovery history.
 
-## Project map
+Before submission, also check the main interaction in a fresh browser session:
+
+1. Start the local server.
+2. Squish and release the mother jellyfish.
+3. Pull outward from the bell and create one baby.
+4. Touch the baby and observe its reaction.
+5. Deny camera access and confirm mouse input still works.
+6. Refresh and confirm the baby and collection entry return.
+
+## Project structure
 
 ```text
-SQUISH/
-├── src/squish/app.py       # Pygame window, drawing, input and animation
-├── src/squish/camera.py    # OpenCV camera and MediaPipe tracking
-├── src/squish/gesture.py   # Gesture maths and rebound spring
-├── run_squish.py           # Reliable beginner-friendly launch file
-├── tests/test_gesture.py   # Camera-free logic tests
-├── PROCESS.md              # Design process and honest trial template
-├── CREDITS.md              # Libraries, references, and authorship notes
-└── pyproject.toml          # Python and dependency setup
+SQUISH-interactive-experience/
+├── web/
+│   ├── index.html             # Interface and accessible page structure
+│   ├── styles.css             # Responsive deep-sea UI
+│   ├── app.js                 # Canvas world, input, audio, animation and integration
+│   ├── emotion-system.js      # Personality, emotion, stats and memory
+│   ├── behavior-system.js     # Unified pointer, follow, flee and steering
+│   ├── social-system.js       # Autonomous social interactions
+│   └── save-system.js         # Versioned save and collection data
+├── tests/                     # Browser-independent JavaScript tests
+├── docs/                      # README screenshots and diagrams
+├── PROCESS.md                 # Design process, user trial and AI-use record
+└── CREDITS.md                 # Libraries, references and media credits
 ```
 
-## Assignment fit (15 marks)
+## Known limitations
 
-| Criterion | Evidence in this repository |
-|---|---|
-| Interaction and design — 5 | Hand pressure reshapes a translucent 3D jelly; release generates visibly different persistent ripples and musical chords. Palm guides, physical deformation, delayed crystallisation, pressure text, collaborator identity, wave count, sound, and rebound make the loop legible. |
-| Working implementation — 4 | Reproducible `uv` setup, pinned compatible camera libraries, camera-free fallback, automated logic tests, and documented limitations. |
-| Usability and iteration — 3 | Visible controls, camera status, reset/quit paths, denied-camera fallback, and a trial procedure in `PROCESS.md`. **The real user trial is still required.** |
-| Process and communication — 3 | README screenshots, process decisions, AI-use record, credits, and a multi-commit Git history. |
+- Camera quality depends on lighting, hand visibility, device speed, and browser support.
+- Handsfree.js and its hand model use a CDN; camera mode may not start offline.
+- Saves use browser `localStorage`, so they do not automatically follow the player to another browser or device. Export/import is provided.
+- The interface is optimized for desktop presentation. Touch works, but small screens provide less space for the collection and camera preview.
+- The quiet generated ambience may be difficult to hear on small laptop speakers.
+- SQUISH is an interactive artwork, not a medical or therapeutic product.
 
-The work is due **Sunday 1 November 2026 at 23:59 Hong Kong time**. Before submitting, conduct the required real user trial, record one evidence-based decision in `PROCESS.md`, push that commit, and test the public GitHub URL while signed out.
+## Process, trial, and credits
 
-## Sensible next steps
+Development decisions, AI assistance, and iteration notes belong in [`PROCESS.md`](PROCESS.md). Libraries and references belong in [`CREDITS.md`](CREDITS.md).
 
-Keep the submitted version focused on Camera Gel. The four earlier varieties document exploration but should not replace testing and refining hand alignment, gesture thresholds, release feedback, sound balance, and collaborator handoff.
+**Required before final submission:** ask at least one other person to try the experience, record what they attempted or found confusing, and describe one design change or reasoned decision in `PROCESS.md`. Do not invent this observation; it must come from a real trial.
 
-## Git checkpoint plan
+The Git history contains separate commits for the soft-body prototype, gesture input, emotions and memory, follow/flee behavior, social interaction, collection and saves, visual redesign, pattern rendering, and generative audio.
 
-The repository uses small, explainable checkpoints. Continue in this style:
+## Visual evidence to add before submission
 
-1. `chore: set up uv project and pure interaction logic`
-2. `feat: add webcam tracking and squishy visual experience`
-3. `docs: add beginner guide process template and credits`
-4. After a real trial: `docs: record user trial observations`
-5. After improvements: `fix: tune gesture thresholds from trial feedback`
+The repository already includes the main experience screenshot, collection screenshot, and interaction-loop diagram above. Two optional additions would make the submission easier to assess:
 
-Do not claim steps 4 or 5 until they actually happen.
+1. **An 8–12 second screen recording** showing one squish, rebound, baby birth, and the ambient sound. Save it as `docs/squish-demo.mp4` and link it here or in the repository description.
+2. **A privacy-safe gesture image** showing only a hand silhouette or cropped tracking view—no face, room details, or another person's recording. Save it as `docs/camera-gesture-guide.png`.
 
+## Repository
+
+Public repository: <https://github.com/Only-SerenaLIN/SQUISH-interactive-experience>
+
+Live demo: not currently deployed; use the local run instructions above.

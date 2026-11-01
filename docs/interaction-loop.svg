@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="330" viewBox="0 0 1200 330" role="img" aria-labelledby="title desc">
+  <title id="title">SQUISH interaction loop</title>
+  <desc id="desc">Four connected stages: input, response, feedback, and next action.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a3043"/><stop offset="1" stop-color="#041526"/></linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9de8e1"/><stop offset="1" stop-color="#f1b2d6"/></linearGradient>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#8edbd6"/></marker>
+  </defs>
+  <rect width="1200" height="330" rx="28" fill="url(#bg)"/>
+  <circle cx="1060" cy="45" r="130" fill="#eaa8d1" opacity=".05"/><circle cx="130" cy="300" r="170" fill="#83ddd9" opacity=".04"/>
+  <text x="60" y="52" fill="#a6deda" font-family="Arial, sans-serif" font-size="13" font-weight="700" letter-spacing="3">THE INTERACTION LOOP</text>
+  <g font-family="Arial, sans-serif">
+    <g transform="translate(55 92)"><rect width="235" height="166" rx="20" fill="#0d3a4d" stroke="#b9ebe7" stroke-opacity=".2"/><circle cx="34" cy="36" r="15" fill="#9de8e1" opacity=".16"/><text x="34" y="41" text-anchor="middle" fill="#c8f6f2" font-size="14" font-weight="700">1</text><text x="58" y="42" fill="#f5fffd" font-size="20" font-weight="700">INPUT</text><text x="26" y="82" fill="#c5dfdd" font-size="15">Click · drag · pinch</text><text x="26" y="109" fill="#c5dfdd" font-size="15">Pull outward · touch</text><text x="26" y="136" fill="#c5dfdd" font-size="15">Fist → open palm</text></g>
+    <g transform="translate(340 92)"><rect width="235" height="166" rx="20" fill="#0d3a4d" stroke="#b9ebe7" stroke-opacity=".2"/><circle cx="34" cy="36" r="15" fill="#b9dce9" opacity=".15"/><text x="34" y="41" text-anchor="middle" fill="#d8eff7" font-size="14" font-weight="700">2</text><text x="58" y="42" fill="#f5fffd" font-size="20" font-weight="700">RESPONSE</text><text x="26" y="82" fill="#c5dfdd" font-size="15">Local deformation</text><text x="26" y="109" fill="#c5dfdd" font-size="15">Elastic stretch and recoil</text><text x="26" y="136" fill="#c5dfdd" font-size="15">Emotion or baby birth</text></g>
+    <g transform="translate(625 92)"><rect width="235" height="166" rx="20" fill="#0d3a4d" stroke="#f1b2d6" stroke-opacity=".25"/><circle cx="34" cy="36" r="15" fill="#f1b2d6" opacity=".16"/><text x="34" y="41" text-anchor="middle" fill="#ffd6ec" font-size="14" font-weight="700">3</text><text x="58" y="42" fill="#f5fffd" font-size="20" font-weight="700">FEEDBACK</text><text x="26" y="82" fill="#c5dfdd" font-size="15">Motion and expression</text><text x="26" y="109" fill="#c5dfdd" font-size="15">Prompt, glow, count</text><text x="26" y="136" fill="#c5dfdd" font-size="15">Sound and ambience</text></g>
+    <g transform="translate(910 92)"><rect width="235" height="166" rx="20" fill="#0d3a4d" stroke="#b9ebe7" stroke-opacity=".2"/><circle cx="34" cy="36" r="15" fill="#d7b6ed" opacity=".15"/><text x="34" y="41" text-anchor="middle" fill="#eedcff" font-size="14" font-weight="700">4</text><text x="58" y="42" fill="#f5fffd" font-size="20" font-weight="700">NEXT ACTION</text><text x="26" y="82" fill="#c5dfdd" font-size="15">Try another pressure</text><text x="26" y="109" fill="#c5dfdd" font-size="15">Play with a baby</text><text x="26" y="136" fill="#c5dfdd" font-size="15">Collect · reset · continue</text></g>
+  </g>
+  <g fill="none" stroke="#8edbd6" stroke-width="2" stroke-opacity=".68" marker-end="url(#arrow)"><path d="M296 175H330"/><path d="M581 175H615"/><path d="M866 175H900"/></g>
+  <path d="M1027 272C1010 316 205 316 178 272" fill="none" stroke="url(#accent)" stroke-width="2" stroke-opacity=".42" marker-end="url(#arrow)"/>
+</svg>
